@@ -107,7 +107,10 @@ export async function computePnl(): Promise<void> {
 
   // Also process gas deductions separate from ERC-20 transfers
   const ethMeta = tokenMeta.get(NATIVE_TOKEN_ADDRESS);
-  for (const gasTx of txGasMap.values()) {
+  const gasTxList = [...txGasMap.values()];
+  console.log(`\n  Processing ${gasTxList.length} gas transactions...`);
+  let gasProcessed = 0;
+  for (const gasTx of gasTxList) {
     const date = tsToDate(gasTx.blockTimestamp || 0);
     if (!ethMeta?.isPriced) continue;
     const ethAmount = humanAmount(gasTx.gasEthWei, 18);
@@ -117,10 +120,18 @@ export async function computePnl(): Promise<void> {
     const lot = getLot(NATIVE_TOKEN_ADDRESS);
     const { lot: newLot } = processGas(lot, ethAmount, ethPrice);
     lotState.set(NATIVE_TOKEN_ADDRESS, newLot);
+
+    gasProcessed++;
+    if (gasProcessed % 500 === 0 || gasProcessed === gasTxList.length) {
+      console.log(`  ${gasProcessed}/${gasTxList.length} gas txs processed`);
+    }
   }
 
   // Persist lot state
-  for (const [tokenAddress, lot] of lotState.entries()) {
+  const lotEntries = [...lotState.entries()];
+  console.log(`\n  Persisting ${lotEntries.length} token lots...`);
+  let lotsWritten = 0;
+  for (const [tokenAddress, lot] of lotEntries) {
     await db.insert(lots)
       .values({
         tokenAddress,
@@ -137,12 +148,20 @@ export async function computePnl(): Promise<void> {
         },
       })
       .run();
+    lotsWritten++;
+    if (lotsWritten % 10 === 0 || lotsWritten === lotEntries.length) {
+      console.log(`  ${lotsWritten}/${lotEntries.length} lots persisted`);
+    }
   }
 
   // Compute and persist daily snapshots
   const today = new Date().toISOString().slice(0, 10);
-  for (const [date, dayLots] of dailyLots.entries()) {
-    if (date > today) continue;
+  const snapshotDates = [...dailyLots.entries()].filter(([date]) => date <= today);
+  console.log(`\n  Computing ${snapshotDates.length} daily snapshots...`);
+  let snapshotsWritten = 0;
+  for (const [date, dayLots] of snapshotDates) {
+    const tokenCount = dayLots.size;
+    process.stdout.write(`  [${snapshotsWritten + 1}/${snapshotDates.length}] ${date} — ${tokenCount} tokens...`);
 
     let totalValueUsd = 0;
     let totalCostBasisUsd = 0;
@@ -178,7 +197,12 @@ export async function computePnl(): Promise<void> {
         },
       })
       .run();
+
+    snapshotsWritten++;
+    process.stdout.write(` $${totalValueUsd.toFixed(0)}\n`);
   }
+
+  console.log(`\n  Done.`);
 }
 
 // Recompute today's daily snapshot from the current lots table.

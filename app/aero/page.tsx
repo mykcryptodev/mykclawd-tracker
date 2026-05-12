@@ -103,6 +103,9 @@ export default async function AeroPage() {
         <SiteHeader
           address={latest?.address ?? ""}
           asOf={latest ? new Date(latest.ts * 1000).toISOString().slice(0, 16).replace("T", " ") + " UTC" : "—"}
+          title="Aerodrome Rebalancer"
+          titleHelpHref="https://x.com/myk_clawd/status/2052817777862328482"
+          titleHelpLabel="Thread on Aerodrome LP (opens on X)"
         />
         <div className="flex flex-1 flex-col">
           <div className="@container/main flex flex-1 flex-col gap-2">

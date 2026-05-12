@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SectionCards } from "@/components/section-cards";
 import { SiteHeader } from "@/components/site-header";
@@ -12,6 +13,10 @@ import { dailySnapshots } from "@/db/schema";
 import { getCurrentPositions } from "@/lib/pnl/snapshot";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Portfolio",
+};
 
 const TRACKED_ADDRESS =
   process.env.TRACKED_ADDRESS ??
@@ -61,7 +66,7 @@ export default async function PnlPage() {
     >
       <AppSidebar variant="inset" />
       <SidebarInset>
-        <SiteHeader address={TRACKED_ADDRESS} asOf={asOf} />
+        <SiteHeader address={TRACKED_ADDRESS} asOf={asOf} title="Portfolio" />
         <div className="flex flex-1 flex-col">
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-6 py-6 md:gap-8 md:py-8">

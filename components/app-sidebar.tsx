@@ -1,8 +1,8 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { NavSecondary } from "@/components/nav-secondary"
 import {
   Sidebar,
   SidebarContent,
@@ -16,27 +16,12 @@ import {
 import {
   LayoutDashboardIcon,
   DropletsIcon,
-  Settings2Icon,
-  CircleHelpIcon,
   HomeIcon,
 } from "lucide-react"
 
-const navSecondary = [
-  {
-    title: "Settings",
-    url: "#",
-    icon: <Settings2Icon />,
-  },
-  {
-    title: "Get Help",
-    url: "#",
-    icon: <CircleHelpIcon />,
-  },
-]
-
 const navMain = [
   { title: "Home", url: "/", icon: <HomeIcon /> },
-  { title: "PnL", url: "/pnl", icon: <LayoutDashboardIcon /> },
+  { title: "Portfolio", url: "/pnl", icon: <LayoutDashboardIcon /> },
   { title: "Aero LP", url: "/aero", icon: <DropletsIcon /> },
 ]
 
@@ -48,11 +33,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              className="data-[slot=sidebar-menu-button]:p-1.5!"
+              className="data-[slot=sidebar-menu-button]:gap-2 data-[slot=sidebar-menu-button]:p-1.5!"
               render={<a href="/" />}
             >
+              <Image
+                src="/images/mykclawd.jpg"
+                alt=""
+                width={24}
+                height={24}
+                className="size-6 shrink-0 rounded-[30%] object-cover"
+                priority
+              />
               <span className="text-base font-[family-name:var(--font-segment)] tracking-tight">
-                PnL
+                myk_clawd
               </span>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -77,7 +70,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
     </Sidebar>
   )
