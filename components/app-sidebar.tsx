@@ -35,7 +35,7 @@ const navSecondary = [
 ]
 
 const navMain = [
-  { title: "home", url: "/", icon: <HomeIcon /> },
+  { title: "Home", url: "/", icon: <HomeIcon /> },
   { title: "PnL", url: "/pnl", icon: <LayoutDashboardIcon /> },
   { title: "Aero LP", url: "/aero", icon: <DropletsIcon /> },
 ]

@@ -9,7 +9,11 @@ import {
 import { getPriceForDate } from "../ingest/prices";
 import { processInbound, processOutbound, processGas, type Lot } from "./wavg";
 import { NATIVE_TOKEN_ADDRESS } from "../rpc";
-import { eq } from "drizzle-orm";
+
+/** Omitted from PnL dashboard positions, totals, and allocation (case-insensitive). */
+const PNL_DASHBOARD_EXCLUDED_CONTRACTS = new Set(
+  ["0xe3c5fcfbfea42d5ce2492fd82c239b5503f17ba3"].map((a) => a.toLowerCase())
+);
 
 function tsToDate(unix: number): string {
   return new Date(unix * 1000).toISOString().slice(0, 10);
@@ -250,6 +254,9 @@ export function getCurrentPositions(today: string): {
   let totalRealizedUsd = 0;
 
   for (const token of allTokens) {
+    if (PNL_DASHBOARD_EXCLUDED_CONTRACTS.has(token.contractAddress.toLowerCase())) {
+      continue;
+    }
     const lot = lotMap.get(token.contractAddress);
     if (!lot) continue;
     const qty = parseFloat(lot.quantity);

@@ -1,31 +1,21 @@
 import { AppSidebar } from "@/components/app-sidebar";
-import { HomeLanding, type HomePnlSnapshot } from "@/components/home-landing";
+import { HomeLanding } from "@/components/home-landing";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import {
+  fetchOpenPullRequestsByAuthor,
+  githubPullsCreatedByUrl,
+} from "@/lib/github/open-pull-requests";
 
-async function getPnlSnapshot(): Promise<HomePnlSnapshot | null> {
-  try {
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-    const res = await fetch(`${base}/api/pnl`, { cache: "no-store" });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return {
-      asOf: data?.asOf ?? "—",
-      totalValueUsd: data?.totalValueUsd ?? 0,
-      totalRealizedUsd: data?.totalRealizedUsd ?? 0,
-      totalUnrealizedUsd: data?.totalUnrealizedUsd ?? 0,
-      byToken: (data?.byToken ?? []).map((p: { symbol: string; valueUsd: number }) => ({
-        symbol: p.symbol,
-        valueUsd: p.valueUsd,
-      })),
-    };
-  } catch {
-    return null;
-  }
-}
+const TRACKED_ADDRESS =
+  process.env.TRACKED_ADDRESS ??
+  "0xcef6e6639e0c60d5c0805670f4363a6698081fab";
+
+const GITHUB_LOGIN = process.env.GITHUB_LOGIN?.trim() || "mykclawd";
 
 export default async function HomePage() {
-  const pnl = await getPnlSnapshot();
+  const openPullRequests = await fetchOpenPullRequestsByAuthor();
+  const githubPullsUrl = githubPullsCreatedByUrl(GITHUB_LOGIN);
 
   return (
     <SidebarProvider
@@ -39,7 +29,11 @@ export default async function HomePage() {
       <AppSidebar variant="inset" />
       <SidebarInset>
         <SiteHeader variant="minimal" title="myk_clawd" />
-        <HomeLanding pnl={pnl} />
+        <HomeLanding
+          trackedAddress={TRACKED_ADDRESS}
+          openPullRequests={openPullRequests}
+          githubPullsUrl={githubPullsUrl}
+        />
       </SidebarInset>
     </SidebarProvider>
   );
