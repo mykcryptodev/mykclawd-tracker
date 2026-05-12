@@ -52,7 +52,7 @@ export function SectionCards({
           <CardDescription className="text-[11px] uppercase tracking-widest font-medium">
             Portfolio Value
           </CardDescription>
-          <CardTitle className="text-4xl font-[family-name:var(--font-segment)] tabular-nums tracking-tight @[250px]/card:text-5xl">
+          <CardTitle className="text-4xl font-[family-name:var(--font-segment)] font-bold tabular-nums tracking-tight @[250px]/card:text-5xl">
             {usd(totalValueUsd)}
           </CardTitle>
         </CardHeader>
@@ -71,7 +71,7 @@ export function SectionCards({
             Unrealized PnL
           </CardDescription>
           <CardTitle
-            className={`text-4xl font-[family-name:var(--font-segment)] tabular-nums tracking-tight @[250px]/card:text-5xl ${pnlClass(totalUnrealizedUsd)}`}
+            className={`text-4xl font-[family-name:var(--font-segment)] font-bold tabular-nums tracking-tight @[250px]/card:text-5xl ${pnlClass(totalUnrealizedUsd)}`}
           >
             {usd(totalUnrealizedUsd)}
           </CardTitle>
@@ -88,7 +88,7 @@ export function SectionCards({
             Realized PnL
           </CardDescription>
           <CardTitle
-            className={`text-4xl font-[family-name:var(--font-segment)] tabular-nums tracking-tight @[250px]/card:text-5xl ${pnlClass(totalRealizedUsd)}`}
+            className={`text-4xl font-[family-name:var(--font-segment)] font-bold tabular-nums tracking-tight @[250px]/card:text-5xl ${pnlClass(totalRealizedUsd)}`}
           >
             {usd(totalRealizedUsd)}
           </CardTitle>

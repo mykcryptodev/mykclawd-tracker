@@ -31,7 +31,7 @@ export function AeroSummaryCards({ latest }: { latest: AeroLatest }) {
       <Card className="@container/card border-border/60">
         <CardHeader className="gap-3">
           <CardDescription className="text-[11px] uppercase tracking-widest font-medium">Strategy value</CardDescription>
-          <CardTitle className="text-3xl font-[family-name:var(--font-segment)] tabular-nums tracking-tight @[250px]/card:text-4xl">
+          <CardTitle className="text-3xl font-[family-name:var(--font-segment)] font-bold tabular-nums tracking-tight @[250px]/card:text-4xl">
             {usd(u.stratUsd)}
           </CardTitle>
         </CardHeader>
@@ -45,7 +45,7 @@ export function AeroSummaryCards({ latest }: { latest: AeroLatest }) {
       <Card className="@container/card border-border/60">
         <CardHeader className="gap-3">
           <CardDescription className="text-[11px] uppercase tracking-widest font-medium">HODL baseline</CardDescription>
-          <CardTitle className="text-3xl font-[family-name:var(--font-segment)] tabular-nums tracking-tight @[250px]/card:text-4xl">
+          <CardTitle className="text-3xl font-[family-name:var(--font-segment)] font-bold tabular-nums tracking-tight @[250px]/card:text-4xl">
             {usd(u.hodlUsd)}
           </CardTitle>
         </CardHeader>
@@ -57,7 +57,7 @@ export function AeroSummaryCards({ latest }: { latest: AeroLatest }) {
       <Card className="@container/card border-border/60">
         <CardHeader className="gap-3">
           <CardDescription className="text-[11px] uppercase tracking-widest font-medium">Δ vs HODL</CardDescription>
-          <CardTitle className={`text-3xl font-[family-name:var(--font-segment)] tabular-nums tracking-tight @[250px]/card:text-4xl ${pnlClass(u.deltaUsd)}`}>
+          <CardTitle className={`text-3xl font-[family-name:var(--font-segment)] font-bold tabular-nums tracking-tight @[250px]/card:text-4xl ${pnlClass(u.deltaUsd)}`}>
             {u.deltaUsd >= 0 ? "+" : ""}{usd(u.deltaUsd)}
           </CardTitle>
         </CardHeader>
@@ -73,7 +73,7 @@ export function AeroSummaryCards({ latest }: { latest: AeroLatest }) {
       <Card className="@container/card border-border/60">
         <CardHeader className="gap-3">
           <CardDescription className="text-[11px] uppercase tracking-widest font-medium">Gas paid</CardDescription>
-          <CardTitle className="text-3xl font-[family-name:var(--font-segment)] tabular-nums tracking-tight @[250px]/card:text-4xl">
+          <CardTitle className="text-3xl font-[family-name:var(--font-segment)] font-bold tabular-nums tracking-tight @[250px]/card:text-4xl">
             {usd(u.totalGasUsd)}
           </CardTitle>
         </CardHeader>
