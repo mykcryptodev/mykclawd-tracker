@@ -8,14 +8,14 @@ import { ingestAeroTransfers } from "./transfers";
 import { computeAeroSnapshot, saveAeroSnapshot, AeroSnapshot } from "./snapshot";
 import { AERO_DEFAULT_ADDRESS } from "./constants";
 
-function getMonitoredAddress(): string {
-  const row = db.select().from(aeroConfig).where(eq(aeroConfig.key, "monitored_address")).get();
+async function getMonitoredAddress(): Promise<string> {
+  const row = await db.select().from(aeroConfig).where(eq(aeroConfig.key, "monitored_address")).get();
   if (row) return row.value.toLowerCase();
   return (process.env.AERO_MONITOR_ADDRESS ?? AERO_DEFAULT_ADDRESS).toLowerCase();
 }
 
-export function setMonitoredAddress(addr: string) {
-  db.insert(aeroConfig)
+export async function setMonitoredAddress(addr: string) {
+  await db.insert(aeroConfig)
     .values({ key: "monitored_address", value: addr.toLowerCase() })
     .onConflictDoUpdate({ target: aeroConfig.key, set: { value: addr.toLowerCase() } })
     .run();
@@ -27,14 +27,14 @@ export async function ingestAeroMonitor(daysBack = 14): Promise<{
   newTransfers: number;
   snapshot: AeroSnapshot | null;
 }> {
-  const address = getMonitoredAddress();
+  const address = await getMonitoredAddress();
   const position = await discoverAeroPosition(address, daysBack);
   if (!position) {
     return { address, position: null, newTransfers: 0, snapshot: null };
   }
   const { newRows } = await ingestAeroTransfers(position, daysBack);
   const snapshot = await computeAeroSnapshot(position, daysBack);
-  saveAeroSnapshot(snapshot);
+  await saveAeroSnapshot(snapshot);
   return { address, position, newTransfers: newRows, snapshot };
 }
 

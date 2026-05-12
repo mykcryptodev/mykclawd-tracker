@@ -42,7 +42,7 @@ export async function runSync(
   const emit = (step: number, label: string, detail?: string) =>
     onProgress?.({ step, totalSteps: TOTAL_STEPS, label, detail });
 
-  runMigrations();
+  await runMigrations();
 
   emit(1, "Ingesting transfers");
   const { newTransfers, blocksScanned } = await ingestTransfers(TRACKED_ADDRESS);
@@ -92,9 +92,9 @@ export async function runSync(
   // Transfer-event replay can miss outbound movements (internal calls, protocol-level
   // burns, or SQL ingestion gaps), leaving phantom balances.
   emit(8, "Reconciling balances");
-  const allLots = db.select().from(lots).all();
+  const allLots = await db.select().from(lots).all();
   const decimalsMap = new Map(
-    db.select().from(tokens).all().map((t) => [t.contractAddress, t.decimals])
+    (await db.select().from(tokens).all()).map((t) => [t.contractAddress, t.decimals])
   );
 
   let corrected = 0;
@@ -120,7 +120,7 @@ export async function runSync(
 
       const discrepancyPct = Math.abs(onChainQty - computedQty) / computedQty;
       if (onChainQty < computedQty && discrepancyPct > 0.01) {
-        db.insert(lots)
+        await db.insert(lots)
           .values({
             tokenAddress: lot.tokenAddress,
             quantity: onChainQty.toString(),
@@ -138,7 +138,7 @@ export async function runSync(
       // RPC failure — leave the lot as-is
     }
   }
-  recomputeTodaySnapshot();
+  await recomputeTodaySnapshot();
   emit(8, "Reconciling balances", `${corrected} corrected`);
 
   emit(9, "Aerodrome LP monitor");

@@ -2,7 +2,7 @@ import "dotenv/config";
 import { runMigrations } from "../db/migrate";
 import { ingestAeroMonitor } from "../lib/aero";
 async function main() {
-  runMigrations();
+  await runMigrations();
   console.log("Running aero monitor…");
   const r = await ingestAeroMonitor(14);
   console.log("Position:", r.position ? `${r.position.tokenMeta0.sym}/${r.position.tokenMeta1.sym}` : "none");

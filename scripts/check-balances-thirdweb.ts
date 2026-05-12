@@ -21,8 +21,8 @@ async function main() {
   console.log(`ThirdWeb found ${owned.length} tokens with non-zero balance\n`);
 
   // Build lookup maps from our DB
-  const allLots = db.select().from(lots).all();
-  const allTokens = db.select().from(tokens).all();
+  const allLots = await db.select().from(lots).all();
+  const allTokens = await db.select().from(tokens).all();
   const lotMap = new Map(allLots.map((l) => [l.tokenAddress.toLowerCase(), parseFloat(l.quantity)]));
   const tokenMap = new Map(allTokens.map((t) => [t.contractAddress.toLowerCase(), t]));
 

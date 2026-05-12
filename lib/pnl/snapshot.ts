@@ -29,7 +29,7 @@ function humanAmount(rawAmount: string, decimals: number): number {
 
 export async function computePnl(): Promise<void> {
   // Load all tokens (for decimals)
-  const allTokens = db.select().from(tokens).all();
+  const allTokens = await db.select().from(tokens).all();
   const tokenMeta = new Map(
     allTokens.map((t) => [
       t.contractAddress,
@@ -38,15 +38,15 @@ export async function computePnl(): Promise<void> {
   );
 
   // Load all transfers sorted chronologically
-  const allTransfers = db
+  const allTransfers = (await db
     .select()
     .from(transfers)
-    .all()
+    .all())
     .sort((a, b) => a.blockTimestamp - b.blockTimestamp);
 
   // Load gas data
   const txGasMap = new Map(
-    db.select().from(transactions).all()
+    (await db.select().from(transactions).all())
       .filter((t) => t.gasEthWei !== "0")
       .map((t) => [t.txHash, t])
   );
@@ -76,7 +76,7 @@ export async function computePnl(): Promise<void> {
     if (!meta?.isPriced) continue; // skip unpriced tokens
 
     const amount = humanAmount(transfer.rawAmount, meta.decimals);
-    const priceUsd = getPriceForDate(tokenAddr, date);
+    const priceUsd = await getPriceForDate(tokenAddr, date);
     if (priceUsd === 0) continue; // no price data for this date — skip event
 
     let lot = getLot(tokenAddr);
@@ -111,7 +111,7 @@ export async function computePnl(): Promise<void> {
     const date = tsToDate(gasTx.blockTimestamp || 0);
     if (!ethMeta?.isPriced) continue;
     const ethAmount = humanAmount(gasTx.gasEthWei, 18);
-    const ethPrice = getPriceForDate(NATIVE_TOKEN_ADDRESS, date);
+    const ethPrice = await getPriceForDate(NATIVE_TOKEN_ADDRESS, date);
     if (ethPrice === 0 || ethAmount === 0) continue;
 
     const lot = getLot(NATIVE_TOKEN_ADDRESS);
@@ -121,7 +121,7 @@ export async function computePnl(): Promise<void> {
 
   // Persist lot state
   for (const [tokenAddress, lot] of lotState.entries()) {
-    db.insert(lots)
+    await db.insert(lots)
       .values({
         tokenAddress,
         quantity: lot.quantity.toString(),
@@ -150,7 +150,7 @@ export async function computePnl(): Promise<void> {
     let realizedPnlUsdCum = 0;
 
     for (const [tokenAddress, lot] of dayLots.entries()) {
-      const priceUsd = getPriceForDate(tokenAddress, date);
+      const priceUsd = await getPriceForDate(tokenAddress, date);
       const value = lot.quantity * priceUsd;
       const costBasis = lot.quantity * lot.avgCostUsd;
 
@@ -160,7 +160,7 @@ export async function computePnl(): Promise<void> {
       realizedPnlUsdCum += lot.realizedPnlUsd;
     }
 
-    db.insert(dailySnapshots)
+    await db.insert(dailySnapshots)
       .values({
         date,
         totalValueUsd,
@@ -183,13 +183,13 @@ export async function computePnl(): Promise<void> {
 
 // Recompute today's daily snapshot from the current lots table.
 // Call this after any lot quantity overrides (e.g. ETH balance correction).
-export function recomputeTodaySnapshot(): void {
+export async function recomputeTodaySnapshot(): Promise<void> {
   const today = new Date().toISOString().slice(0, 10);
-  const allLots = db.select().from(lots).all();
+  const allLots = await db.select().from(lots).all();
   const tokenLiqMap = new Map(
-    db.select({ contractAddress: tokens.contractAddress, liquidityUsd: tokens.liquidityUsd })
+    (await db.select({ contractAddress: tokens.contractAddress, liquidityUsd: tokens.liquidityUsd })
       .from(tokens)
-      .all()
+      .all())
       .map((t) => [t.contractAddress, t.liquidityUsd])
   );
 
@@ -200,7 +200,7 @@ export function recomputeTodaySnapshot(): void {
 
   for (const lot of allLots) {
     const qty = parseFloat(lot.quantity);
-    const price = getPriceForDate(lot.tokenAddress, today);
+    const price = await getPriceForDate(lot.tokenAddress, today);
     const rawValue = qty * price;
     const liq = tokenLiqMap.get(lot.tokenAddress);
     const value =
@@ -212,7 +212,7 @@ export function recomputeTodaySnapshot(): void {
     realizedPnlUsdCum += lot.realizedPnlUsd;
   }
 
-  db.insert(dailySnapshots)
+  await db.insert(dailySnapshots)
     .values({ date: today, totalValueUsd, totalCostBasisUsd, unrealizedPnlUsd, realizedPnlUsdCum })
     .onConflictDoUpdate({
       target: dailySnapshots.date,
@@ -239,14 +239,14 @@ export interface TokenPosition {
   imageChecked: boolean;
 }
 
-export function getCurrentPositions(today: string): {
+export async function getCurrentPositions(today: string): Promise<{
   positions: TokenPosition[];
   totalValueUsd: number;
   totalRealizedUsd: number;
   totalUnrealizedUsd: number;
-} {
-  const allTokens = db.select().from(tokens).all();
-  const allLots = db.select().from(lots).all();
+}> {
+  const allTokens = await db.select().from(tokens).all();
+  const allLots = await db.select().from(lots).all();
   const lotMap = new Map(allLots.map((l) => [l.tokenAddress, l]));
 
   const positions: TokenPosition[] = [];
@@ -263,7 +263,7 @@ export function getCurrentPositions(today: string): {
     if (qty <= 0 && lot.realizedPnlUsd === 0) continue;
 
     const currentPrice = token.isPriced
-      ? getPriceForDate(token.contractAddress, today)
+      ? await getPriceForDate(token.contractAddress, today)
       : 0;
     const rawValueUsd = qty * currentPrice;
     const valueUsd =

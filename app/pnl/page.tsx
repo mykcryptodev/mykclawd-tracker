@@ -6,6 +6,12 @@ import { AllocationChart } from "@/components/allocation-chart";
 import { TokenTable } from "@/components/token-table";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { runMigrations } from "@/db/migrate";
+import { db } from "@/db/client";
+import { dailySnapshots } from "@/db/schema";
+import { getCurrentPositions } from "@/lib/pnl/snapshot";
+
+export const dynamic = "force-dynamic";
 
 const TRACKED_ADDRESS =
   process.env.TRACKED_ADDRESS ??
@@ -13,10 +19,22 @@ const TRACKED_ADDRESS =
 
 async function getPnlData() {
   try {
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-    const res = await fetch(`${base}/api/pnl`, { cache: "no-store" });
-    if (!res.ok) return null;
-    return res.json();
+    await runMigrations();
+    const today = new Date().toISOString().slice(0, 10);
+    const { positions, totalValueUsd, totalRealizedUsd, totalUnrealizedUsd } =
+      await getCurrentPositions(today);
+    const series = (await db.select().from(dailySnapshots).all()).sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
+
+    return {
+      asOf: today,
+      totalValueUsd,
+      totalRealizedUsd,
+      totalUnrealizedUsd,
+      byToken: positions,
+      dailySeries: series,
+    };
   } catch {
     return null;
   }

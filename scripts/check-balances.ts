@@ -6,8 +6,8 @@ import { erc20Abi } from "viem";
 const ADDRESS = (process.env.TRACKED_ADDRESS ?? "0xcef6e6639e0c60d5c0805670f4363a6698081fab") as `0x${string}`;
 
 async function main() {
-  const allLots = db.select().from(lots).all();
-  const tokenMap = new Map(db.select().from(tokens).all().map((t) => [t.contractAddress, t]));
+  const allLots = await db.select().from(lots).all();
+  const tokenMap = new Map((await db.select().from(tokens).all()).map((t) => [t.contractAddress, t]));
 
   const held = allLots
     .map((l) => ({ ...l, qty: parseFloat(l.quantity) }))

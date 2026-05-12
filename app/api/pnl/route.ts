@@ -5,16 +5,16 @@ import { db } from "../../../db/client";
 import { dailySnapshots } from "../../../db/schema";
 
 export async function GET() {
-  runMigrations();
+  await runMigrations();
 
   const today = new Date().toISOString().slice(0, 10);
   const { positions, totalValueUsd, totalRealizedUsd, totalUnrealizedUsd } =
-    getCurrentPositions(today);
+    await getCurrentPositions(today);
 
-  const series = db
+  const series = (await db
     .select()
     .from(dailySnapshots)
-    .all()
+    .all())
     .sort((a, b) => a.date.localeCompare(b.date));
 
   return NextResponse.json({

@@ -1,4 +1,4 @@
-import { db } from "../../db/client";
+import { changedRows, db } from "../../db/client";
 import { transfers, syncState, tokens } from "../../db/schema";
 import { getTransferLogs, getWethEvents, getCurrentBlock, NATIVE_TOKEN_ADDRESS, WETH_ADDRESS } from "../rpc";
 import { eq } from "drizzle-orm";
@@ -237,16 +237,16 @@ async function fetchAdaptive(
   return rows;
 }
 
-function upsertTransfers(rows: RawTransfer[]): number {
+async function upsertTransfers(rows: RawTransfer[]): Promise<number> {
   let added = 0;
   for (const t of rows) {
-    const tokenExists = db
+    const tokenExists = await db
       .select()
       .from(tokens)
       .where(eq(tokens.contractAddress, t.tokenAddress))
       .get();
     if (!tokenExists) {
-      db.insert(tokens)
+      await db.insert(tokens)
         .values({
           contractAddress: t.tokenAddress,
           symbol: "",
@@ -258,12 +258,12 @@ function upsertTransfers(rows: RawTransfer[]): number {
         .onConflictDoNothing()
         .run();
     }
-    const result = db
+    const result = await db
       .insert(transfers)
       .values(t)
       .onConflictDoNothing()
       .run();
-    if (result.changes > 0) added++;
+    if (changedRows(result) > 0) added++;
   }
   return added;
 }
@@ -288,21 +288,21 @@ type BasescanTx = {
 // When WETH.withdraw() is called, the WETH contract sends ETH to the caller via an
 // internal call — NOT a normal tx value, so it won't be in the Blockscout tx list.
 // The Withdrawal event amount is always exactly equal to the ETH received.
-export function synthesizeEthFromWethWithdrawals(): number {
+export async function synthesizeEthFromWethWithdrawals(): Promise<number> {
   const ZERO = "0x0000000000000000000000000000000000000000";
   // Find all WETH Withdrawal events: WETH "out" transfers with counterparty = zero addr
-  const withdrawals = db
+  const withdrawals = (await db
     .select()
     .from(transfers)
     .where(eq(transfers.tokenAddress, WETH_ADDRESS))
-    .all()
+    .all())
     .filter((t) => t.direction === "out" && t.counterparty === ZERO && t.logIndex >= 0);
 
   let added = 0;
   for (const w of withdrawals) {
     // logIndex for synthetic ETH "in" — must be unique per txHash, must not collide with -1
     const syntheticLogIndex = -(w.logIndex + 100);
-    const result = db
+    const result = await db
       .insert(transfers)
       .values({
         txHash: w.txHash,
@@ -316,7 +316,7 @@ export function synthesizeEthFromWethWithdrawals(): number {
       })
       .onConflictDoNothing()
       .run();
-    if (result.changes > 0) added++;
+    if (changedRows(result) > 0) added++;
   }
   return added;
 }
@@ -352,7 +352,7 @@ export async function ingestNativeEthBackfill(address: string): Promise<number> 
         };
       });
 
-    added += upsertTransfers(ethTxs);
+    added += await upsertTransfers(ethTxs);
     console.log(`  ETH backfill page ${page} | ${json.result.length} txs | ${added} new ETH transfers`);
 
     if (json.result.length < 10000) break;
@@ -367,7 +367,7 @@ export async function ingestTransfers(
   address: string
 ): Promise<{ newTransfers: number; blocksScanned: number }> {
   const syncKey = getSyncKey(address);
-  const stateRow = db
+  const stateRow = await db
     .select()
     .from(syncState)
     .where(eq(syncState.key, syncKey))
@@ -393,9 +393,9 @@ export async function ingestTransfers(
   for (let i = 0; i < chunks.length; i++) {
     const [chunkStart, chunkEnd] = chunks[i];
     const rows = await fetchAdaptive(address, chunkStart, chunkEnd);
-    newTransfers += upsertTransfers(rows);
+    newTransfers += await upsertTransfers(rows);
 
-    db.insert(syncState)
+    await db.insert(syncState)
       .values({ key: syncKey, value: chunkEnd.toString() })
       .onConflictDoUpdate({ target: syncState.key, set: { value: chunkEnd.toString() } })
       .run();

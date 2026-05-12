@@ -97,7 +97,7 @@ export interface AeroSnapshot {
 
 export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: number): Promise<AeroSnapshot> {
   // Pull cached transfers
-  const allRows = db.select().from(aeroTransfers).orderBy(asc(aeroTransfers.blockTimestamp)).all();
+  const allRows = await db.select().from(aeroTransfers).orderBy(asc(aeroTransfers.blockTimestamp)).all();
   const windowFloor = Math.floor(Date.now() / 1000) - daysBack * 86400;
   const rows = allRows.filter((r) => r.blockTimestamp >= windowFloor);
   if (rows.length === 0) throw new Error("No cached aero_transfers in window — run sync first.");
@@ -261,8 +261,8 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
 }
 
 // Persist a snapshot row to aero_snapshots
-export function saveAeroSnapshot(s: AeroSnapshot): void {
-  db.insert(aeroSnapshots).values({
+export async function saveAeroSnapshot(s: AeroSnapshot): Promise<void> {
+  await db.insert(aeroSnapshots).values({
     ts: s.ts,
     address: s.address,
     pool: s.pool,

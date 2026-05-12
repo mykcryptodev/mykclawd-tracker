@@ -108,7 +108,7 @@ export async function resolveTokenImage(
 export async function ingestImages(
   onProgress?: (current: number, total: number) => void
 ): Promise<number> {
-  const unchecked = db
+  const unchecked = await db
     .select({
       contractAddress: tokens.contractAddress,
       coingeckoId: tokens.coingeckoId,
@@ -128,7 +128,7 @@ export async function ingestImages(
 
     const imageUrl = await resolveTokenImage(contractAddress, coingeckoId);
 
-    db.update(tokens)
+    await db.update(tokens)
       .set({ imageUrl, imageChecked: true })
       .where(eq(tokens.contractAddress, contractAddress))
       .run();

@@ -6,14 +6,14 @@ import { runMigrations } from "../../../db/migrate";
 import { resolveTokenImage } from "../../../lib/ingest/images";
 
 export async function GET(request: NextRequest) {
-  runMigrations();
+  await runMigrations();
 
   const address = request.nextUrl.searchParams.get("address")?.toLowerCase();
   if (!address) {
     return NextResponse.json({ error: "address required" }, { status: 400 });
   }
 
-  const row = db.select().from(tokens).where(eq(tokens.contractAddress, address)).get();
+  const row = await db.select().from(tokens).where(eq(tokens.contractAddress, address)).get();
 
   if (row?.imageChecked) {
     return NextResponse.json({ url: row.imageUrl ?? null });
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
   const imageUrl = await resolveTokenImage(address, row?.coingeckoId ?? null);
 
-  db.update(tokens)
+  await db.update(tokens)
     .set({ imageUrl, imageChecked: true })
     .where(eq(tokens.contractAddress, address))
     .run();

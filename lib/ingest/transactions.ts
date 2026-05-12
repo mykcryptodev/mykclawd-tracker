@@ -9,12 +9,12 @@ export async function resolveTransactions(address: string): Promise<number> {
   const normalizedAddress = address.toLowerCase();
 
   // Two queries instead of N+1: load all transfer hashes, load resolved hashes, diff in JS
-  const allHashes = db
+  const allHashes = await db
     .select({ txHash: transfers.txHash })
     .from(transfers)
     .all();
   const resolvedSet = new Set(
-    db.select({ txHash: transactions.txHash }).from(transactions).all().map((r) => r.txHash)
+    (await db.select({ txHash: transactions.txHash }).from(transactions).all()).map((r) => r.txHash)
   );
   const uniqueHashes = [
     ...new Map(
@@ -37,7 +37,7 @@ export async function resolveTransactions(address: string): Promise<number> {
       const BASE_GENESIS_UNIX = 1686789347;
       const blockNum = Number(tx.blockNumber ?? 0n);
 
-      db.insert(transactions)
+      await db.insert(transactions)
         .values({
           txHash,
           blockNumber: blockNum,
@@ -54,7 +54,7 @@ export async function resolveTransactions(address: string): Promise<number> {
         const to = (tx.to ?? "").toLowerCase();
         if (from === normalizedAddress || to === normalizedAddress) {
           const direction = from === normalizedAddress ? "out" : "in";
-          db.insert(transfers)
+          await db.insert(transfers)
             .values({
               txHash,
               logIndex: -1,

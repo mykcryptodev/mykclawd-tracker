@@ -13,7 +13,7 @@ export async function ingestPrices(): Promise<number> {
   let added = 0;
   const stateKey = "prices_last_fetch";
 
-  const pricedTokens = db
+  const pricedTokens = await db
     .select()
     .from(tokens)
     .where(eq(tokens.isPriced, true))
@@ -28,11 +28,11 @@ export async function ingestPrices(): Promise<number> {
     console.log(`  ${done}/${total} tokens | ${added} price rows`);
 
     // Check how many days of data we already have
-    const existingCount = db
+    const existingCount = (await db
       .select({ date: prices.date })
       .from(prices)
       .where(eq(prices.tokenAddress, token.contractAddress))
-      .all().length;
+      .all()).length;
 
     // Always fetch last 7 days to keep recent data fresh; fetch 365 days if cold start
     const days = existingCount < 10 ? 365 : 7;
@@ -42,7 +42,7 @@ export async function ingestPrices(): Promise<number> {
 
       for (const [tsMs, priceUsd] of dailyPrices) {
         const date = toDateString(tsMs);
-        db.insert(prices)
+        await db.insert(prices)
           .values({
             tokenAddress: token.contractAddress,
             date,
@@ -65,11 +65,11 @@ export async function ingestPrices(): Promise<number> {
   }
 
   // Zerion price pass: tokens with zerionId but no CoinGecko ID
-  const zerionTokens = db
+  const zerionTokens = (await db
     .select()
     .from(tokens)
     .where(and(isNotNull(tokens.zerionId), eq(tokens.isPriced, true)))
-    .all()
+    .all())
     .filter((t) => !t.coingeckoId && t.zerionId);
 
   if (zerionTokens.length > 0) {
@@ -82,7 +82,7 @@ export async function ingestPrices(): Promise<number> {
         const points = await getZerionPriceHistory(token.zerionId!);
         for (const [tsSeconds, priceUsd] of points) {
           const date = toDateString(tsSeconds * 1000);
-          db.insert(prices)
+          await db.insert(prices)
             .values({ tokenAddress: token.contractAddress, date, priceUsd, source: "zerion" })
             .onConflictDoUpdate({
               target: [prices.tokenAddress, prices.date],
@@ -99,7 +99,7 @@ export async function ingestPrices(): Promise<number> {
   }
 
   // Codex pass: tokens not priced by CoinGecko or Zerion
-  const codexCandidates = db
+  const codexCandidates = await db
     .select()
     .from(tokens)
     .where(and(eq(tokens.isPriced, false), eq(tokens.codexChecked, false)))
@@ -118,7 +118,7 @@ export async function ingestPrices(): Promise<number> {
         if (points.length > 0) {
           for (const [tsSeconds, priceUsd] of points) {
             const date = toDateString(tsSeconds * 1000);
-            db.insert(prices)
+            await db.insert(prices)
               .values({ tokenAddress: token.contractAddress, date, priceUsd, source: "codex" })
               .onConflictDoUpdate({
                 target: [prices.tokenAddress, prices.date],
@@ -127,13 +127,13 @@ export async function ingestPrices(): Promise<number> {
               .run();
             added++;
           }
-          db.update(tokens)
+          await db.update(tokens)
             .set({ isPriced: true, codexChecked: true })
             .where(eq(tokens.contractAddress, token.contractAddress))
             .run();
           codexFound++;
         } else {
-          db.update(tokens)
+          await db.update(tokens)
             .set({ codexChecked: true })
             .where(eq(tokens.contractAddress, token.contractAddress))
             .run();
@@ -146,7 +146,7 @@ export async function ingestPrices(): Promise<number> {
     console.log(`  Codex: ${codexFound}/${codexCandidates.length} tokens found`);
   }
 
-  db.insert(syncState)
+  await db.insert(syncState)
     .values({ key: stateKey, value: new Date().toISOString() })
     .onConflictDoUpdate({
       target: syncState.key,
@@ -158,11 +158,11 @@ export async function ingestPrices(): Promise<number> {
 }
 
 // Look up USD price for a token on a specific date (returns 0 if not found).
-export function getPriceForDate(
+export async function getPriceForDate(
   tokenAddress: string,
   dateStr: string
-): number {
-  const row = db
+): Promise<number> {
+  const row = await db
     .select()
     .from(prices)
     .where(
@@ -176,13 +176,13 @@ export function getPriceForDate(
 }
 
 // Returns sorted array of {date, priceUsd} for a token
-export function getPriceHistory(
+export async function getPriceHistory(
   tokenAddress: string
-): Array<{ date: string; priceUsd: number }> {
-  return db
+): Promise<Array<{ date: string; priceUsd: number }>> {
+  return (await db
     .select({ date: prices.date, priceUsd: prices.priceUsd })
     .from(prices)
     .where(eq(prices.tokenAddress, tokenAddress))
-    .all()
+    .all())
     .sort((a, b) => a.date.localeCompare(b.date));
 }

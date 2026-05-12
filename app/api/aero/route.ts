@@ -5,9 +5,9 @@ import { aeroSnapshots } from "../../../db/schema";
 import { desc } from "drizzle-orm";
 
 export async function GET() {
-  runMigrations();
+  await runMigrations();
 
-  const snapshots = db.select().from(aeroSnapshots).orderBy(desc(aeroSnapshots.ts)).all();
+  const snapshots = await db.select().from(aeroSnapshots).orderBy(desc(aeroSnapshots.ts)).all();
   if (snapshots.length === 0) {
     return NextResponse.json({ latest: null, history: [] });
   }

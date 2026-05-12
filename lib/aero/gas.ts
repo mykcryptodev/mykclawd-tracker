@@ -17,10 +17,10 @@ export async function ingestAeroGas(txHashes: string[]): Promise<{ cached: numbe
 
   // Find which hashes we already have
   const existing = new Set(
-    db.select({ tx: aeroGasCache.txHash })
+    (await db.select({ tx: aeroGasCache.txHash })
       .from(aeroGasCache)
       .where(inArray(aeroGasCache.txHash, txHashes))
-      .all()
+      .all())
       .map((r) => r.tx)
   );
   const missing = txHashes.filter((h) => !existing.has(h));
@@ -31,7 +31,7 @@ export async function ingestAeroGas(txHashes: string[]): Promise<{ cached: numbe
       const r = await rpc.getTransactionReceipt({ hash: h as `0x${string}` });
       if (r.status !== "success") continue;
       const wei = r.gasUsed * r.effectiveGasPrice;
-      db.insert(aeroGasCache)
+      await db.insert(aeroGasCache)
         .values({ txHash: h, gasWei: wei.toString(), blockNumber: Number(r.blockNumber) })
         .onConflictDoNothing()
         .run();
@@ -42,7 +42,7 @@ export async function ingestAeroGas(txHashes: string[]): Promise<{ cached: numbe
   }
 
   // Sum gas for the requested hashes
-  const rows = db.select()
+  const rows = await db.select()
     .from(aeroGasCache)
     .where(inArray(aeroGasCache.txHash, txHashes))
     .all();

@@ -40,13 +40,13 @@ export async function enrichTokens(): Promise<number> {
   invalidateCoinsListCache(); // ensure fresh list each sync run
 
   // Ensure ETH is always in the tokens table
-  const ethRow = db
+  const ethRow = await db
     .select()
     .from(tokens)
     .where(eq(tokens.contractAddress, NATIVE_TOKEN_ADDRESS))
     .get();
   if (!ethRow) {
-    db.insert(tokens)
+    await db.insert(tokens)
       .values({
         contractAddress: NATIVE_TOKEN_ADDRESS,
         symbol: "ETH",
@@ -61,32 +61,32 @@ export async function enrichTokens(): Promise<number> {
   }
 
   // Fill metadata for tokens with empty symbol (discovered but not yet enriched)
-  const unenriched = db
+  const unenriched = (await db
     .select()
     .from(tokens)
     .where(eq(tokens.symbol, ""))
-    .all()
+    .all())
     .filter((t) => t.contractAddress !== NATIVE_TOKEN_ADDRESS);
 
   for (const token of unenriched) {
     const meta = await fetchErc20Meta(token.contractAddress as `0x${string}`);
-    db.update(tokens)
+    await db.update(tokens)
       .set(meta)
       .where(eq(tokens.contractAddress, token.contractAddress))
       .run();
   }
 
   // Resolve CoinGecko IDs for tokens not yet checked (avoids re-querying 404s on next sync)
-  const unresolved = db
+  const unresolved = (await db
     .select()
     .from(tokens)
     .where(eq(tokens.cgChecked, false))
-    .all()
+    .all())
     .filter((t) => t.contractAddress !== NATIVE_TOKEN_ADDRESS);
 
   for (const token of unresolved) {
     const cgId = await getCoinIdByContract("base", token.contractAddress);
-    db.update(tokens)
+    await db.update(tokens)
       .set(cgId
         ? { coingeckoId: cgId, isPriced: true, cgChecked: true }
         : { cgChecked: true })
@@ -95,11 +95,11 @@ export async function enrichTokens(): Promise<number> {
   }
 
   // Zerion fallback: check tokens that failed CoinGecko and haven't been checked on Zerion yet
-  const zerionUnresolved = db
+  const zerionUnresolved = (await db
     .select()
     .from(tokens)
     .where(and(eq(tokens.cgChecked, true), eq(tokens.isPriced, false), eq(tokens.zerionChecked, false)))
-    .all()
+    .all())
     .filter((t) => t.contractAddress !== NATIVE_TOKEN_ADDRESS);
 
   if (zerionUnresolved.length > 0) {
@@ -107,7 +107,7 @@ export async function enrichTokens(): Promise<number> {
     let zerionFound = 0;
     for (const token of zerionUnresolved) {
       const zId = await getZerionId(token.contractAddress);
-      db.update(tokens)
+      await db.update(tokens)
         .set(zId
           ? { zerionId: zId, isPriced: true, zerionChecked: true }
           : { zerionChecked: true })

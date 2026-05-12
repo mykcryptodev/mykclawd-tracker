@@ -1,7 +1,7 @@
-import { sqlite } from "./client";
+import { client } from "./client";
 
-export function runMigrations() {
-  sqlite.exec(`
+export async function runMigrations() {
+  await client.executeMultiple(`
     CREATE TABLE IF NOT EXISTS tokens (
       contract_address TEXT PRIMARY KEY,
       symbol TEXT NOT NULL DEFAULT '',
@@ -144,39 +144,39 @@ export function runMigrations() {
 
   // Additive migrations for existing databases
   try {
-    sqlite.exec(`ALTER TABLE tokens ADD COLUMN cg_checked INTEGER NOT NULL DEFAULT 0`);
-    sqlite.exec(`UPDATE tokens SET cg_checked = 1 WHERE symbol != ''`);
+    await client.execute(`ALTER TABLE tokens ADD COLUMN cg_checked INTEGER NOT NULL DEFAULT 0`);
+    await client.execute(`UPDATE tokens SET cg_checked = 1 WHERE symbol != ''`);
   } catch { /* column already exists */ }
 
   try {
-    sqlite.exec(`ALTER TABLE tokens ADD COLUMN zerion_id TEXT`);
+    await client.execute(`ALTER TABLE tokens ADD COLUMN zerion_id TEXT`);
   } catch { /* column already exists */ }
 
   try {
-    sqlite.exec(`ALTER TABLE tokens ADD COLUMN zerion_checked INTEGER NOT NULL DEFAULT 0`);
+    await client.execute(`ALTER TABLE tokens ADD COLUMN zerion_checked INTEGER NOT NULL DEFAULT 0`);
   } catch { /* column already exists */ }
 
   try {
-    sqlite.exec(`ALTER TABLE tokens ADD COLUMN codex_checked INTEGER NOT NULL DEFAULT 0`);
+    await client.execute(`ALTER TABLE tokens ADD COLUMN codex_checked INTEGER NOT NULL DEFAULT 0`);
   } catch { /* column already exists */ }
 
   try {
-    sqlite.exec(`ALTER TABLE tokens ADD COLUMN liquidity_usd REAL`);
+    await client.execute(`ALTER TABLE tokens ADD COLUMN liquidity_usd REAL`);
   } catch { /* column already exists */ }
 
   try {
-    sqlite.exec(`ALTER TABLE tokens ADD COLUMN image_url TEXT`);
+    await client.execute(`ALTER TABLE tokens ADD COLUMN image_url TEXT`);
   } catch { /* column already exists */ }
 
   try {
-    sqlite.exec(`ALTER TABLE tokens ADD COLUMN image_checked INTEGER NOT NULL DEFAULT 0`);
+    await client.execute(`ALTER TABLE tokens ADD COLUMN image_checked INTEGER NOT NULL DEFAULT 0`);
   } catch { /* column already exists */ }
 
   // Reset any rows that were checked with the broken pipeline (no image found but pipeline was wrong)
-  sqlite.exec(`UPDATE tokens SET image_checked = 0 WHERE image_url IS NULL AND image_checked = 1`);
+  await client.execute(`UPDATE tokens SET image_checked = 0 WHERE image_url IS NULL AND image_checked = 1`);
 
   // Fix block_timestamp = 0 in transactions (was a bug — now computed from block_number)
-  sqlite.exec(`
+  await client.execute(`
     UPDATE transactions
     SET block_timestamp = 1686789347 + block_number * 2
     WHERE block_timestamp = 0

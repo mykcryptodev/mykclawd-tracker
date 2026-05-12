@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 export async function ingestLiquidity(
   onProgress?: (current: number, total: number) => void
 ): Promise<number> {
-  const rows = db
+  const rows = await db
     .select({ tokenAddress: prices.tokenAddress })
     .from(prices)
     .where(eq(prices.source, "codex"))
@@ -24,7 +24,7 @@ export async function ingestLiquidity(
 
     const liq = await getCodexTokenLiquidity(addr);
     if (liq !== null) {
-      db.update(tokens)
+      await db.update(tokens)
         .set({ liquidityUsd: liq })
         .where(eq(tokens.contractAddress, addr))
         .run();

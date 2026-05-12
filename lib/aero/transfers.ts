@@ -3,7 +3,7 @@
 
 import { Insight, createThirdwebClient, prepareEvent } from "thirdweb";
 import { base as twBase } from "thirdweb/chains";
-import { db } from "../../db/client";
+import { changedRows, db } from "../../db/client";
 import { aeroTransfers, aeroConfig } from "../../db/schema";
 import { eq } from "drizzle-orm";
 import { AERO_AERO, AERO_SYMBOLS } from "./constants";
@@ -32,13 +32,13 @@ function lastSyncedKey(address: string): string {
   return `aero_last_block_${address.toLowerCase()}`;
 }
 
-function readLastSyncedBlock(address: string): number {
-  const row = db.select().from(aeroConfig).where(eq(aeroConfig.key, lastSyncedKey(address))).get();
+async function readLastSyncedBlock(address: string): Promise<number> {
+  const row = await db.select().from(aeroConfig).where(eq(aeroConfig.key, lastSyncedKey(address))).get();
   return row ? Number(row.value) : 0;
 }
 
-function writeLastSyncedBlock(address: string, blockNumber: number) {
-  db.insert(aeroConfig)
+async function writeLastSyncedBlock(address: string, blockNumber: number) {
+  await db.insert(aeroConfig)
     .values({ key: lastSyncedKey(address), value: blockNumber.toString() })
     .onConflictDoUpdate({ target: aeroConfig.key, set: { value: blockNumber.toString() } })
     .run();
@@ -87,7 +87,7 @@ export async function ingestAeroTransfers(
 ): Promise<IngestTransfersResult> {
   const tw = getClient();
   const ADDR_PADDED = "0x000000000000000000000000" + pos.address.slice(2);
-  const lastBlock = readLastSyncedBlock(pos.address);
+  const lastBlock = await readLastSyncedBlock(pos.address);
   // Always look back at least daysBack on a cold start; on incremental runs
   // we only need events after the last synced block (overlap by a small buffer
   // to be safe).
@@ -113,7 +113,7 @@ export async function ingestAeroTransfers(
         const to   = "0x" + e.topics[2].slice(26);
         const rawAmount = BigInt(e.data).toString();
         const counterparty = dir === "in" ? from : to;
-        const result = db.insert(aeroTransfers).values({
+        const result = await db.insert(aeroTransfers).values({
           txHash: e.transaction_hash,
           logIndex: e.log_index,
           blockNumber: e.block_number,
@@ -125,13 +125,13 @@ export async function ingestAeroTransfers(
           counterparty,
           rawAmount,
         }).onConflictDoNothing().run();
-        if (result.changes > 0) newRows++;
+        if (changedRows(result) > 0) newRows++;
         if (e.block_number > maxBlockSeen) maxBlockSeen = e.block_number;
       }
     }
   }
 
-  if (maxBlockSeen > lastBlock) writeLastSyncedBlock(pos.address, maxBlockSeen);
+  if (maxBlockSeen > lastBlock) await writeLastSyncedBlock(pos.address, maxBlockSeen);
 
   return { newRows, fromBlock, toBlock: maxBlockSeen };
 }
