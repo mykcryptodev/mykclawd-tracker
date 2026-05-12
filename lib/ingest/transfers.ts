@@ -3,8 +3,8 @@ import { transfers, syncState, tokens } from "../../db/schema";
 import { getTransferLogs, getWethEvents, getCurrentBlock, NATIVE_TOKEN_ADDRESS, WETH_ADDRESS } from "../rpc";
 import { eq } from "drizzle-orm";
 import type { Address } from "viem";
+import { CdpSqlError, cdpQuery, parseSqlTimestamp, sqlString } from "../cdp-sql";
 
-const CDP_SQL_URL = "https://api.cdp.coinbase.com/platform/v2/data/query/run";
 const SQL_LIMIT = 1000; // target limit per SQL query
 const RPC_CHUNK_BLOCKS = 1_000n; // ThirdWeb/Coinbase RPC max
 const SQL_FALLBACK_MIN = 50_000n; // below this, switch straight to RPC
@@ -22,25 +22,6 @@ type RawTransfer = {
   rawAmount: string;
   counterparty: string;
 };
-
-function parseSqlTimestamp(ts: string): number {
-  return Math.floor(new Date(ts).getTime() / 1000);
-}
-
-async function cdpQuery(sql: string): Promise<Record<string, unknown>[]> {
-  const key = process.env.CDP_API_KEY;
-  const res = await fetch(CDP_SQL_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ sql }),
-  });
-  const json = (await res.json()) as { result?: Record<string, unknown>[]; errorMessage?: string };
-  if (json.errorMessage) throw new Error(`SQL_SCAN_LIMIT:${json.errorMessage}`);
-  return json.result ?? [];
-}
 
 function parseSqlRows(rows: Record<string, unknown>[], address: string): RawTransfer[] {
   const out: RawTransfer[] = [];
@@ -83,7 +64,7 @@ function parseSqlNativeEthRows(rows: Record<string, unknown>[], address: string)
         txHash: row.transaction_hash as string,
         logIndex: -1,
         blockNumber: typeof row.block_number === "string" ? parseInt(row.block_number) : (row.block_number as number),
-        blockTimestamp: parseSqlTimestamp(row.block_timestamp as string),
+        blockTimestamp: parseSqlTimestamp((row.block_timestamp ?? row.timestamp) as string | number),
         tokenAddress: NATIVE_TOKEN_ADDRESS,
         direction,
         rawAmount: (row.value ?? "0").toString(),
@@ -123,24 +104,24 @@ async function fetchSql(
         SELECT block_number, log_index, block_timestamp, address, parameters, transaction_hash
         FROM base.events
         WHERE event_signature = 'Transfer(address,address,uint256)'
-          AND (parameters['to'] = '${address.toLowerCase()}'
-            OR parameters['from'] = '${address.toLowerCase()}')
+          AND (parameters['to'] = ${sqlString(address.toLowerCase())}
+            OR parameters['from'] = ${sqlString(address.toLowerCase())})
           AND block_number BETWEEN ${fromBlock} AND ${toBlock}
         LIMIT ${limit}
       `),
       cdpQuery(`
         SELECT block_number, log_index, block_timestamp, event_signature, parameters, transaction_hash
         FROM base.events
-        WHERE address = '${WETH_ADDRESS}'
-          AND ((event_signature = 'Deposit(address,uint256)' AND parameters['dst'] = '${address.toLowerCase()}')
-            OR (event_signature = 'Withdrawal(address,uint256)' AND parameters['src'] = '${address.toLowerCase()}'))
+        WHERE address = ${sqlString(WETH_ADDRESS)}
+          AND ((event_signature = 'Deposit(address,uint256)' AND parameters['dst'] = ${sqlString(address.toLowerCase())})
+            OR (event_signature = 'Withdrawal(address,uint256)' AND parameters['src'] = ${sqlString(address.toLowerCase())}))
           AND block_number BETWEEN ${fromBlock} AND ${toBlock}
         LIMIT 1000
       `),
       cdpQuery(`
-        SELECT transaction_hash, block_number, block_timestamp, from_address, to_address, value
+        SELECT transaction_hash, block_number, timestamp, from_address, to_address, value
         FROM base.transactions
-        WHERE (from_address = '${address.toLowerCase()}' OR to_address = '${address.toLowerCase()}')
+        WHERE (from_address = ${sqlString(address.toLowerCase())} OR to_address = ${sqlString(address.toLowerCase())})
           AND CAST(value AS NUMERIC) > 0
           AND block_number BETWEEN ${fromBlock} AND ${toBlock}
         LIMIT 2000
@@ -148,7 +129,7 @@ async function fetchSql(
     ]);
     return [...parseSqlRows(transferRows, address), ...parseSqlWethRows(wethRows), ...parseSqlNativeEthRows(nativeEthRows, address)];
   } catch (e) {
-    if ((e as Error).message.startsWith("SQL_SCAN_LIMIT")) return null;
+    if (e instanceof CdpSqlError) return null;
     throw e;
   }
 }
@@ -322,6 +303,10 @@ export async function synthesizeEthFromWethWithdrawals(): Promise<number> {
 }
 
 export async function ingestNativeEthBackfill(address: string): Promise<number> {
+  const currentBlock = await getCurrentBlock();
+  const sqlRows = await fetchNativeEthSqlAdaptive(address, FIRST_ACTIVE_BLOCK, currentBlock);
+  if (sqlRows) return upsertTransfers(sqlRows);
+
   const apiKey = process.env.BASESCAN_API_KEY ?? "";
   const addrLower = address.toLowerCase();
   let added = 0;
@@ -361,6 +346,52 @@ export async function ingestNativeEthBackfill(address: string): Promise<number> 
   }
 
   return added;
+}
+
+async function fetchNativeEthSql(
+  address: string,
+  fromBlock: bigint,
+  toBlock: bigint,
+  limit = 2000
+): Promise<RawTransfer[] | null> {
+  try {
+    const rows = await cdpQuery(`
+      SELECT transaction_hash, block_number, timestamp, from_address, to_address, value
+      FROM base.transactions
+      WHERE (from_address = ${sqlString(address.toLowerCase())} OR to_address = ${sqlString(address.toLowerCase())})
+        AND CAST(value AS NUMERIC) > 0
+        AND block_number BETWEEN ${fromBlock} AND ${toBlock}
+      LIMIT ${limit}
+    `);
+    return parseSqlNativeEthRows(rows, address);
+  } catch (e) {
+    if (e instanceof CdpSqlError) return null;
+    throw e;
+  }
+}
+
+async function fetchNativeEthSqlAdaptive(
+  address: string,
+  fromBlock: bigint,
+  toBlock: bigint,
+  depth = 0
+): Promise<RawTransfer[] | null> {
+  const blockRange = toBlock - fromBlock + 1n;
+  if (blockRange <= SQL_FALLBACK_MIN || depth >= 5) {
+    return fetchNativeEthSql(address, fromBlock, toBlock, 2000);
+  }
+
+  const rows = await fetchNativeEthSql(address, fromBlock, toBlock, 2000);
+  if (rows === null) return null;
+  if (rows.length < 2000) return rows;
+
+  const mid = fromBlock + (toBlock - fromBlock) / 2n;
+  const [a, b] = await Promise.all([
+    fetchNativeEthSqlAdaptive(address, fromBlock, mid, depth + 1),
+    fetchNativeEthSqlAdaptive(address, mid + 1n, toBlock, depth + 1),
+  ]);
+  if (a === null || b === null) return null;
+  return [...a, ...b];
 }
 
 export async function ingestTransfers(

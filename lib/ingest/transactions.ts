@@ -1,9 +1,22 @@
 import { db } from "../../db/client";
 import { transactions, transfers } from "../../db/schema";
 import { getTransaction, NATIVE_TOKEN_ADDRESS } from "../rpc";
-import { eq } from "drizzle-orm";
+import { CdpSqlError, cdpQuery, parseSqlTimestamp, sqlString } from "../cdp-sql";
 
 const CONCURRENCY = 20;
+const SQL_BATCH_SIZE = 250;
+
+type TxHashRow = { txHash: string };
+type CdpTransactionRow = {
+  transaction_hash?: unknown;
+  block_number?: unknown;
+  timestamp?: unknown;
+  from_address?: unknown;
+  to_address?: unknown;
+  value?: unknown;
+  gas?: unknown;
+  gas_price?: unknown;
+};
 
 export async function resolveTransactions(address: string): Promise<number> {
   const normalizedAddress = address.toLowerCase();
@@ -27,10 +40,54 @@ export async function resolveTransactions(address: string): Promise<number> {
   let resolved = 0;
   const total = uniqueHashes.length;
 
-  async function processTx(txHash: string) {
+  async function processSqlTx(row: CdpTransactionRow) {
+    const txHash = row.transaction_hash?.toString();
+    if (!txHash) return false;
+
+    const from = (row.from_address?.toString() ?? "").toLowerCase();
+    const to = (row.to_address?.toString() ?? "").toLowerCase();
+    const blockNum = Number(row.block_number ?? 0);
+    const gas = BigInt(row.gas?.toString() ?? "0");
+    const gasPrice = BigInt(row.gas_price?.toString() ?? "0");
+    const value = BigInt(row.value?.toString() ?? "0");
+    const isOriginator = from === normalizedAddress;
+
+    await db.insert(transactions)
+      .values({
+        txHash,
+        blockNumber: blockNum,
+        blockTimestamp: parseSqlTimestamp(row.timestamp as string | number),
+        gasUsed: gas.toString(),
+        effectiveGasPrice: gasPrice.toString(),
+        gasEthWei: isOriginator ? (gas * gasPrice).toString() : "0",
+      })
+      .onConflictDoNothing()
+      .run();
+
+    if (value > 0n && (from === normalizedAddress || to === normalizedAddress)) {
+      const direction = from === normalizedAddress ? "out" : "in";
+      await db.insert(transfers)
+        .values({
+          txHash,
+          logIndex: -1,
+          blockNumber: blockNum,
+          blockTimestamp: parseSqlTimestamp(row.timestamp as string | number),
+          tokenAddress: NATIVE_TOKEN_ADDRESS,
+          direction,
+          rawAmount: value.toString(),
+          counterparty: direction === "in" ? from : to,
+        })
+        .onConflictDoNothing()
+        .run();
+    }
+
+    return true;
+  }
+
+  async function processRpcTx(txHash: string) {
     try {
       const tx = await getTransaction(txHash as `0x${string}`);
-      if (!tx) return;
+      if (!tx) return false;
 
       const gasWei = BigInt(tx.gas ?? 0n) * BigInt(tx.gasPrice ?? tx.maxFeePerGas ?? 0n);
       const isOriginator = tx.from.toLowerCase() === normalizedAddress;
@@ -70,17 +127,50 @@ export async function resolveTransactions(address: string): Promise<number> {
         }
       }
 
-      resolved++;
+      return true;
     } catch {
       // Skip if RPC fails for this tx
+      return false;
     }
   }
 
-  // Process in parallel batches of CONCURRENCY
-  for (let i = 0; i < total; i += CONCURRENCY) {
-    const batch = uniqueHashes.slice(i, i + CONCURRENCY);
-    await Promise.all(batch.map((r) => processTx(r.txHash)));
-    console.log(`  ${Math.min(i + CONCURRENCY, total)}/${total} txs | ${resolved} resolved`);
+  async function processSqlBatch(batch: TxHashRow[]) {
+    const quoted = batch.map((r) => sqlString(r.txHash)).join(", ");
+    try {
+      const rows = (await cdpQuery(`
+        SELECT transaction_hash, block_number, timestamp, from_address, to_address, value, gas, gas_price
+        FROM base.transactions
+        WHERE transaction_hash IN (${quoted})
+      `)) as CdpTransactionRow[];
+
+      const seen = new Set<string>();
+      for (const row of rows) {
+        const hash = row.transaction_hash?.toString();
+        if (hash) seen.add(hash);
+        if (await processSqlTx(row)) resolved++;
+      }
+
+      const missing = batch.filter((r) => !seen.has(r.txHash));
+      for (let i = 0; i < missing.length; i += CONCURRENCY) {
+        const fallbackBatch = missing.slice(i, i + CONCURRENCY);
+        const results = await Promise.all(fallbackBatch.map((r) => processRpcTx(r.txHash)));
+        resolved += results.filter(Boolean).length;
+      }
+    } catch (e) {
+      if (!(e instanceof CdpSqlError)) throw e;
+      for (let i = 0; i < batch.length; i += CONCURRENCY) {
+        const fallbackBatch = batch.slice(i, i + CONCURRENCY);
+        const results = await Promise.all(fallbackBatch.map((r) => processRpcTx(r.txHash)));
+        resolved += results.filter(Boolean).length;
+      }
+    }
+  }
+
+  // Resolve in SQL batches; only missing/erroring rows fall back to RPC.
+  for (let i = 0; i < total; i += SQL_BATCH_SIZE) {
+    const batch = uniqueHashes.slice(i, i + SQL_BATCH_SIZE);
+    await processSqlBatch(batch);
+    console.log(`  ${Math.min(i + SQL_BATCH_SIZE, total)}/${total} txs | ${resolved} resolved`);
   }
 
   return resolved;

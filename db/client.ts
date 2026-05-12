@@ -8,16 +8,21 @@ const dbPath = path.join(process.cwd(), "data", "tracker.db");
 const fallbackDbPath = process.env.VERCEL ? "/tmp/tracker.db" : dbPath;
 const localUrl = `file:${fallbackDbPath}`;
 
+function nonEmptyEnv(name: string) {
+  const value = process.env[name]?.trim();
+  return value ? value : undefined;
+}
+
 function getDatabaseUrl() {
   return (
-    process.env.TURSO_DATABASE_URL ??
-    process.env.LIBSQL_DATABASE_URL ??
+    nonEmptyEnv("TURSO_DATABASE_URL") ??
+    nonEmptyEnv("LIBSQL_DATABASE_URL") ??
     localUrl
   );
 }
 
 function getAuthToken() {
-  return process.env.TURSO_AUTH_TOKEN ?? process.env.LIBSQL_AUTH_TOKEN;
+  return nonEmptyEnv("TURSO_AUTH_TOKEN") ?? nonEmptyEnv("LIBSQL_AUTH_TOKEN");
 }
 
 if (getDatabaseUrl() === localUrl) {

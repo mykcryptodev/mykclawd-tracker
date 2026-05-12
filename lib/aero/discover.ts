@@ -6,6 +6,7 @@ import { base } from "viem/chains";
 import { Insight, createThirdwebClient, prepareEvent } from "thirdweb";
 import { base as twBase } from "thirdweb/chains";
 import { AERO_AERO, AERO_SYMBOLS, TokenMeta } from "./constants";
+import { CdpSqlError, cdpQuery, sqlDateTimeFromUnix, sqlString } from "../cdp-sql";
 
 const rpc = createPublicClient({
   chain: base,
@@ -61,34 +62,67 @@ interface InsightLog {
   data: string;
 }
 
+async function fetchAeroRewardSendersSql(address: string, sinceTs: number): Promise<Set<string> | null> {
+  const senders = new Set<string>();
+  let offset = 0;
+
+  try {
+    while (true) {
+      const rows = await cdpQuery(`
+        SELECT parameters
+        FROM base.events
+        WHERE address = ${sqlString(AERO_AERO)}
+          AND event_signature = 'Transfer(address,address,uint256)'
+          AND parameters['to'] = ${sqlString(address.toLowerCase())}
+          AND block_timestamp >= ${sqlDateTimeFromUnix(sinceTs)}
+        ORDER BY block_number DESC, log_index DESC
+        LIMIT 1000 OFFSET ${offset}
+      `);
+      for (const row of rows) {
+        const params = row.parameters as { from?: string };
+        if (params?.from) senders.add(params.from.toLowerCase());
+      }
+      if (rows.length < 1000) break;
+      offset += rows.length;
+    }
+    return senders;
+  } catch (e) {
+    if (e instanceof CdpSqlError) return null;
+    throw e;
+  }
+}
+
 export async function discoverAeroPosition(address: string, daysBack = 14): Promise<DiscoveredPosition | null> {
   const clientId = process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID;
   if (!clientId) throw new Error("NEXT_PUBLIC_THIRDWEB_CLIENT_ID is required");
-  const tw = createThirdwebClient({ clientId });
 
   const ADDR_PADDED = "0x000000000000000000000000" + address.toLowerCase().slice(2);
   const sinceTs = Math.floor(Date.now() / 1000) - daysBack * 86400;
 
   // AERO senders (i.e. gauges that paid this address)
-  const senders = new Set<string>();
-  let page = 0;
-  while (true) {
-    const events = (await Insight.getContractEvents({
-      client: tw, chains: [twBase],
-      contractAddress: AERO_AERO as `0x${string}`,
-      event: ERC20_TRANSFER, decodeLogs: false,
-      queryOptions: {
-        filter_block_timestamp_gte: sinceTs,
-        filter_topic_2: ADDR_PADDED,
-        sort_by: "block_number", sort_order: "desc",
-        limit: 500, page,
-      },
-    } as Parameters<typeof Insight.getContractEvents>[0])) as unknown as InsightLog[];
-    if (!events.length) break;
-    for (const e of events) senders.add(("0x" + e.topics[1].slice(26)).toLowerCase());
-    if (events.length < 500) break;
-    page++;
-  }
+  const senders = await fetchAeroRewardSendersSql(address, sinceTs) ?? await (async () => {
+    const tw = createThirdwebClient({ clientId });
+    const fallbackSenders = new Set<string>();
+    let page = 0;
+    while (true) {
+      const events = (await Insight.getContractEvents({
+        client: tw, chains: [twBase],
+        contractAddress: AERO_AERO as `0x${string}`,
+        event: ERC20_TRANSFER, decodeLogs: false,
+        queryOptions: {
+          filter_block_timestamp_gte: sinceTs,
+          filter_topic_2: ADDR_PADDED,
+          sort_by: "block_number", sort_order: "desc",
+          limit: 500, page,
+        },
+      } as Parameters<typeof Insight.getContractEvents>[0])) as unknown as InsightLog[];
+      if (!events.length) break;
+      for (const e of events) fallbackSenders.add(("0x" + e.topics[1].slice(26)).toLowerCase());
+      if (events.length < 500) break;
+      page++;
+    }
+    return fallbackSenders;
+  })();
 
   // Probe each AERO sender — pick the first one whose rewardToken==AERO and stakedValues(address) is non-empty.
   for (const g of senders) {

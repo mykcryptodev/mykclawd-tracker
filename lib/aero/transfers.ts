@@ -8,6 +8,7 @@ import { aeroTransfers, aeroConfig } from "../../db/schema";
 import { eq } from "drizzle-orm";
 import { AERO_AERO, AERO_SYMBOLS } from "./constants";
 import { DiscoveredPosition } from "./discover";
+import { CdpSqlError, cdpQuery, parseSqlTimestamp, sqlDateTimeFromUnix, sqlString } from "../cdp-sql";
 
 interface InsightLog {
   block_number: number;
@@ -75,6 +76,54 @@ async function scanOne(
   return out;
 }
 
+interface CdpAeroLog {
+  block_number?: unknown;
+  block_timestamp?: unknown;
+  transaction_hash?: unknown;
+  log_index?: unknown;
+  address?: unknown;
+  parameters?: { from?: string; to?: string; value?: string };
+}
+
+function isCdpAeroLog(event: InsightLog | CdpAeroLog): event is CdpAeroLog {
+  return "parameters" in event;
+}
+
+async function scanOneSql(
+  contractAddress: string,
+  dir: "in" | "out",
+  address: string,
+  fromBlock: number,
+  sinceTs: number,
+): Promise<CdpAeroLog[] | null> {
+  const out: CdpAeroLog[] = [];
+  const param = dir === "in" ? "to" : "from";
+  let offset = 0;
+
+  try {
+    while (true) {
+      const rows = (await cdpQuery(`
+        SELECT block_number, block_timestamp, transaction_hash, log_index, address, parameters
+        FROM base.events
+        WHERE address = ${sqlString(contractAddress.toLowerCase())}
+          AND event_signature = 'Transfer(address,address,uint256)'
+          AND parameters[${sqlString(param)}] = ${sqlString(address.toLowerCase())}
+          AND block_timestamp >= ${sqlDateTimeFromUnix(sinceTs)}
+          ${fromBlock > 0 ? `AND block_number >= ${fromBlock}` : ""}
+        ORDER BY block_number ASC, log_index ASC
+        LIMIT 1000 OFFSET ${offset}
+      `)) as CdpAeroLog[];
+      out.push(...rows);
+      if (rows.length < 1000) break;
+      offset += rows.length;
+    }
+    return out;
+  } catch (e) {
+    if (e instanceof CdpSqlError) return null;
+    throw e;
+  }
+}
+
 export interface IngestTransfersResult {
   newRows: number;
   fromBlock: number;
@@ -85,7 +134,7 @@ export async function ingestAeroTransfers(
   pos: DiscoveredPosition,
   daysBack: number,
 ): Promise<IngestTransfersResult> {
-  const tw = getClient();
+  let tw: ReturnType<typeof createThirdwebClient> | null = null;
   const ADDR_PADDED = "0x000000000000000000000000" + pos.address.slice(2);
   const lastBlock = await readLastSyncedBlock(pos.address);
   // Always look back at least daysBack on a cold start; on incremental runs
@@ -105,19 +154,33 @@ export async function ingestAeroTransfers(
 
   for (const { addr, meta } of tokensToScan) {
     for (const dir of ["in", "out"] as const) {
-      const filterKey: "filter_topic_1" | "filter_topic_2" =
-        dir === "in" ? "filter_topic_2" : "filter_topic_1";
-      const events = await scanOne(tw, addr, filterKey, ADDR_PADDED, fromBlock, sinceTs);
+      const sqlEvents = await scanOneSql(addr, dir, pos.address, fromBlock, sinceTs);
+      const events = sqlEvents ?? await (async () => {
+        tw ??= getClient();
+        const filterKey: "filter_topic_1" | "filter_topic_2" =
+          dir === "in" ? "filter_topic_2" : "filter_topic_1";
+        return scanOne(tw, addr, filterKey, ADDR_PADDED, fromBlock, sinceTs);
+      })();
       for (const e of events) {
-        const from = "0x" + e.topics[1].slice(26);
-        const to   = "0x" + e.topics[2].slice(26);
-        const rawAmount = BigInt(e.data).toString();
+        const isSqlEvent = isCdpAeroLog(e);
+        const from = isSqlEvent
+          ? (e.parameters?.from ?? "").toLowerCase()
+          : "0x" + e.topics[1].slice(26);
+        const to = isSqlEvent
+          ? (e.parameters?.to ?? "").toLowerCase()
+          : "0x" + e.topics[2].slice(26);
+        const rawAmount = isSqlEvent
+          ? (e.parameters?.value ?? "0").toString()
+          : BigInt(e.data).toString();
+        const blockTimestamp = isSqlEvent
+          ? parseSqlTimestamp(e.block_timestamp as string | number)
+          : e.block_timestamp;
         const counterparty = dir === "in" ? from : to;
         const result = await db.insert(aeroTransfers).values({
-          txHash: e.transaction_hash,
-          logIndex: e.log_index,
-          blockNumber: e.block_number,
-          blockTimestamp: e.block_timestamp,
+          txHash: e.transaction_hash as string,
+          logIndex: Number(e.log_index),
+          blockNumber: Number(e.block_number),
+          blockTimestamp,
           tokenAddress: addr.toLowerCase(),
           symbol: meta.sym,
           decimals: meta.dec,
@@ -126,7 +189,7 @@ export async function ingestAeroTransfers(
           rawAmount,
         }).onConflictDoNothing().run();
         if (changedRows(result) > 0) newRows++;
-        if (e.block_number > maxBlockSeen) maxBlockSeen = e.block_number;
+        if (Number(e.block_number) > maxBlockSeen) maxBlockSeen = Number(e.block_number);
       }
     }
   }

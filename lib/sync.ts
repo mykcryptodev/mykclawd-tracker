@@ -13,7 +13,7 @@ import { publicClient, NATIVE_TOKEN_ADDRESS } from "./rpc";
 import { erc20Abi } from "viem";
 
 const TRACKED_ADDRESS =
-  process.env.TRACKED_ADDRESS ??
+  process.env.TRACKED_ADDRESS?.trim() ||
   "0xcef6e6639e0c60d5c0805670f4363a6698081fab";
 
 export interface SyncResult {
