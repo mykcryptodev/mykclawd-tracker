@@ -18,6 +18,7 @@ import {
   DropletsIcon,
   Settings2Icon,
   CircleHelpIcon,
+  HomeIcon,
 } from "lucide-react"
 
 const navSecondary = [
@@ -34,7 +35,8 @@ const navSecondary = [
 ]
 
 const navMain = [
-  { title: "Dashboard", url: "/", icon: <LayoutDashboardIcon /> },
+  { title: "home", url: "/", icon: <HomeIcon /> },
+  { title: "PnL", url: "/pnl", icon: <LayoutDashboardIcon /> },
   { title: "Aero LP", url: "/aero", icon: <DropletsIcon /> },
 ]
 
