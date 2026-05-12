@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-
+import { usePathname } from "next/navigation"
 import { NavSecondary } from "@/components/nav-secondary"
 import {
   Sidebar,
@@ -15,9 +15,9 @@ import {
 } from "@/components/ui/sidebar"
 import {
   LayoutDashboardIcon,
+  DropletsIcon,
   Settings2Icon,
   CircleHelpIcon,
-  TrendingUpIcon,
 } from "lucide-react"
 
 const navSecondary = [
@@ -33,7 +33,13 @@ const navSecondary = [
   },
 ]
 
+const navMain = [
+  { title: "Dashboard", url: "/", icon: <LayoutDashboardIcon /> },
+  { title: "Aero LP", url: "/aero", icon: <DropletsIcon /> },
+]
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const pathname = usePathname()
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -43,8 +49,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               className="data-[slot=sidebar-menu-button]:p-1.5!"
               render={<a href="/" />}
             >
-              <TrendingUpIcon className="size-5!" />
-              <span className="text-base font-semibold">PnL Tracker</span>
+              <span className="text-base font-[family-name:var(--font-segment)] tracking-tight">
+                PnL
+              </span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -53,12 +60,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton isActive tooltip="Dashboard">
-                  <LayoutDashboardIcon />
-                  <span>Dashboard</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {navMain.map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton
+                    isActive={pathname === item.url}
+                    tooltip={item.title}
+                    render={<a href={item.url} />}
+                  >
+                    {item.icon}
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
