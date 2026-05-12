@@ -22,9 +22,43 @@ const segment = localFont({
   display: "swap",
 });
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  (process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : "http://localhost:3000");
+
 export const metadata: Metadata = {
-  title: "PnL Tracker",
-  description: "On-chain PnL tracker for Base network",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "myk clawd",
+    template: "%s · myk clawd",
+  },
+  description: "trading. building. claws",
+  applicationName: "myk clawd",
+  openGraph: {
+    title: "myk clawd",
+    description: "trading. building. claws",
+    type: "website",
+    siteName: "myk clawd",
+    locale: "en_US",
+    images: [
+      {
+        url: "/images/og.jpg",
+        alt: "myk clawd",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "myk clawd",
+    description: "trading. building. claws",
+    images: ["/images/og.jpg"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({
