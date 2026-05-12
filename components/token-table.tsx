@@ -81,9 +81,8 @@ export function TokenTable({ positions, trackedAddress }: Props) {
 
   const visibleRows = [...sortedActive, ...unpricedActive];
 
-  // Zero-balance rows sorted by realized PnL descending (closed positions)
-  const zeroRows = [...zero].sort(
-    (a, b) => b.realizedPnlUsd - a.realizedPnlUsd
+  const zeroRows = [...zero].sort((a, b) =>
+    asc ? a[sortKey] - b[sortKey] : b[sortKey] - a[sortKey]
   );
 
   function ColHead({ label, k }: { label: string; k?: SortKey }) {
