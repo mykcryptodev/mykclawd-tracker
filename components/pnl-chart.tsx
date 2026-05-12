@@ -20,9 +20,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface Snapshot {
   date: string;
-  total_value_usd: number;
-  unrealized_pnl_usd: number;
-  realized_pnl_usd_cum: number;
+  totalValueUsd: number;
+  unrealizedPnlUsd: number;
+  realizedPnlUsdCum: number;
 }
 
 interface Props {
@@ -30,8 +30,8 @@ interface Props {
 }
 
 const chartConfig = {
-  value: { label: "Portfolio Value", color: "hsl(var(--chart-1))" },
-  pnl: { label: "Total PnL", color: "hsl(var(--chart-2))" },
+  value: { label: "Portfolio Value", color: "var(--chart-1)" },
+  pnl: { label: "Total PnL", color: "var(--chart-2)" },
 };
 
 function formatDate(d: string) {
@@ -50,12 +50,12 @@ function usd(n: number) {
 export function PnlChart({ series }: Props) {
   const valueData = series.map((s) => ({
     date: formatDate(s.date),
-    value: s.total_value_usd,
+    value: s.totalValueUsd,
   }));
 
   const pnlData = series.map((s) => ({
     date: formatDate(s.date),
-    pnl: s.unrealized_pnl_usd + s.realized_pnl_usd_cum,
+    pnl: s.unrealizedPnlUsd + s.realizedPnlUsdCum,
   }));
 
   if (series.length === 0) {

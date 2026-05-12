@@ -46,7 +46,7 @@ export default async function DashboardPage() {
         <SiteHeader address={TRACKED_ADDRESS} asOf={asOf} />
         <div className="flex flex-1 flex-col">
           <div className="@container/main flex flex-1 flex-col gap-2">
-            <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+            <div className="flex flex-col gap-6 py-6 md:gap-8 md:py-8">
               <SectionCards
                 totalValueUsd={totalValueUsd}
                 totalRealizedUsd={totalRealizedUsd}
@@ -59,9 +59,11 @@ export default async function DashboardPage() {
                 <AllocationChart positions={positions} />
               </div>
               <div className="px-4 lg:px-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Positions</CardTitle>
+                <Card className="border-border/60">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
+                      Positions
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="p-0">
                     <TokenTable positions={positions} trackedAddress={TRACKED_ADDRESS} />

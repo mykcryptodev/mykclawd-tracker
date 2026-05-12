@@ -63,6 +63,83 @@ export function runMigrations() {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    -- Aerodrome LP rebalance monitor tables
+    CREATE TABLE IF NOT EXISTS aero_transfers (
+      tx_hash TEXT NOT NULL,
+      log_index INTEGER NOT NULL,
+      block_number INTEGER NOT NULL,
+      block_timestamp INTEGER NOT NULL,
+      token_address TEXT NOT NULL,
+      symbol TEXT NOT NULL,
+      decimals INTEGER NOT NULL,
+      direction TEXT NOT NULL CHECK(direction IN ('in', 'out')),
+      counterparty TEXT NOT NULL,
+      raw_amount TEXT NOT NULL,
+      PRIMARY KEY (tx_hash, log_index)
+    );
+    CREATE INDEX IF NOT EXISTS aero_transfers_ts_idx ON aero_transfers(block_timestamp);
+    CREATE INDEX IF NOT EXISTS aero_transfers_block_idx ON aero_transfers(block_number);
+
+    CREATE TABLE IF NOT EXISTS aero_gas_cache (
+      tx_hash TEXT PRIMARY KEY,
+      gas_wei TEXT NOT NULL,
+      block_number INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS aero_snapshots (
+      ts INTEGER PRIMARY KEY,
+      address TEXT NOT NULL,
+      pool TEXT NOT NULL,
+      gauge TEXT NOT NULL,
+      token0 TEXT NOT NULL,
+      token1 TEXT NOT NULL,
+      sym0 TEXT NOT NULL,
+      sym1 TEXT NOT NULL,
+      dec0 INTEGER NOT NULL,
+      dec1 INTEGER NOT NULL,
+      first_ts INTEGER NOT NULL,
+      last_ts INTEGER NOT NULL,
+      days REAL NOT NULL,
+      p0_now REAL NOT NULL,
+      p1_now REAL NOT NULL,
+      pa_now REAL NOT NULL,
+      p0_start REAL NOT NULL,
+      p1_start REAL NOT NULL,
+      pa_start REAL NOT NULL,
+      start_eth REAL NOT NULL,
+      start_t0 REAL NOT NULL,
+      start_t1 REAL NOT NULL,
+      start_aero REAL NOT NULL,
+      ext_inflow_t0 REAL NOT NULL DEFAULT 0,
+      ext_inflow_t1 REAL NOT NULL DEFAULT 0,
+      wallet_eth REAL NOT NULL,
+      wallet_t0 REAL NOT NULL,
+      wallet_t1 REAL NOT NULL,
+      wallet_aero REAL NOT NULL,
+      position_t0 REAL NOT NULL,
+      position_t1 REAL NOT NULL,
+      pending_aero REAL NOT NULL,
+      start_usd REAL NOT NULL,
+      hodl_usd REAL NOT NULL,
+      strat_usd REAL NOT NULL,
+      delta_usd REAL NOT NULL,
+      lp_only_delta_usd REAL NOT NULL,
+      aero_added_usd REAL NOT NULL,
+      delta_pct REAL NOT NULL,
+      apr REAL NOT NULL,
+      total_gas_eth REAL NOT NULL,
+      total_gas_usd REAL NOT NULL,
+      tx_count INTEGER NOT NULL,
+      gas_txs_counted INTEGER NOT NULL,
+      positions_json TEXT NOT NULL,
+      inflows_json TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS aero_config (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
 
   // Additive migrations for existing databases
@@ -86,6 +163,17 @@ export function runMigrations() {
   try {
     sqlite.exec(`ALTER TABLE tokens ADD COLUMN liquidity_usd REAL`);
   } catch { /* column already exists */ }
+
+  try {
+    sqlite.exec(`ALTER TABLE tokens ADD COLUMN image_url TEXT`);
+  } catch { /* column already exists */ }
+
+  try {
+    sqlite.exec(`ALTER TABLE tokens ADD COLUMN image_checked INTEGER NOT NULL DEFAULT 0`);
+  } catch { /* column already exists */ }
+
+  // Reset any rows that were checked with the broken pipeline (no image found but pipeline was wrong)
+  sqlite.exec(`UPDATE tokens SET image_checked = 0 WHERE image_url IS NULL AND image_checked = 1`);
 
   // Fix block_timestamp = 0 in transactions (was a bug — now computed from block_number)
   sqlite.exec(`

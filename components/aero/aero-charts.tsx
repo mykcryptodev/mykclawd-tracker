@@ -1,0 +1,166 @@
+"use client";
+
+import {
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine,
+} from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { AeroLatest, AeroHistoryPoint } from "./aero-types";
+
+function usdShort(n: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 }).format(n);
+}
+function usdFull(n: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n);
+}
+function tsShort(ts: number) {
+  return new Date(ts * 1000).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+// ───── Trend over time (strategy vs HODL) ─────
+export function AeroTrendChart({ history }: { history: AeroHistoryPoint[] }) {
+  if (history.length < 2) {
+    return (
+      <Card className="border-border/60">
+        <CardHeader><CardTitle>Performance over time</CardTitle></CardHeader>
+        <CardContent className="flex items-center justify-center h-48 text-muted-foreground text-sm">
+          Need ≥2 snapshots — re-run sync to add another.
+        </CardContent>
+      </Card>
+    );
+  }
+  const data = history.map((h) => ({ label: tsShort(h.ts), strategy: h.stratUsd, hodl: h.hodlUsd }));
+  return (
+    <Card className="border-border/60">
+      <CardHeader>
+        <CardTitle>Performance over time ({history.length} snapshots)</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ChartContainer config={{ strategy: { label: "Strategy", color: "var(--chart-1)" }, hodl: { label: "HODL", color: "var(--chart-3)" } }} className="h-72">
+          <AreaChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
+            <YAxis tickFormatter={usdShort} tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
+            <ChartTooltip content={<ChartTooltipContent formatter={(v) => usdFull(Number(v))} />} />
+            <Area type="monotone" dataKey="strategy" stroke="var(--color-strategy)" fill="var(--color-strategy)" fillOpacity={0.2} strokeWidth={2} />
+            <Area type="monotone" dataKey="hodl" stroke="var(--color-hodl)" fill="var(--color-hodl)" fillOpacity={0.05} strokeWidth={2} strokeDasharray="5 5" />
+          </AreaChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ───── Composition pie ─────
+export function AeroCompositionChart({ latest }: { latest: AeroLatest }) {
+  const { end, prices, sym0, sym1 } = latest;
+  const posT0Usd = end.positionT0 * prices.p0Now;
+  const posT1Usd = end.positionT1 * prices.p1Now;
+  const aeroAllUsd = (end.walletAero + end.pendingAero) * prices.paNow;
+  const walletUsd = (end.walletEth + end.walletT0) * prices.p0Now + end.walletT1 * prices.p1Now;
+
+  const data = [
+    { name: `LP ${sym0}`, value: posT0Usd },
+    { name: `LP ${sym1}`, value: posT1Usd },
+    { name: "AERO total", value: aeroAllUsd },
+    { name: "Wallet", value: walletUsd },
+  ].filter((d) => d.value > 0);
+
+  const colors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-4)", "var(--chart-5)"];
+
+  return (
+    <Card className="border-border/60">
+      <CardHeader><CardTitle>Where the money is now</CardTitle></CardHeader>
+      <CardContent>
+        <ChartContainer config={{}} className="h-72">
+          <PieChart>
+            <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={95} paddingAngle={2}
+              label={(p) => `${p.name} ${(((p.percent as number) ?? 0) * 100).toFixed(0)}%`}
+              labelLine={false}
+            >
+              {data.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
+            </Pie>
+            <Tooltip formatter={(v) => usdFull(Number(v))} />
+          </PieChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ───── Strategy vs HODL bar ─────
+export function AeroVsHodlChart({ latest }: { latest: AeroLatest }) {
+  const data = [
+    { name: "HODL", value: latest.usd.hodlUsd, color: "var(--muted-foreground)" },
+    { name: "Strategy", value: latest.usd.stratUsd, color: latest.usd.deltaUsd >= 0 ? "var(--chart-1)" : "var(--destructive)" },
+  ];
+  return (
+    <Card className="border-border/60">
+      <CardHeader><CardTitle>Strategy vs HODL</CardTitle></CardHeader>
+      <CardContent>
+        <ChartContainer config={{}} className="h-72">
+          <BarChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+            <YAxis tickFormatter={usdShort} tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
+            <Tooltip formatter={(v) => usdFull(Number(v))} cursor={{ fill: "transparent" }} />
+            <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+              {data.map((d, i) => <Cell key={i} fill={d.color} />)}
+            </Bar>
+          </BarChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ───── Waterfall decomposing Δ vs HODL ─────
+export function AeroWaterfallChart({ latest }: { latest: AeroLatest }) {
+  const { hodlUsd, aeroAddedUsd, lpOnlyDelta, stratUsd } = latest.usd;
+  // Floating bars: [base, top] for each segment
+  const fb = (a: number, b: number): [number, number] => [Math.min(a, b), Math.max(a, b)];
+  const data = [
+    { label: "HODL", range: fb(0, hodlUsd), color: "var(--muted-foreground)", delta: hodlUsd },
+    { label: "+ AERO rewards", range: fb(hodlUsd, hodlUsd + aeroAddedUsd), color: "var(--chart-4)", delta: aeroAddedUsd },
+    {
+      label: lpOnlyDelta >= 0 ? "+ LP gains" : "− LP slippage / IL",
+      range: fb(hodlUsd + aeroAddedUsd, hodlUsd + aeroAddedUsd + lpOnlyDelta),
+      color: lpOnlyDelta >= 0 ? "var(--chart-1)" : "var(--destructive)",
+      delta: lpOnlyDelta,
+    },
+    { label: "Strategy", range: fb(0, stratUsd), color: "var(--chart-1)", delta: stratUsd },
+  ];
+
+  return (
+    <Card className="border-border/60">
+      <CardHeader><CardTitle>Decomposing Δ vs HODL</CardTitle></CardHeader>
+      <CardContent>
+        <ChartContainer config={{}} className="h-80">
+          <BarChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+            <YAxis tickFormatter={usdShort} tick={{ fontSize: 11 }} />
+            <Tooltip
+              cursor={{ fill: "transparent" }}
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const item = payload[0].payload as { label: string; delta: number };
+                return (
+                  <div className="rounded-md border bg-background px-3 py-2 text-xs shadow-sm">
+                    <div className="font-medium">{item.label}</div>
+                    <div className="text-muted-foreground">{usdFull(item.delta)}</div>
+                  </div>
+                );
+              }}
+            />
+            <ReferenceLine y={0} stroke="hsl(var(--border))" />
+            <Bar dataKey="range" radius={[6, 6, 6, 6]}>
+              {data.map((d, i) => <Cell key={i} fill={d.color} />)}
+            </Bar>
+          </BarChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
+  );
+}
