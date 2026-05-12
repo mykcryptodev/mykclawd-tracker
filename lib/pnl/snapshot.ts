@@ -231,6 +231,8 @@ export interface TokenPosition {
   unrealizedPnlUsd: number;
   realizedPnlUsd: number;
   percentageOfPortfolio: number;
+  imageUrl: string | null;
+  imageChecked: boolean;
 }
 
 export function getCurrentPositions(today: string): {
@@ -277,7 +279,9 @@ export function getCurrentPositions(today: string): {
       costBasisUsd,
       unrealizedPnlUsd,
       realizedPnlUsd: lot.realizedPnlUsd,
-      percentageOfPortfolio: 0, // computed after total is known
+      percentageOfPortfolio: 0,
+      imageUrl: token.imageUrl ?? null,
+      imageChecked: token.imageChecked,
     });
 
     totalValueUsd += valueUsd;

@@ -4,7 +4,9 @@ import { ingestTransfers } from "./ingest/transfers";
 import { resolveTransactions } from "./ingest/transactions";
 import { ingestPrices } from "./ingest/prices";
 import { ingestLiquidity } from "./ingest/liquidity";
+import { ingestImages } from "./ingest/images";
 import { computePnl, recomputeTodaySnapshot } from "./pnl/snapshot";
+import { ingestAeroMonitor } from "./aero";
 import { db } from "../db/client";
 import { lots, tokens } from "../db/schema";
 import { publicClient, NATIVE_TOKEN_ADDRESS } from "./rpc";
@@ -31,7 +33,7 @@ export interface SyncProgress {
   detail?: string;
 }
 
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 9;
 
 export async function runSync(
   onProgress?: (event: SyncProgress) => void
@@ -70,14 +72,26 @@ export async function runSync(
   });
   emit(5, "Fetching liquidity data", "done");
 
-  emit(6, "Computing PnL");
+  emit(6, "Resolving token images");
+  await ingestImages((current, total) => {
+    onProgress?.({
+      step: 6,
+      totalSteps: TOTAL_STEPS,
+      label: "Resolving token images",
+      innerPct: Math.round((current / total) * 100),
+      detail: `${current} / ${total} tokens`,
+    });
+  });
+  emit(6, "Resolving token images", "done");
+
+  emit(7, "Computing PnL");
   await computePnl();
-  emit(6, "Computing PnL", "done");
+  emit(7, "Computing PnL", "done");
 
   // Reconcile lot quantities against live on-chain balances.
   // Transfer-event replay can miss outbound movements (internal calls, protocol-level
   // burns, or SQL ingestion gaps), leaving phantom balances.
-  emit(7, "Reconciling balances");
+  emit(8, "Reconciling balances");
   const allLots = db.select().from(lots).all();
   const decimalsMap = new Map(
     db.select().from(tokens).all().map((t) => [t.contractAddress, t.decimals])
@@ -125,7 +139,19 @@ export async function runSync(
     }
   }
   recomputeTodaySnapshot();
-  emit(7, "Reconciling balances", `${corrected} corrected`);
+  emit(8, "Reconciling balances", `${corrected} corrected`);
+
+  emit(9, "Aerodrome LP monitor");
+  try {
+    const aero = await ingestAeroMonitor(14);
+    if (aero.position && aero.snapshot) {
+      emit(9, "Aerodrome LP monitor", `+${aero.newTransfers} transfers · Δ vs HODL $${aero.snapshot.usd.deltaUsd.toFixed(2)}`);
+    } else {
+      emit(9, "Aerodrome LP monitor", "no active position");
+    }
+  } catch (e) {
+    emit(9, "Aerodrome LP monitor", `skipped: ${(e as Error).message.slice(0, 80)}`);
+  }
 
   const durationMs = Date.now() - start;
 

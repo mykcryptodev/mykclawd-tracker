@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
+import { Blobbie } from "thirdweb/react";
 
 interface Position {
   contractAddress: string;
@@ -23,6 +24,8 @@ interface Position {
   unrealizedPnlUsd: number;
   realizedPnlUsd: number;
   percentageOfPortfolio: number;
+  imageUrl: string | null;
+  imageChecked: boolean;
 }
 
 type SortKey = keyof Pick<
@@ -108,12 +111,25 @@ export function TokenTable({ positions, trackedAddress }: Props) {
         }
       >
         <TableCell className="font-medium">
-          {p.symbol || p.contractAddress.slice(0, 8)}
-          {!p.isPriced && (
-            <Badge variant="secondary" className="ml-2 text-xs">
-              unpriced
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {p.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={p.imageUrl}
+                alt=""
+                className="size-5 rounded-full shrink-0 object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+            ) : (
+              <Blobbie address={p.contractAddress} size={20} className="rounded-full shrink-0" />
+            )}
+            <span>{p.symbol || p.contractAddress.slice(0, 8)}</span>
+            {!p.isPriced && (
+              <Badge variant="secondary" className="text-xs">
+                unpriced
+              </Badge>
+            )}
+          </div>
         </TableCell>
         <TableCell>{p.quantity.toFixed(4)}</TableCell>
         <TableCell>{p.isPriced ? usd(p.avgCostUsd, false) : "—"}</TableCell>
