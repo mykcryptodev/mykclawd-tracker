@@ -39,26 +39,32 @@ export async function enrichTokens(): Promise<number> {
   let added = 0;
   invalidateCoinsListCache(); // ensure fresh list each sync run
 
-  // Ensure ETH is always in the tokens table
+  // Native ETH is represented as a pseudo-token so the normal pricing/PnL
+  // pipeline can treat it like any other holding.
+  const ethMeta = {
+    symbol: "ETH",
+    name: "Ether",
+    decimals: 18,
+    coingeckoId: "ethereum",
+    isPriced: true,
+    cgChecked: true,
+  };
   const ethRow = await db
     .select()
     .from(tokens)
     .where(eq(tokens.contractAddress, NATIVE_TOKEN_ADDRESS))
     .get();
-  if (!ethRow) {
-    await db.insert(tokens)
-      .values({
-        contractAddress: NATIVE_TOKEN_ADDRESS,
-        symbol: "ETH",
-        name: "Ether",
-        decimals: 18,
-        coingeckoId: "ethereum",
-        isPriced: true,
-      })
-      .onConflictDoNothing()
-      .run();
-    added++;
-  }
+  await db.insert(tokens)
+    .values({
+      contractAddress: NATIVE_TOKEN_ADDRESS,
+      ...ethMeta,
+    })
+    .onConflictDoUpdate({
+      target: tokens.contractAddress,
+      set: ethMeta,
+    })
+    .run();
+  if (!ethRow) added++;
 
   // Fill metadata for tokens with empty symbol (discovered but not yet enriched)
   const unenriched = (await db

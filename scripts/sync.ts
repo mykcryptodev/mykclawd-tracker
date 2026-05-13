@@ -1,10 +1,11 @@
 import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
-import { runSync } from "../lib/sync";
 
 (async () => {
   try {
-    const result = await runSync();
+    const { runSync } = await import("../lib/sync");
+    const mode = process.argv.includes("--fast") ? "fast" : "full";
+    const result = await runSync({ mode });
     console.log("\nSync result:", JSON.stringify(result, null, 2));
     process.exit(0);
   } catch (e) {

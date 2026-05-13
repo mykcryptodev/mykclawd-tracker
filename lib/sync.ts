@@ -1,11 +1,20 @@
 import { runMigrations } from "../db/migrate";
 import { enrichTokens } from "./ingest/tokens";
-import { ingestTransfers } from "./ingest/transfers";
+import {
+  ingestNativeEthBackfill,
+  ingestTransfers,
+  synthesizeEthFromWethWithdrawals,
+} from "./ingest/transfers";
 import { resolveTransactions } from "./ingest/transactions";
-import { ingestPrices } from "./ingest/prices";
+import { getPriceForDate, ingestPrices } from "./ingest/prices";
 import { ingestLiquidity } from "./ingest/liquidity";
 import { ingestImages } from "./ingest/images";
-import { computePnl, recomputeTodaySnapshot } from "./pnl/snapshot";
+import {
+  computePnl,
+  computePnlIncremental,
+  initializePnlCursorFromCurrentState,
+  recomputeTodaySnapshot,
+} from "./pnl/snapshot";
 import { ingestAeroMonitor } from "./aero";
 import { db } from "../db/client";
 import { lots, tokens } from "../db/schema";
@@ -17,11 +26,14 @@ const TRACKED_ADDRESS =
   "0xcef6e6639e0c60d5c0805670f4363a6698081fab";
 
 export interface SyncResult {
+  mode: SyncMode;
   tokensAdded: number;
   newTransfers: number;
+  nativeEthTransfers: number;
   blocksScanned: number;
   txResolved: number;
   pricesAdded: number;
+  pnlEventsProcessed: number | null;
   durationMs: number;
 }
 
@@ -33,20 +45,38 @@ export interface SyncProgress {
   detail?: string;
 }
 
+export type SyncMode = "fast" | "full";
+
+export interface SyncOptions {
+  mode?: SyncMode;
+}
+
 const TOTAL_STEPS = 9;
 
 export async function runSync(
+  options: SyncOptions = {},
   onProgress?: (event: SyncProgress) => void
 ): Promise<SyncResult> {
+  const mode = options.mode ?? "fast";
   const start = Date.now();
   const emit = (step: number, label: string, detail?: string) =>
     onProgress?.({ step, totalSteps: TOTAL_STEPS, label, detail });
 
   await runMigrations();
+  if (mode === "fast") {
+    await initializePnlCursorFromCurrentState();
+  }
 
   emit(1, "Ingesting transfers");
   const { newTransfers, blocksScanned } = await ingestTransfers(TRACKED_ADDRESS);
-  emit(1, "Ingesting transfers", `+${newTransfers} transfers · ${blocksScanned.toLocaleString()} blocks`);
+  const nativeEthTransfers =
+    (await ingestNativeEthBackfill(TRACKED_ADDRESS)) +
+    (await synthesizeEthFromWethWithdrawals());
+  emit(
+    1,
+    "Ingesting transfers",
+    `+${newTransfers} token transfers · +${nativeEthTransfers} ETH transfers · ${blocksScanned.toLocaleString()} blocks`
+  );
 
   emit(2, "Enriching token metadata");
   const tokensAdded = await enrichTokens();
@@ -84,15 +114,36 @@ export async function runSync(
   });
   emit(6, "Resolving token images", "done");
 
-  emit(7, "Computing PnL");
-  await computePnl();
-  emit(7, "Computing PnL", "done");
+  emit(7, mode === "full" ? "Computing full PnL" : "Computing incremental PnL");
+  let pnlEventsProcessed: number | null = null;
+  if (mode === "full") {
+    await computePnl();
+    emit(7, "Computing full PnL", "full replay done");
+  } else {
+    const pnl = await computePnlIncremental();
+    pnlEventsProcessed = pnl.eventsProcessed;
+    const detail = pnl.fullReplay
+      ? "bootstrap full replay done"
+      : pnl.initializedCursor
+        ? "cursor initialized"
+        : `${pnl.eventsProcessed} events · ${pnl.snapshotsWritten} snapshots`;
+    emit(7, "Computing incremental PnL", detail);
+  }
 
   // Reconcile lot quantities against live on-chain balances.
-  // Transfer-event replay can miss outbound movements (internal calls, protocol-level
-  // burns, or SQL ingestion gaps), leaving phantom balances.
+  // Transfer-event replay can miss internal movements or SQL ingestion gaps. ERC-20
+  // reconciliation only lowers phantom balances; native ETH can move both ways.
   emit(8, "Reconciling balances");
+  const today = new Date().toISOString().slice(0, 10);
   const allLots = await db.select().from(lots).all();
+  if (!allLots.some((lot) => lot.tokenAddress === NATIVE_TOKEN_ADDRESS)) {
+    allLots.push({
+      tokenAddress: NATIVE_TOKEN_ADDRESS,
+      quantity: "0",
+      avgCostUsd: 0,
+      realizedPnlUsd: 0,
+    });
+  }
   const decimalsMap = new Map(
     (await db.select().from(tokens).all()).map((t) => [t.contractAddress, t.decimals])
   );
@@ -100,11 +151,12 @@ export async function runSync(
   let corrected = 0;
   for (const lot of allLots) {
     const computedQty = parseFloat(lot.quantity);
-    if (computedQty <= 0) continue;
+    const isNativeEth = lot.tokenAddress === NATIVE_TOKEN_ADDRESS;
+    if (computedQty <= 0 && !isNativeEth) continue;
 
     try {
       let onChainQty: number;
-      if (lot.tokenAddress === NATIVE_TOKEN_ADDRESS) {
+      if (isNativeEth) {
         const wei = await publicClient.getBalance({ address: TRACKED_ADDRESS as `0x${string}` });
         onChainQty = Number(wei) / 1e18;
       } else {
@@ -118,18 +170,27 @@ export async function runSync(
         onChainQty = Number(raw) / 10 ** decimals;
       }
 
-      const discrepancyPct = Math.abs(onChainQty - computedQty) / computedQty;
-      if (onChainQty < computedQty && discrepancyPct > 0.01) {
+      const discrepancyPct = Math.abs(onChainQty - computedQty) / Math.max(computedQty, 1e-12);
+      const shouldCorrect = isNativeEth
+        ? Math.abs(onChainQty - computedQty) > 1e-10 && discrepancyPct > 0.01
+        : onChainQty < computedQty && discrepancyPct > 0.01;
+
+      if (shouldCorrect) {
+        const avgCostUsd =
+          isNativeEth && computedQty <= 0 && onChainQty > 0 && lot.avgCostUsd === 0
+            ? await getPriceForDate(NATIVE_TOKEN_ADDRESS, today)
+            : lot.avgCostUsd;
+
         await db.insert(lots)
           .values({
             tokenAddress: lot.tokenAddress,
             quantity: onChainQty.toString(),
-            avgCostUsd: lot.avgCostUsd,
+            avgCostUsd,
             realizedPnlUsd: lot.realizedPnlUsd,
           })
           .onConflictDoUpdate({
             target: lots.tokenAddress,
-            set: { quantity: onChainQty.toString() },
+            set: { quantity: onChainQty.toString(), avgCostUsd },
           })
           .run();
         corrected++;
@@ -156,11 +217,14 @@ export async function runSync(
   const durationMs = Date.now() - start;
 
   return {
+    mode,
     tokensAdded,
     newTransfers,
+    nativeEthTransfers,
     blocksScanned,
     txResolved,
     pricesAdded,
+    pnlEventsProcessed,
     durationMs,
   };
 }

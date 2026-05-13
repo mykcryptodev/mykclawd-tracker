@@ -1,5 +1,7 @@
 import { runSync } from "../../../lib/sync";
 
+export const maxDuration = 300;
+
 export async function POST(req: Request) {
   const token = req.headers.get("x-sync-token");
   const syncToken = process.env.SYNC_TOKEN;
@@ -19,7 +21,7 @@ export async function POST(req: Request) {
       }
 
       try {
-        const result = await runSync((progress) => emit(progress));
+        const result = await runSync({ mode: "fast" }, (progress) => emit(progress));
         emit({ done: true, result });
       } catch (e) {
         emit({ error: (e as Error).message });

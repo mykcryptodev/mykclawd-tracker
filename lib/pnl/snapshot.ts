@@ -5,10 +5,12 @@ import {
   tokens,
   lots,
   dailySnapshots,
+  syncState,
 } from "../../db/schema";
 import { getPriceForDate } from "../ingest/prices";
 import { processInbound, processOutbound, processGas, type Lot } from "./wavg";
 import { NATIVE_TOKEN_ADDRESS } from "../rpc";
+import { eq, gt } from "drizzle-orm";
 
 /** Omitted from PnL dashboard positions, totals, and allocation (case-insensitive). */
 const PNL_DASHBOARD_EXCLUDED_CONTRACTS = new Set(
@@ -27,110 +29,171 @@ function humanAmount(rawAmount: string, decimals: number): number {
   return Number(whole) + Number(frac) / Number(divisor);
 }
 
-export async function computePnl(): Promise<void> {
-  // Load all tokens (for decimals)
+const PNL_SYNC_KEY = "pnl_last_processed_block";
+
+type TransferRow = typeof transfers.$inferSelect;
+type TransactionRow = typeof transactions.$inferSelect;
+type TokenMeta = Map<string, { decimals: number; isPriced: boolean; symbol: string }>;
+
+type ReplayEvent =
+  | {
+      kind: "transfer";
+      blockTimestamp: number;
+      blockNumber: number;
+      sortIndex: number;
+      transfer: TransferRow;
+    }
+  | {
+      kind: "gas";
+      blockTimestamp: number;
+      blockNumber: number;
+      sortIndex: number;
+      tx: TransactionRow;
+    };
+
+export interface IncrementalPnlResult {
+  eventsProcessed: number;
+  snapshotsWritten: number;
+  fullReplay: boolean;
+  initializedCursor: boolean;
+}
+
+async function loadTokenMeta(): Promise<TokenMeta> {
   const allTokens = await db.select().from(tokens).all();
-  const tokenMeta = new Map(
+  return new Map(
     allTokens.map((t) => [
       t.contractAddress,
       { decimals: t.decimals, isPriced: t.isPriced, symbol: t.symbol },
     ])
   );
+}
 
-  // Load all transfers sorted chronologically
-  const allTransfers = (await db
-    .select()
-    .from(transfers)
-    .all())
-    .sort((a, b) => a.blockTimestamp - b.blockTimestamp);
-
-  // Load gas data
-  const txGasMap = new Map(
-    (await db.select().from(transactions).all())
-      .filter((t) => t.gasEthWei !== "0")
-      .map((t) => [t.txHash, t])
+function sortReplayEvents(events: ReplayEvent[]): ReplayEvent[] {
+  return events.sort((a, b) =>
+    a.blockTimestamp - b.blockTimestamp ||
+    a.blockNumber - b.blockNumber ||
+    a.sortIndex - b.sortIndex
   );
+}
 
-  // Initialize lots state
-  const lotState = new Map<string, Lot>();
-  function getLot(address: string): Lot {
-    return lotState.get(address) ?? { quantity: 0, avgCostUsd: 0, realizedPnlUsd: 0 };
-  }
+async function loadReplayEvents(afterBlock?: number): Promise<ReplayEvent[]> {
+  const allTransfers = afterBlock === undefined
+    ? await db.select().from(transfers).all()
+    : await db.select().from(transfers).where(gt(transfers.blockNumber, afterBlock)).all();
+  const gasTxList = (afterBlock === undefined
+    ? await db.select().from(transactions).all()
+    : await db.select().from(transactions).where(gt(transactions.blockNumber, afterBlock)).all())
+    .filter((t) => t.gasEthWei !== "0");
 
-  // Collect day-end state for snapshots
-  const dailyLots = new Map<string, Map<string, Lot>>(); // date → tokenAddress → lot
+  return sortReplayEvents([
+    ...allTransfers.map((transfer) => ({
+      kind: "transfer" as const,
+      blockTimestamp: transfer.blockTimestamp,
+      blockNumber: transfer.blockNumber,
+      sortIndex: transfer.logIndex,
+      transfer,
+    })),
+    ...gasTxList.map((tx) => ({
+      kind: "gas" as const,
+      blockTimestamp: tx.blockTimestamp,
+      blockNumber: tx.blockNumber,
+      sortIndex: Number.MAX_SAFE_INTEGER,
+      tx,
+    })),
+  ]);
+}
 
-  let lastDate = "";
+async function readPnlLastProcessedBlock(): Promise<number | null> {
+  const row = await db
+    .select()
+    .from(syncState)
+    .where(eq(syncState.key, PNL_SYNC_KEY))
+    .get();
+  return row ? Number(row.value) : null;
+}
 
-  const totalTransfers = allTransfers.length;
-  let processed = 0;
+async function writePnlLastProcessedBlock(blockNumber: number): Promise<void> {
+  await db.insert(syncState)
+    .values({ key: PNL_SYNC_KEY, value: blockNumber.toString() })
+    .onConflictDoUpdate({
+      target: syncState.key,
+      set: { value: blockNumber.toString() },
+    })
+    .run();
+}
 
-  for (const transfer of allTransfers) {
-    processed++;
-    if (processed % 500 === 0 || processed === totalTransfers) {
-      console.log(`  ${processed}/${totalTransfers} transfers replayed`);
-    }
-    const date = tsToDate(transfer.blockTimestamp);
-    const tokenAddr = transfer.tokenAddress ?? NATIVE_TOKEN_ADDRESS;
+async function readMaxPortfolioBlock(): Promise<number> {
+  const transferBlocks = await db
+    .select({ blockNumber: transfers.blockNumber })
+    .from(transfers)
+    .all();
+  const txBlocks = await db
+    .select({ blockNumber: transactions.blockNumber })
+    .from(transactions)
+    .all();
+
+  return Math.max(0, ...transferBlocks.map((r) => r.blockNumber), ...txBlocks.map((r) => r.blockNumber));
+}
+
+function loadLotStateFromRows(rows: Array<typeof lots.$inferSelect>): Map<string, Lot> {
+  return new Map(
+    rows.map((lot) => [
+      lot.tokenAddress,
+      {
+        quantity: parseFloat(lot.quantity),
+        avgCostUsd: lot.avgCostUsd,
+        realizedPnlUsd: lot.realizedPnlUsd,
+      },
+    ])
+  );
+}
+
+function getLot(lotState: Map<string, Lot>, address: string): Lot {
+  return lotState.get(address) ?? { quantity: 0, avgCostUsd: 0, realizedPnlUsd: 0 };
+}
+
+async function applyReplayEvent(
+  event: ReplayEvent,
+  tokenMeta: TokenMeta,
+  lotState: Map<string, Lot>
+): Promise<boolean> {
+  const date = tsToDate(event.blockTimestamp);
+
+  if (event.kind === "transfer") {
+    const tokenAddr = event.transfer.tokenAddress ?? NATIVE_TOKEN_ADDRESS;
     const meta = tokenMeta.get(tokenAddr);
-    if (!meta?.isPriced) continue; // skip unpriced tokens
+    if (!meta?.isPriced) return false;
 
-    const amount = humanAmount(transfer.rawAmount, meta.decimals);
+    const amount = humanAmount(event.transfer.rawAmount, meta.decimals);
     const priceUsd = await getPriceForDate(tokenAddr, date);
-    if (priceUsd === 0) continue; // no price data for this date — skip event
+    if (priceUsd === 0) return false;
 
-    let lot = getLot(tokenAddr);
-
-    if (transfer.direction === "in") {
-      const { lot: newLot } = processInbound(lot, amount, priceUsd);
-      lot = newLot;
-    } else {
-      const { lot: newLot } = processOutbound(lot, amount, priceUsd);
-      lot = newLot;
-    }
-
-    lotState.set(tokenAddr, lot);
-
-    // Track gas for this tx (only if ETH lot and tx is originated by our wallet)
-    const gasTx = txGasMap.get(transfer.txHash);
-    if (gasTx && tokenAddr !== NATIVE_TOKEN_ADDRESS) {
-      // Gas already handled below when processing the ETH lot
-    }
-
-    if (date !== lastDate) {
-      lastDate = date;
-    }
-
-    // Snapshot daily state
-    dailyLots.set(date, new Map(lotState));
+    const lot = getLot(lotState, tokenAddr);
+    const { lot: newLot } = event.transfer.direction === "in"
+      ? processInbound(lot, amount, priceUsd)
+      : processOutbound(lot, amount, priceUsd);
+    lotState.set(tokenAddr, newLot);
+    return true;
   }
 
-  // Also process gas deductions separate from ERC-20 transfers
   const ethMeta = tokenMeta.get(NATIVE_TOKEN_ADDRESS);
-  const gasTxList = [...txGasMap.values()];
-  console.log(`\n  Processing ${gasTxList.length} gas transactions...`);
-  let gasProcessed = 0;
-  for (const gasTx of gasTxList) {
-    const date = tsToDate(gasTx.blockTimestamp || 0);
-    if (!ethMeta?.isPriced) continue;
-    const ethAmount = humanAmount(gasTx.gasEthWei, 18);
-    const ethPrice = await getPriceForDate(NATIVE_TOKEN_ADDRESS, date);
-    if (ethPrice === 0 || ethAmount === 0) continue;
+  if (!ethMeta?.isPriced) return false;
 
-    const lot = getLot(NATIVE_TOKEN_ADDRESS);
-    const { lot: newLot } = processGas(lot, ethAmount, ethPrice);
-    lotState.set(NATIVE_TOKEN_ADDRESS, newLot);
+  const ethAmount = humanAmount(event.tx.gasEthWei, 18);
+  const ethPrice = await getPriceForDate(NATIVE_TOKEN_ADDRESS, date);
+  if (ethPrice === 0 || ethAmount === 0) return false;
 
-    gasProcessed++;
-    if (gasProcessed % 500 === 0 || gasProcessed === gasTxList.length) {
-      console.log(`  ${gasProcessed}/${gasTxList.length} gas txs processed`);
-    }
-  }
+  const lot = getLot(lotState, NATIVE_TOKEN_ADDRESS);
+  const { lot: newLot } = processGas(lot, ethAmount, ethPrice);
+  lotState.set(NATIVE_TOKEN_ADDRESS, newLot);
+  return true;
+}
 
-  // Persist lot state
+async function persistLots(lotState: Map<string, Lot>): Promise<number> {
   const lotEntries = [...lotState.entries()];
   console.log(`\n  Persisting ${lotEntries.length} token lots...`);
   let lotsWritten = 0;
+
   for (const [tokenAddress, lot] of lotEntries) {
     await db.insert(lots)
       .values({
@@ -154,6 +217,75 @@ export async function computePnl(): Promise<void> {
     }
   }
 
+  return lotsWritten;
+}
+
+async function writeDailySnapshot(date: string, dayLots: Map<string, Lot>): Promise<void> {
+  let totalValueUsd = 0;
+  let totalCostBasisUsd = 0;
+  let unrealizedPnlUsd = 0;
+  let realizedPnlUsdCum = 0;
+
+  for (const [tokenAddress, lot] of dayLots.entries()) {
+    const priceUsd = await getPriceForDate(tokenAddress, date);
+    const value = lot.quantity * priceUsd;
+    const costBasis = lot.quantity * lot.avgCostUsd;
+
+    totalValueUsd += value;
+    totalCostBasisUsd += costBasis;
+    unrealizedPnlUsd += value - costBasis;
+    realizedPnlUsdCum += lot.realizedPnlUsd;
+  }
+
+  await db.insert(dailySnapshots)
+    .values({
+      date,
+      totalValueUsd,
+      totalCostBasisUsd,
+      unrealizedPnlUsd,
+      realizedPnlUsdCum,
+    })
+    .onConflictDoUpdate({
+      target: dailySnapshots.date,
+      set: {
+        totalValueUsd,
+        totalCostBasisUsd,
+        unrealizedPnlUsd,
+        realizedPnlUsdCum,
+      },
+    })
+    .run();
+
+  process.stdout.write(` $${totalValueUsd.toFixed(0)}\n`);
+}
+
+export async function computePnl(): Promise<void> {
+  const tokenMeta = await loadTokenMeta();
+  const replayEvents = await loadReplayEvents();
+  const lotState = new Map<string, Lot>();
+
+  // Collect day-end state for snapshots
+  const dailyLots = new Map<string, Map<string, Lot>>(); // date → tokenAddress → lot
+
+  const totalEvents = replayEvents.length;
+  let processed = 0;
+
+  for (const event of replayEvents) {
+    processed++;
+    if (processed % 500 === 0 || processed === totalEvents) {
+      console.log(`  ${processed}/${totalEvents} portfolio events replayed`);
+    }
+    const date = tsToDate(event.blockTimestamp);
+
+    const applied = await applyReplayEvent(event, tokenMeta, lotState);
+    if (!applied) continue;
+
+    // Snapshot daily state
+    dailyLots.set(date, new Map(lotState));
+  }
+
+  await persistLots(lotState);
+
   // Compute and persist daily snapshots
   const today = new Date().toISOString().slice(0, 10);
   const snapshotDates = [...dailyLots.entries()].filter(([date]) => date <= today);
@@ -162,47 +294,102 @@ export async function computePnl(): Promise<void> {
   for (const [date, dayLots] of snapshotDates) {
     const tokenCount = dayLots.size;
     process.stdout.write(`  [${snapshotsWritten + 1}/${snapshotDates.length}] ${date} — ${tokenCount} tokens...`);
-
-    let totalValueUsd = 0;
-    let totalCostBasisUsd = 0;
-    let unrealizedPnlUsd = 0;
-    let realizedPnlUsdCum = 0;
-
-    for (const [tokenAddress, lot] of dayLots.entries()) {
-      const priceUsd = await getPriceForDate(tokenAddress, date);
-      const value = lot.quantity * priceUsd;
-      const costBasis = lot.quantity * lot.avgCostUsd;
-
-      totalValueUsd += value;
-      totalCostBasisUsd += costBasis;
-      unrealizedPnlUsd += value - costBasis;
-      realizedPnlUsdCum += lot.realizedPnlUsd;
-    }
-
-    await db.insert(dailySnapshots)
-      .values({
-        date,
-        totalValueUsd,
-        totalCostBasisUsd,
-        unrealizedPnlUsd,
-        realizedPnlUsdCum,
-      })
-      .onConflictDoUpdate({
-        target: dailySnapshots.date,
-        set: {
-          totalValueUsd,
-          totalCostBasisUsd,
-          unrealizedPnlUsd,
-          realizedPnlUsdCum,
-        },
-      })
-      .run();
-
+    await writeDailySnapshot(date, dayLots);
     snapshotsWritten++;
-    process.stdout.write(` $${totalValueUsd.toFixed(0)}\n`);
   }
 
+  await writePnlLastProcessedBlock(await readMaxPortfolioBlock());
   console.log(`\n  Done.`);
+}
+
+export async function initializePnlCursorFromCurrentState(): Promise<boolean> {
+  const lastProcessedBlock = await readPnlLastProcessedBlock();
+  if (lastProcessedBlock !== null) return false;
+
+  const existingLots = await db.select().from(lots).all();
+  const existingSnapshots = await db
+    .select({ date: dailySnapshots.date })
+    .from(dailySnapshots)
+    .all();
+
+  if (existingLots.length === 0 && existingSnapshots.length === 0) return false;
+
+  const maxBlock = await readMaxPortfolioBlock();
+  await writePnlLastProcessedBlock(maxBlock);
+  console.log(`  Initialized PnL cursor at block ${maxBlock.toLocaleString()} from existing lots/snapshots`);
+  return true;
+}
+
+export async function computePnlIncremental(): Promise<IncrementalPnlResult> {
+  const lastProcessedBlock = await readPnlLastProcessedBlock();
+  const maxBlock = await readMaxPortfolioBlock();
+
+  if (lastProcessedBlock === null) {
+    const initializedCursor = await initializePnlCursorFromCurrentState();
+    if (initializedCursor) {
+      return {
+        eventsProcessed: 0,
+        snapshotsWritten: 0,
+        fullReplay: false,
+        initializedCursor: true,
+      };
+    }
+
+    await computePnl();
+    return {
+      eventsProcessed: 0,
+      snapshotsWritten: 0,
+      fullReplay: true,
+      initializedCursor: false,
+    };
+  }
+
+  if (lastProcessedBlock >= maxBlock) {
+    return {
+      eventsProcessed: 0,
+      snapshotsWritten: 0,
+      fullReplay: false,
+      initializedCursor: false,
+    };
+  }
+
+  const tokenMeta = await loadTokenMeta();
+  const replayEvents = await loadReplayEvents(lastProcessedBlock);
+  const lotState = loadLotStateFromRows(await db.select().from(lots).all());
+  const dailyLots = new Map<string, Map<string, Lot>>();
+
+  let appliedEvents = 0;
+  for (const event of replayEvents) {
+    if (appliedEvents % 100 === 0 && appliedEvents > 0) {
+      console.log(`  ${appliedEvents}/${replayEvents.length} incremental portfolio events applied`);
+    }
+
+    const applied = await applyReplayEvent(event, tokenMeta, lotState);
+    if (!applied) continue;
+
+    appliedEvents++;
+    dailyLots.set(tsToDate(event.blockTimestamp), new Map(lotState));
+  }
+
+  await persistLots(lotState);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const snapshotDates = [...dailyLots.entries()].filter(([date]) => date <= today);
+  let snapshotsWritten = 0;
+  for (const [date, dayLots] of snapshotDates) {
+    process.stdout.write(`  [incremental ${snapshotsWritten + 1}/${snapshotDates.length}] ${date} — ${dayLots.size} tokens...`);
+    await writeDailySnapshot(date, dayLots);
+    snapshotsWritten++;
+  }
+
+  await writePnlLastProcessedBlock(maxBlock);
+
+  return {
+    eventsProcessed: appliedEvents,
+    snapshotsWritten,
+    fullReplay: false,
+    initializedCursor: false,
+  };
 }
 
 // Recompute today's daily snapshot from the current lots table.

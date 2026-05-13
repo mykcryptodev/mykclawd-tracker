@@ -62,7 +62,9 @@ export function SyncButton() {
                 ...s,
                 status: "done",
                 progress: null,
-                summary: `+${r.newTransfers} transfers · ${(r.durationMs / 1000).toFixed(1)}s`,
+                summary: `+${r.newTransfers} token transfers · +${r.nativeEthTransfers ?? 0} ETH transfers · ${(
+                  r.durationMs / 1000
+                ).toFixed(1)}s`,
               }));
               setTimeout(() => window.location.reload(), 1500);
               return;

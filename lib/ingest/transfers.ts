@@ -2,7 +2,6 @@ import { changedRows, db } from "../../db/client";
 import { transfers, syncState, tokens } from "../../db/schema";
 import { getTransferLogs, getWethEvents, getCurrentBlock, NATIVE_TOKEN_ADDRESS, WETH_ADDRESS } from "../rpc";
 import { eq } from "drizzle-orm";
-import type { Address } from "viem";
 import { CdpSqlError, cdpQuery, parseSqlTimestamp, sqlString } from "../cdp-sql";
 
 const SQL_LIMIT = 1000; // target limit per SQL query
@@ -253,6 +252,10 @@ function getSyncKey(address: string) {
   return `last_block_${address.toLowerCase()}`;
 }
 
+function getNativeEthSyncKey(address: string) {
+  return `last_native_eth_block_${address.toLowerCase()}`;
+}
+
 type BasescanTx = {
   hash: string;
   blockNumber: string;
@@ -263,7 +266,7 @@ type BasescanTx = {
   isError: string;
 };
 
-// One-time backfill: fetch all native ETH value transfers via Basescan API.
+// Incremental backfill for native ETH value transfers.
 // Safe to re-run — onConflictDoNothing prevents duplicates.
 // Synthesize native ETH "in" transfers from WETH Withdrawal events already in the DB.
 // When WETH.withdraw() is called, the WETH contract sends ETH to the caller via an
@@ -303,9 +306,33 @@ export async function synthesizeEthFromWethWithdrawals(): Promise<number> {
 }
 
 export async function ingestNativeEthBackfill(address: string): Promise<number> {
+  const syncKey = getNativeEthSyncKey(address);
+  const stateRow = await db
+    .select()
+    .from(syncState)
+    .where(eq(syncState.key, syncKey))
+    .get();
+
+  const fromBlock = stateRow ? BigInt(stateRow.value) + 1n : FIRST_ACTIVE_BLOCK;
   const currentBlock = await getCurrentBlock();
-  const sqlRows = await fetchNativeEthSqlAdaptive(address, FIRST_ACTIVE_BLOCK, currentBlock);
-  if (sqlRows) return upsertTransfers(sqlRows);
+  if (fromBlock > currentBlock) return 0;
+
+  async function markSynced() {
+    await db.insert(syncState)
+      .values({ key: syncKey, value: currentBlock.toString() })
+      .onConflictDoUpdate({
+        target: syncState.key,
+        set: { value: currentBlock.toString() },
+      })
+      .run();
+  }
+
+  const sqlRows = await fetchNativeEthSqlAdaptive(address, fromBlock, currentBlock);
+  if (sqlRows) {
+    const added = await upsertTransfers(sqlRows);
+    await markSynced();
+    return added;
+  }
 
   const apiKey = process.env.BASESCAN_API_KEY ?? "";
   const addrLower = address.toLowerCase();
@@ -314,7 +341,7 @@ export async function ingestNativeEthBackfill(address: string): Promise<number> 
 
   // Fetch normal txs (direct ETH sends/receives) — paginated 10k at a time
   while (true) {
-    const url = `https://api.basescan.org/api?module=account&action=txlist&address=${address}&startblock=${Number(FIRST_ACTIVE_BLOCK)}&endblock=99999999&page=${page}&offset=10000&sort=asc&apikey=${apiKey}`;
+    const url = `https://api.basescan.org/api?module=account&action=txlist&address=${address}&startblock=${Number(fromBlock)}&endblock=${Number(currentBlock)}&page=${page}&offset=10000&sort=asc&apikey=${apiKey}`;
     const res = await fetch(url);
     const json = (await res.json()) as { status: string; result: BasescanTx[] | string };
     if (json.status !== "1" || !Array.isArray(json.result)) break;
@@ -345,6 +372,7 @@ export async function ingestNativeEthBackfill(address: string): Promise<number> 
     await new Promise((r) => setTimeout(r, 250));
   }
 
+  await markSynced();
   return added;
 }
 

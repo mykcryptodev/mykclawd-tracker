@@ -59,6 +59,16 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  icons: {
+    icon: [
+      { url: "/favicons/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicons/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicons/favicon.ico", sizes: "any" },
+    ],
+    apple: "/favicons/apple-touch-icon.png",
+    shortcut: "/favicons/favicon.ico",
+  },
+  manifest: "/favicons/site.webmanifest",
 };
 
 export default function RootLayout({
