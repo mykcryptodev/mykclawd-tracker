@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { PieChart, Pie, Cell, Tooltip } from "recharts";
 import type { PieLabelRenderProps } from "recharts";
 import { ChartContainer } from "@/components/ui/chart";
@@ -28,13 +29,29 @@ const CHART_COLORS = [
 ];
 
 const chartConfig = {};
+const TOP_N = 5;
+const usdFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
 
 export function AllocationChart({ positions }: Props) {
-  const priced = positions
-    .filter((p) => p.isPriced && p.valueUsd > 0)
-    .sort((a, b) => b.valueUsd - a.valueUsd);
+  const data = useMemo(() => {
+    const priced = positions
+      .filter((p) => p.isPriced && p.valueUsd > 0)
+      .sort((a, b) => b.valueUsd - a.valueUsd);
 
-  if (priced.length === 0) {
+    const top = priced.slice(0, TOP_N);
+    const othersValue = priced.slice(TOP_N).reduce((s, p) => s + p.valueUsd, 0);
+
+    return [
+      ...top.map((p) => ({ name: p.symbol, value: p.valueUsd })),
+      ...(othersValue > 0 ? [{ name: "Other", value: othersValue }] : []),
+    ];
+  }, [positions]);
+
+  if (data.length === 0) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center h-48 text-muted-foreground text-sm">
@@ -43,21 +60,6 @@ export function AllocationChart({ positions }: Props) {
       </Card>
     );
   }
-
-  const TOP_N = 5;
-  const top = priced.slice(0, TOP_N);
-  const othersValue = priced.slice(TOP_N).reduce((s, p) => s + p.valueUsd, 0);
-
-  const data = [
-    ...top.map((p) => ({ name: p.symbol, value: p.valueUsd })),
-    ...(othersValue > 0 ? [{ name: "Other", value: othersValue }] : []),
-  ];
-
-  const fmt = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  });
 
   return (
     <Card>
@@ -87,7 +89,7 @@ export function AllocationChart({ positions }: Props) {
               ))}
             </Pie>
             <Tooltip
-              formatter={(value) => fmt.format(Number(value))}
+              formatter={(value) => usdFormatter.format(Number(value))}
             />
           </PieChart>
         </ChartContainer>

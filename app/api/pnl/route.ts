@@ -1,21 +1,18 @@
 import { NextResponse } from "next/server";
-import { runMigrations } from "../../../db/migrate";
-import { getCurrentPositions } from "../../../lib/pnl/snapshot";
-import { db } from "../../../db/client";
-import { dailySnapshots } from "../../../db/schema";
+import {
+  getCurrentPositions,
+  getDailySnapshotSeries,
+} from "../../../lib/pnl/snapshot";
 
 export async function GET() {
-  await runMigrations();
-
   const today = new Date().toISOString().slice(0, 10);
-  const { positions, totalValueUsd, totalRealizedUsd, totalUnrealizedUsd } =
-    await getCurrentPositions(today);
-
-  const series = (await db
-    .select()
-    .from(dailySnapshots)
-    .all())
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const [
+    { positions, totalValueUsd, totalRealizedUsd, totalUnrealizedUsd },
+    series,
+  ] = await Promise.all([
+    getCurrentPositions(today),
+    getDailySnapshotSeries(),
+  ]);
 
   return NextResponse.json({
     asOf: today,

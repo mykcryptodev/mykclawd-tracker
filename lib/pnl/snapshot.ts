@@ -4,13 +4,14 @@ import {
   transactions,
   tokens,
   lots,
+  prices,
   dailySnapshots,
   syncState,
 } from "../../db/schema";
 import { getPriceForDate } from "../ingest/prices";
 import { processInbound, processOutbound, processGas, type Lot } from "./wavg";
 import { NATIVE_TOKEN_ADDRESS } from "../rpc";
-import { eq, gt } from "drizzle-orm";
+import { and, asc, eq, gt, inArray } from "drizzle-orm";
 
 /** Omitted from PnL dashboard positions, totals, and allocation (case-insensitive). */
 const PNL_DASHBOARD_EXCLUDED_CONTRACTS = new Set(
@@ -450,15 +451,59 @@ export interface TokenPosition {
   imageChecked: boolean;
 }
 
+export async function getDailySnapshotSeries(): Promise<Array<typeof dailySnapshots.$inferSelect>> {
+  return db.select().from(dailySnapshots).orderBy(asc(dailySnapshots.date)).all();
+}
+
+async function loadPricesForDate(
+  tokenAddresses: string[],
+  date: string
+): Promise<Map<string, number>> {
+  if (tokenAddresses.length === 0) return new Map();
+
+  const rows = await db
+    .select({ tokenAddress: prices.tokenAddress, priceUsd: prices.priceUsd })
+    .from(prices)
+    .where(and(eq(prices.date, date), inArray(prices.tokenAddress, tokenAddresses)))
+    .all();
+
+  return new Map(rows.map((row) => [row.tokenAddress, row.priceUsd]));
+}
+
 export async function getCurrentPositions(today: string): Promise<{
   positions: TokenPosition[];
   totalValueUsd: number;
   totalRealizedUsd: number;
   totalUnrealizedUsd: number;
 }> {
-  const allTokens = await db.select().from(tokens).all();
   const allLots = await db.select().from(lots).all();
-  const lotMap = new Map(allLots.map((l) => [l.tokenAddress, l]));
+  const displayLots = allLots.filter((lot) => {
+    const qty = parseFloat(lot.quantity);
+    return qty > 0 || lot.realizedPnlUsd !== 0;
+  });
+
+  if (displayLots.length === 0) {
+    return {
+      positions: [],
+      totalValueUsd: 0,
+      totalRealizedUsd: 0,
+      totalUnrealizedUsd: 0,
+    };
+  }
+
+  const lotMap = new Map(displayLots.map((lot) => [lot.tokenAddress, lot]));
+  const tokenAddresses = displayLots.map((lot) => lot.tokenAddress);
+  const allTokens = await db
+    .select()
+    .from(tokens)
+    .where(inArray(tokens.contractAddress, tokenAddresses))
+    .all();
+  const priceMap = await loadPricesForDate(
+    allTokens
+      .filter((token) => token.isPriced)
+      .map((token) => token.contractAddress),
+    today
+  );
 
   const positions: TokenPosition[] = [];
   let totalValueUsd = 0;
@@ -474,7 +519,7 @@ export async function getCurrentPositions(today: string): Promise<{
     if (qty <= 0 && lot.realizedPnlUsd === 0) continue;
 
     const currentPrice = token.isPriced
-      ? await getPriceForDate(token.contractAddress, today)
+      ? priceMap.get(token.contractAddress) ?? 0
       : 0;
     const rawValueUsd = qty * currentPrice;
     const valueUsd =

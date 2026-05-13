@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Table,
   TableBody,
@@ -33,13 +33,21 @@ type SortKey = keyof Pick<
   "valueUsd" | "unrealizedPnlUsd" | "realizedPnlUsd" | "percentageOfPortfolio"
 >;
 
+const usdFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 4,
+});
+
+const compactUsdFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
 function usd(n: number, compact = false) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    notation: compact ? "compact" : "standard",
-    maximumFractionDigits: compact ? 1 : 4,
-  }).format(n);
+  return compact ? compactUsdFormatter.format(n) : usdFormatter.format(n);
 }
 
 function pnlClass(n: number) {
@@ -53,112 +61,135 @@ interface Props {
   trackedAddress: string;
 }
 
+function ColHead({
+  label,
+  k,
+  sortKey,
+  asc,
+  onSort,
+}: {
+  label: string;
+  k?: SortKey;
+  sortKey: SortKey;
+  asc: boolean;
+  onSort: (key: SortKey) => void;
+}) {
+  return (
+    <TableHead
+      className={k ? "cursor-pointer select-none" : ""}
+      onClick={k ? () => onSort(k) : undefined}
+    >
+      {label}
+      {k && sortKey === k && (asc ? " ↑" : " ↓")}
+    </TableHead>
+  );
+}
+
+function PositionRow({
+  p,
+  trackedAddress,
+}: {
+  p: Position;
+  trackedAddress: string;
+}) {
+  return (
+    <TableRow
+      className="cursor-pointer hover:bg-muted/50"
+      onClick={() =>
+        window.open(
+          `https://basescan.org/token/${p.contractAddress}?a=${trackedAddress}`,
+          "_blank",
+          "noopener,noreferrer"
+        )
+      }
+    >
+      <TableCell className="font-medium">
+        <div className="flex items-center gap-2">
+          {p.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={p.imageUrl}
+              alt=""
+              className="size-5 rounded-full shrink-0 object-cover"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            />
+          ) : (
+            <Blobbie address={p.contractAddress} size={20} className="rounded-full shrink-0" />
+          )}
+          <span>{p.symbol || p.contractAddress.slice(0, 8)}</span>
+          {!p.isPriced && (
+            <Badge variant="secondary" className="text-xs">
+              unpriced
+            </Badge>
+          )}
+        </div>
+      </TableCell>
+      <TableCell>{p.quantity.toFixed(4)}</TableCell>
+      <TableCell>{p.isPriced ? usd(p.avgCostUsd, false) : "—"}</TableCell>
+      <TableCell>{p.isPriced ? usd(p.currentPriceUsd, false) : "—"}</TableCell>
+      <TableCell>{p.isPriced ? usd(p.valueUsd, true) : "—"}</TableCell>
+      <TableCell className={pnlClass(p.unrealizedPnlUsd)}>
+        {p.isPriced ? usd(p.unrealizedPnlUsd, true) : "—"}
+      </TableCell>
+      <TableCell className={pnlClass(p.realizedPnlUsd)}>
+        {p.isPriced ? usd(p.realizedPnlUsd, true) : "—"}
+      </TableCell>
+      <TableCell>
+        {p.isPriced ? `${p.percentageOfPortfolio.toFixed(1)}%` : "—"}
+      </TableCell>
+    </TableRow>
+  );
+}
+
 export function TokenTable({ positions, trackedAddress }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("valueUsd");
   const [asc, setAsc] = useState(false);
   const [showZero, setShowZero] = useState(false);
 
-  function toggleSort(key: SortKey) {
+  const toggleSort = useCallback((key: SortKey) => {
     if (sortKey === key) {
       setAsc(!asc);
     } else {
       setSortKey(key);
       setAsc(false);
     }
-  }
+  }, [asc, sortKey]);
 
   // Compact formatter uses 1 decimal place, so anything < $0.05 rounds to "$0.0".
   // Collapse those alongside true zeros.
-  const active = positions.filter((p) => p.valueUsd >= 0.05);
-  const zero = positions.filter((p) => p.valueUsd < 0.05);
+  const { visibleRows, zeroRows } = useMemo(() => {
+    const active = positions.filter((p) => p.valueUsd >= 0.05);
+    const zero = positions.filter((p) => p.valueUsd < 0.05);
 
-  const pricedActive = active.filter((p) => p.isPriced);
-  const unpricedActive = active.filter((p) => !p.isPriced);
+    const pricedActive = active.filter((p) => p.isPriced);
+    const unpricedActive = active.filter((p) => !p.isPriced);
 
-  const sortedActive = [...pricedActive].sort((a, b) =>
-    asc ? a[sortKey] - b[sortKey] : b[sortKey] - a[sortKey]
-  );
-
-  const visibleRows = [...sortedActive, ...unpricedActive];
-
-  const zeroRows = [...zero].sort((a, b) =>
-    asc ? a[sortKey] - b[sortKey] : b[sortKey] - a[sortKey]
-  );
-
-  function ColHead({ label, k }: { label: string; k?: SortKey }) {
-    return (
-      <TableHead
-        className={k ? "cursor-pointer select-none" : ""}
-        onClick={k ? () => toggleSort(k) : undefined}
-      >
-        {label}
-        {k && sortKey === k && (asc ? " ↑" : " ↓")}
-      </TableHead>
+    const sortedActive = [...pricedActive].sort((a, b) =>
+      asc ? a[sortKey] - b[sortKey] : b[sortKey] - a[sortKey]
     );
-  }
 
-  function PositionRow({ p }: { p: Position }) {
-    return (
-      <TableRow
-        className="cursor-pointer hover:bg-muted/50"
-        onClick={() =>
-          window.open(
-            `https://basescan.org/token/${p.contractAddress}?a=${trackedAddress}`,
-            "_blank",
-            "noopener,noreferrer"
-          )
-        }
-      >
-        <TableCell className="font-medium">
-          <div className="flex items-center gap-2">
-            {p.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={p.imageUrl}
-                alt=""
-                className="size-5 rounded-full shrink-0 object-cover"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-              />
-            ) : (
-              <Blobbie address={p.contractAddress} size={20} className="rounded-full shrink-0" />
-            )}
-            <span>{p.symbol || p.contractAddress.slice(0, 8)}</span>
-            {!p.isPriced && (
-              <Badge variant="secondary" className="text-xs">
-                unpriced
-              </Badge>
-            )}
-          </div>
-        </TableCell>
-        <TableCell>{p.quantity.toFixed(4)}</TableCell>
-        <TableCell>{p.isPriced ? usd(p.avgCostUsd, false) : "—"}</TableCell>
-        <TableCell>{p.isPriced ? usd(p.currentPriceUsd, false) : "—"}</TableCell>
-        <TableCell>{p.isPriced ? usd(p.valueUsd, true) : "—"}</TableCell>
-        <TableCell className={pnlClass(p.unrealizedPnlUsd)}>
-          {p.isPriced ? usd(p.unrealizedPnlUsd, true) : "—"}
-        </TableCell>
-        <TableCell className={pnlClass(p.realizedPnlUsd)}>
-          {p.isPriced ? usd(p.realizedPnlUsd, true) : "—"}
-        </TableCell>
-        <TableCell>
-          {p.isPriced ? `${p.percentageOfPortfolio.toFixed(1)}%` : "—"}
-        </TableCell>
-      </TableRow>
+    const sortedZero = [...zero].sort((a, b) =>
+      asc ? a[sortKey] - b[sortKey] : b[sortKey] - a[sortKey]
     );
-  }
+
+    return {
+      visibleRows: [...sortedActive, ...unpricedActive],
+      zeroRows: sortedZero,
+    };
+  }, [asc, positions, sortKey]);
 
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <ColHead label="Token" />
-          <ColHead label="Qty" />
-          <ColHead label="Avg Cost" />
-          <ColHead label="Price" />
-          <ColHead label="Value" k="valueUsd" />
-          <ColHead label="Unrealized" k="unrealizedPnlUsd" />
-          <ColHead label="Realized" k="realizedPnlUsd" />
-          <ColHead label="%" k="percentageOfPortfolio" />
+          <ColHead label="Token" sortKey={sortKey} asc={asc} onSort={toggleSort} />
+          <ColHead label="Qty" sortKey={sortKey} asc={asc} onSort={toggleSort} />
+          <ColHead label="Avg Cost" sortKey={sortKey} asc={asc} onSort={toggleSort} />
+          <ColHead label="Price" sortKey={sortKey} asc={asc} onSort={toggleSort} />
+          <ColHead label="Value" k="valueUsd" sortKey={sortKey} asc={asc} onSort={toggleSort} />
+          <ColHead label="Unrealized" k="unrealizedPnlUsd" sortKey={sortKey} asc={asc} onSort={toggleSort} />
+          <ColHead label="Realized" k="realizedPnlUsd" sortKey={sortKey} asc={asc} onSort={toggleSort} />
+          <ColHead label="%" k="percentageOfPortfolio" sortKey={sortKey} asc={asc} onSort={toggleSort} />
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -174,7 +205,7 @@ export function TokenTable({ positions, trackedAddress }: Props) {
         )}
 
         {visibleRows.map((p) => (
-          <PositionRow key={p.contractAddress} p={p} />
+          <PositionRow key={p.contractAddress} p={p} trackedAddress={trackedAddress} />
         ))}
 
         {zeroRows.length > 0 && (
@@ -197,7 +228,9 @@ export function TokenTable({ positions, trackedAddress }: Props) {
         )}
 
         {showZero &&
-          zeroRows.map((p) => <PositionRow key={p.contractAddress} p={p} />)}
+          zeroRows.map((p) => (
+            <PositionRow key={p.contractAddress} p={p} trackedAddress={trackedAddress} />
+          ))}
       </TableBody>
     </Table>
   );

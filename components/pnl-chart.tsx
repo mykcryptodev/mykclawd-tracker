@@ -1,13 +1,12 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   AreaChart,
   Area,
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
 import {
@@ -34,29 +33,42 @@ const chartConfig = {
   pnl: { label: "Total PnL", color: "var(--chart-2)" },
 };
 
+const dateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+
+const compactUsdFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
+const usdFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
+
 function formatDate(d: string) {
-  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return dateFormatter.format(new Date(`${d}T00:00:00Z`));
 }
 
 function usd(n: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(n);
+  return compactUsdFormatter.format(n);
 }
 
 export function PnlChart({ series }: Props) {
-  const valueData = series.map((s) => ({
-    date: formatDate(s.date),
-    value: s.totalValueUsd,
-  }));
-
-  const pnlData = series.map((s) => ({
-    date: formatDate(s.date),
-    pnl: s.unrealizedPnlUsd + s.realizedPnlUsdCum,
-  }));
+  const chartData = useMemo(
+    () =>
+      series.map((s) => ({
+        date: formatDate(s.date),
+        value: s.totalValueUsd,
+        pnl: s.unrealizedPnlUsd + s.realizedPnlUsdCum,
+      })),
+    [series]
+  );
 
   if (series.length === 0) {
     return (
@@ -82,7 +94,7 @@ export function PnlChart({ series }: Props) {
 
           <TabsContent value="value">
             <ChartContainer config={chartConfig} className="h-64">
-              <AreaChart data={valueData}>
+              <AreaChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="date"
@@ -94,10 +106,7 @@ export function PnlChart({ series }: Props) {
                   content={
                     <ChartTooltipContent
                       formatter={(v) =>
-                        new Intl.NumberFormat("en-US", {
-                          style: "currency",
-                          currency: "USD",
-                        }).format(v as number)
+                        usdFormatter.format(v as number)
                       }
                     />
                   }
@@ -116,7 +125,7 @@ export function PnlChart({ series }: Props) {
 
           <TabsContent value="pnl">
             <ChartContainer config={chartConfig} className="h-64">
-              <AreaChart data={pnlData}>
+              <AreaChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="date"
@@ -129,10 +138,7 @@ export function PnlChart({ series }: Props) {
                   content={
                     <ChartTooltipContent
                       formatter={(v) =>
-                        new Intl.NumberFormat("en-US", {
-                          style: "currency",
-                          currency: "USD",
-                        }).format(v as number)
+                        usdFormatter.format(v as number)
                       }
                     />
                   }
