@@ -8,6 +8,7 @@ import { TokenTable } from "@/components/token-table";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentPositions, getDailySnapshotSeries } from "@/lib/pnl/snapshot";
+import { fetchInferenceSpend } from "@/lib/inference-spend";
 
 export const dynamic = "force-dynamic";
 
@@ -25,9 +26,11 @@ async function getPnlData() {
     const [
       { positions, totalValueUsd, totalRealizedUsd, totalUnrealizedUsd },
       series,
+      inferenceSpend,
     ] = await Promise.all([
       getCurrentPositions(today),
       getDailySnapshotSeries(),
+      fetchInferenceSpend(),
     ]);
 
     return {
@@ -37,6 +40,7 @@ async function getPnlData() {
       totalUnrealizedUsd,
       byToken: positions,
       dailySeries: series,
+      inferenceSpend,
     };
   } catch {
     return null;
@@ -52,6 +56,7 @@ export default async function PnlPage() {
   const positions = data?.byToken ?? [];
   const series = data?.dailySeries ?? [];
   const asOf = data?.asOf ?? "—";
+  const inferenceSpendUsd = data?.inferenceSpend?.totalUsd ?? 0;
 
   return (
     <SidebarProvider
@@ -72,6 +77,7 @@ export default async function PnlPage() {
                 totalValueUsd={totalValueUsd}
                 totalRealizedUsd={totalRealizedUsd}
                 totalUnrealizedUsd={totalUnrealizedUsd}
+                inferenceSpendUsd={inferenceSpendUsd}
               />
               <div className="grid grid-cols-1 gap-4 px-4 lg:grid-cols-3 lg:px-6">
                 <div className="lg:col-span-2">

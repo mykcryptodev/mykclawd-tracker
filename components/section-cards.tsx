@@ -22,6 +22,7 @@ interface Props {
   totalValueUsd: number
   totalRealizedUsd: number
   totalUnrealizedUsd: number
+  inferenceSpendUsd: number
 }
 
 function pnlClass(n: number) {
@@ -42,11 +43,12 @@ export function SectionCards({
   totalValueUsd,
   totalRealizedUsd,
   totalUnrealizedUsd,
+  inferenceSpendUsd,
 }: Props) {
   const totalPnl = totalRealizedUsd + totalUnrealizedUsd
 
   return (
-    <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @4xl/main:grid-cols-4">
       <Card className="@container/card border-border/60">
         <CardHeader className="gap-3">
           <CardDescription className="text-[11px] uppercase tracking-widest font-medium">
@@ -96,6 +98,20 @@ export function SectionCards({
         <CardFooter className="flex items-center gap-1.5">
           <PnlIndicator value={totalRealizedUsd} />
           <span className="text-[11px] text-muted-foreground">Closed positions · weighted avg cost</span>
+        </CardFooter>
+      </Card>
+
+      <Card className="@container/card border-border/60">
+        <CardHeader className="gap-3">
+          <CardDescription className="text-[11px] uppercase tracking-widest font-medium">
+            Inference Spend
+          </CardDescription>
+          <CardTitle className="text-4xl font-[family-name:var(--font-segment)] font-bold tabular-nums tracking-tight @[250px]/card:text-5xl text-red-600 dark:text-red-400">
+            {usd(inferenceSpendUsd)}
+          </CardTitle>
+        </CardHeader>
+        <CardFooter className="flex items-center gap-1.5">
+          <span className="text-[11px] text-muted-foreground">Surplus Intelligence · USDC</span>
         </CardFooter>
       </Card>
     </div>

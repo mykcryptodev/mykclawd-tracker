@@ -83,36 +83,38 @@ export async function runSync(
   emit(2, "Enriching token metadata", `+${tokensAdded} tokens`);
 
   emit(3, "Resolving transactions");
-  const txResolved = await resolveTransactions(TRACKED_ADDRESS);
-  emit(3, "Resolving transactions", `${txResolved} resolved`);
-
   emit(4, "Ingesting prices");
-  const pricesAdded = await ingestPrices();
-  emit(4, "Ingesting prices", `+${pricesAdded} price rows`);
-
   emit(5, "Fetching liquidity data");
-  await ingestLiquidity((current, total) => {
-    onProgress?.({
-      step: 5,
-      totalSteps: TOTAL_STEPS,
-      label: "Fetching liquidity data",
-      innerPct: Math.round((current / total) * 100),
-      detail: `${current} / ${total} tokens`,
-    });
-  });
-  emit(5, "Fetching liquidity data", "done");
-
   emit(6, "Resolving token images");
-  await ingestImages((current, total) => {
-    onProgress?.({
-      step: 6,
-      totalSteps: TOTAL_STEPS,
-      label: "Resolving token images",
-      innerPct: Math.round((current / total) * 100),
-      detail: `${current} / ${total} tokens`,
-    });
-  });
-  emit(6, "Resolving token images", "done");
+
+  const [txResolved, pricesAdded] = await Promise.all([
+    resolveTransactions(TRACKED_ADDRESS).then((n) => {
+      emit(3, "Resolving transactions", `${n} resolved`);
+      return n;
+    }),
+    ingestPrices().then((n) => {
+      emit(4, "Ingesting prices", `+${n} price rows`);
+      return n;
+    }),
+    ingestLiquidity((current, total) => {
+      onProgress?.({
+        step: 5,
+        totalSteps: TOTAL_STEPS,
+        label: "Fetching liquidity data",
+        innerPct: Math.round((current / total) * 100),
+        detail: `${current} / ${total} tokens`,
+      });
+    }).then(() => emit(5, "Fetching liquidity data", "done")),
+    ingestImages((current, total) => {
+      onProgress?.({
+        step: 6,
+        totalSteps: TOTAL_STEPS,
+        label: "Resolving token images",
+        innerPct: Math.round((current / total) * 100),
+        detail: `${current} / ${total} tokens`,
+      });
+    }).then(() => emit(6, "Resolving token images", "done")),
+  ]);
 
   emit(7, mode === "full" ? "Computing full PnL" : "Computing incremental PnL");
   let pnlEventsProcessed: number | null = null;
