@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { syncState } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { runMigrations } from "@/db/migrate";
+import { CpuChart } from "@/components/health/cpu-chart";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -208,20 +209,13 @@ export default async function HealthPage() {
                   )}
 
                   {/* CPU */}
-                  <Card className="border-border/60">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
-                        CPU
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <StatRow label="Model" value={data.cpu.model} />
-                      <StatRow label="Cores" value={String(data.cpu.cores)} />
-                      <StatRow label="Load (1m)" value={data.cpu.loadAvg1m.toFixed(2)} />
-                      <StatRow label="Load (5m)" value={data.cpu.loadAvg5m.toFixed(2)} />
-                      <StatRow label="Load (15m)" value={data.cpu.loadAvg15m.toFixed(2)} />
-                    </CardContent>
-                  </Card>
+                  <CpuChart
+                    model={data.cpu.model}
+                    cores={data.cpu.cores}
+                    loadAvg1m={data.cpu.loadAvg1m}
+                    loadAvg5m={data.cpu.loadAvg5m}
+                    loadAvg15m={data.cpu.loadAvg15m}
+                  />
 
                   {/* Uptime */}
                   <Card className="border-border/60">
