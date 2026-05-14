@@ -23,6 +23,12 @@ interface HealthSnapshot {
     freeBytes: number;
     usedPercent: number;
   };
+  disk: {
+    totalBytes: number;
+    usedBytes: number;
+    freeBytes: number;
+    usedPercent: number;
+  } | null;
   cpu: {
     model: string;
     cores: number;
@@ -166,6 +172,40 @@ export default async function HealthPage() {
                       </div>
                     </CardContent>
                   </Card>
+
+                  {/* Disk */}
+                  {data.disk && (
+                    <Card className="border-border/60">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
+                          Disk
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-mono">
+                            {formatBytes(data.disk.usedBytes)} / {formatBytes(data.disk.totalBytes)}
+                          </span>
+                          <span
+                            className={`font-mono font-semibold ${
+                              data.disk.usedPercent > 90
+                                ? "text-red-500"
+                                : data.disk.usedPercent > 70
+                                ? "text-yellow-500"
+                                : "text-green-500"
+                            }`}
+                          >
+                            {data.disk.usedPercent.toFixed(1)}%
+                          </span>
+                        </div>
+                        <ProgressBar value={data.disk.usedPercent} />
+                        <div className="grid grid-cols-2 gap-2 mt-1">
+                          <StatRow label="Free" value={formatBytes(data.disk.freeBytes)} />
+                          <StatRow label="Total" value={formatBytes(data.disk.totalBytes)} />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   {/* CPU */}
                   <Card className="border-border/60">
