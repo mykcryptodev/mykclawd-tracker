@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
-import os from "os";
+import { db } from "@/db/client";
+import { syncState } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { runMigrations } from "@/db/migrate";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -10,6 +13,52 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Server Health",
 };
+
+interface HealthSnapshot {
+  timestamp: string;
+  uptime: { system: number; process: number };
+  memory: {
+    totalBytes: number;
+    usedBytes: number;
+    freeBytes: number;
+    usedPercent: number;
+  };
+  cpu: {
+    model: string;
+    cores: number;
+    loadAvg1m: number;
+    loadAvg5m: number;
+    loadAvg15m: number;
+  };
+  process: {
+    nodeVersion: string;
+    platform: string;
+    arch: string;
+    memoryUsage: {
+      rss: number;
+      heapTotal: number;
+      heapUsed: number;
+      external: number;
+    };
+  };
+}
+
+const HEALTH_SNAPSHOT_KEY = "health_snapshot";
+
+async function getHealthSnapshot(): Promise<HealthSnapshot | null> {
+  try {
+    await runMigrations();
+    const row = await db
+      .select()
+      .from(syncState)
+      .where(eq(syncState.key, HEALTH_SNAPSHOT_KEY))
+      .get();
+    if (!row) return null;
+    return JSON.parse(row.value) as HealthSnapshot;
+  } catch {
+    return null;
+  }
+}
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1024 ** 3) return (bytes / 1024 ** 3).toFixed(2) + " GB";
@@ -22,7 +71,7 @@ function formatUptime(seconds: number): string {
   const h = Math.floor((seconds % 86400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
-  const parts = [];
+  const parts: string[] = [];
   if (d > 0) parts.push(`${d}d`);
   if (h > 0) parts.push(`${h}h`);
   if (m > 0) parts.push(`${m}m`);
@@ -44,11 +93,7 @@ function ProgressBar({ value }: { value: number }) {
   );
 }
 
-interface StatRowProps {
-  label: string;
-  value: string;
-}
-function StatRow({ label, value }: StatRowProps) {
+function StatRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
       <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
@@ -59,20 +104,12 @@ function StatRow({ label, value }: StatRowProps) {
   );
 }
 
-export default function HealthPage() {
-  const totalMem = os.totalmem();
-  const freeMem = os.freemem();
-  const usedMem = totalMem - freeMem;
-  const memPct = (usedMem / totalMem) * 100;
+export default async function HealthPage() {
+  const data = await getHealthSnapshot();
 
-  const cpus = os.cpus();
-  const loadAvg = os.loadavg();
-
-  const sysUptime = os.uptime();
-  const procUptime = process.uptime();
-  const procMem = process.memoryUsage();
-
-  const asOf = new Date().toISOString().slice(0, 19).replace("T", " ") + " UTC";
+  const asOf = data
+    ? new Date(data.timestamp).toISOString().slice(0, 19).replace("T", " ") + " UTC"
+    : "—";
 
   return (
     <SidebarProvider
@@ -90,83 +127,93 @@ export default function HealthPage() {
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-6 py-6 md:gap-8 md:py-8 px-4 lg:px-6">
 
-              {/* Memory */}
-              <Card className="border-border/60">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
-                    Memory
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-mono">
-                      {formatBytes(usedMem)} / {formatBytes(totalMem)}
-                    </span>
-                    <span
-                      className={`font-mono font-semibold ${
-                        memPct > 90
-                          ? "text-red-500"
-                          : memPct > 70
-                          ? "text-yellow-500"
-                          : "text-green-500"
-                      }`}
-                    >
-                      {memPct.toFixed(1)}%
-                    </span>
-                  </div>
-                  <ProgressBar value={memPct} />
-                  <div className="grid grid-cols-2 gap-2 mt-1">
-                    <StatRow label="Free" value={formatBytes(freeMem)} />
-                    <StatRow label="Total" value={formatBytes(totalMem)} />
-                  </div>
-                </CardContent>
-              </Card>
+              {!data ? (
+                <Card className="border-border/60">
+                  <CardContent className="py-12 text-center text-sm text-muted-foreground">
+                    No health data yet. The metrics reporter on the home server hasn&apos;t pushed any data.
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  {/* Memory */}
+                  <Card className="border-border/60">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
+                        Memory
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-mono">
+                          {formatBytes(data.memory.usedBytes)} / {formatBytes(data.memory.totalBytes)}
+                        </span>
+                        <span
+                          className={`font-mono font-semibold ${
+                            data.memory.usedPercent > 90
+                              ? "text-red-500"
+                              : data.memory.usedPercent > 70
+                              ? "text-yellow-500"
+                              : "text-green-500"
+                          }`}
+                        >
+                          {data.memory.usedPercent.toFixed(1)}%
+                        </span>
+                      </div>
+                      <ProgressBar value={data.memory.usedPercent} />
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                        <StatRow label="Free" value={formatBytes(data.memory.freeBytes)} />
+                        <StatRow label="Total" value={formatBytes(data.memory.totalBytes)} />
+                      </div>
+                    </CardContent>
+                  </Card>
 
-              {/* CPU */}
-              <Card className="border-border/60">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
-                    CPU
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <StatRow label="Model" value={cpus[0]?.model ?? "Unknown"} />
-                  <StatRow label="Cores" value={String(cpus.length)} />
-                  <StatRow label="Load (1m)" value={loadAvg[0].toFixed(2)} />
-                  <StatRow label="Load (5m)" value={loadAvg[1].toFixed(2)} />
-                  <StatRow label="Load (15m)" value={loadAvg[2].toFixed(2)} />
-                </CardContent>
-              </Card>
+                  {/* CPU */}
+                  <Card className="border-border/60">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
+                        CPU
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <StatRow label="Model" value={data.cpu.model} />
+                      <StatRow label="Cores" value={String(data.cpu.cores)} />
+                      <StatRow label="Load (1m)" value={data.cpu.loadAvg1m.toFixed(2)} />
+                      <StatRow label="Load (5m)" value={data.cpu.loadAvg5m.toFixed(2)} />
+                      <StatRow label="Load (15m)" value={data.cpu.loadAvg15m.toFixed(2)} />
+                    </CardContent>
+                  </Card>
 
-              {/* Uptime */}
-              <Card className="border-border/60">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
-                    Uptime
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <StatRow label="System" value={formatUptime(sysUptime)} />
-                  <StatRow label="Process" value={formatUptime(procUptime)} />
-                </CardContent>
-              </Card>
+                  {/* Uptime */}
+                  <Card className="border-border/60">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
+                        Uptime
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <StatRow label="System" value={formatUptime(data.uptime.system)} />
+                      <StatRow label="Process" value={formatUptime(data.uptime.process)} />
+                    </CardContent>
+                  </Card>
 
-              {/* Process */}
-              <Card className="border-border/60">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
-                    Process
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <StatRow label="Node.js" value={process.version} />
-                  <StatRow label="Platform" value={`${os.platform()} ${os.arch()}`} />
-                  <StatRow label="Heap Used" value={formatBytes(procMem.heapUsed)} />
-                  <StatRow label="Heap Total" value={formatBytes(procMem.heapTotal)} />
-                  <StatRow label="RSS" value={formatBytes(procMem.rss)} />
-                  <StatRow label="External" value={formatBytes(procMem.external)} />
-                </CardContent>
-              </Card>
+                  {/* Process */}
+                  <Card className="border-border/60">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
+                        Process
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <StatRow label="Node.js" value={data.process.nodeVersion} />
+                      <StatRow label="Platform" value={`${data.process.platform} ${data.process.arch}`} />
+                      <StatRow label="Heap Used" value={formatBytes(data.process.memoryUsage.heapUsed)} />
+                      <StatRow label="Heap Total" value={formatBytes(data.process.memoryUsage.heapTotal)} />
+                      <StatRow label="RSS" value={formatBytes(data.process.memoryUsage.rss)} />
+                      <StatRow label="External" value={formatBytes(data.process.memoryUsage.external)} />
+                    </CardContent>
+                  </Card>
+                </>
+              )}
 
             </div>
           </div>

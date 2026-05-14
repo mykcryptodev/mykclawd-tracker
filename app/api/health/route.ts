@@ -1,40 +1,28 @@
 import { NextResponse } from "next/server";
-import os from "os";
+import { db } from "@/db/client";
+import { syncState } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { runMigrations } from "@/db/migrate";
 
 export const dynamic = "force-dynamic";
 
+const HEALTH_SNAPSHOT_KEY = "health_snapshot";
+
 export async function GET() {
-  const totalMem = os.totalmem();
-  const freeMem = os.freemem();
-  const usedMem = totalMem - freeMem;
+  try {
+    await runMigrations();
+    const row = await db
+      .select()
+      .from(syncState)
+      .where(eq(syncState.key, HEALTH_SNAPSHOT_KEY))
+      .get();
 
-  const cpus = os.cpus();
-  const loadAvg = os.loadavg();
+    if (!row) {
+      return NextResponse.json({ error: "no data yet" }, { status: 404 });
+    }
 
-  return NextResponse.json({
-    timestamp: new Date().toISOString(),
-    uptime: {
-      system: os.uptime(),
-      process: process.uptime(),
-    },
-    memory: {
-      totalBytes: totalMem,
-      usedBytes: usedMem,
-      freeBytes: freeMem,
-      usedPercent: (usedMem / totalMem) * 100,
-    },
-    cpu: {
-      model: cpus[0]?.model ?? "Unknown",
-      cores: cpus.length,
-      loadAvg1m: loadAvg[0],
-      loadAvg5m: loadAvg[1],
-      loadAvg15m: loadAvg[2],
-    },
-    process: {
-      nodeVersion: process.version,
-      platform: os.platform(),
-      arch: os.arch(),
-      memoryUsage: process.memoryUsage(),
-    },
-  });
+    return NextResponse.json(JSON.parse(row.value));
+  } catch {
+    return NextResponse.json({ error: "unavailable" }, { status: 503 });
+  }
 }
