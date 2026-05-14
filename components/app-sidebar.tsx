@@ -18,12 +18,14 @@ import {
   LayoutDashboardIcon,
   DropletsIcon,
   HomeIcon,
+  ServerIcon,
 } from "lucide-react"
 
 const navMain = [
   { title: "Home", url: "/", icon: <HomeIcon /> },
   { title: "Portfolio", url: "/pnl", icon: <LayoutDashboardIcon /> },
   { title: "Aero LP", url: "/aero", icon: <DropletsIcon /> },
+  { title: "Server Health", url: "/health", icon: <ServerIcon /> },
 ]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
