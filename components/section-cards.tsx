@@ -106,7 +106,7 @@ export function SectionCards({
           <CardDescription className="text-[11px] uppercase tracking-widest font-medium">
             Inference Spend
           </CardDescription>
-          <CardTitle className="text-4xl font-[family-name:var(--font-segment)] font-bold tabular-nums tracking-tight @[250px]/card:text-5xl text-red-600 dark:text-red-400">
+          <CardTitle className="text-4xl font-[family-name:var(--font-segment)] font-bold tabular-nums tracking-tight @[250px]/card:text-5xl text-black dark:text-white">
             {usd(inferenceSpendUsd)}
           </CardTitle>
         </CardHeader>
