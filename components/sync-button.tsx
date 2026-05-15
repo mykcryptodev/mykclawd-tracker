@@ -1,135 +1,163 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import type { SyncProgress } from "@/lib/sync";
+import type { RunStatus, JobStatus } from "@/app/api/gh-sync/[runId]/status/route";
 
-type Status = "idle" | "syncing" | "done" | "error";
+type Phase = "idle" | "dispatching" | "running" | "done" | "error";
 
 interface State {
-  status: Status;
-  progress: SyncProgress | null;
+  phase: Phase;
+  runId: number | null;
+  runUrl: string | null;
+  jobs: JobStatus[];
+  conclusion: string | null;
   error: string;
-  summary: string;
+}
+
+const INITIAL: State = {
+  phase: "idle",
+  runId: null,
+  runUrl: null,
+  jobs: [],
+  conclusion: null,
+  error: "",
+};
+
+const POLL_MS = 4000;
+
+function jobIcon(j: JobStatus) {
+  if (j.status === "completed") {
+    if (j.conclusion === "success") return "✅";
+    if (j.conclusion === "failure") return "❌";
+    if (j.conclusion === "cancelled") return "🚫";
+    return "⚠️";
+  }
+  if (j.status === "in_progress") return "⏳";
+  return "⬜"; // queued
 }
 
 export function SyncButton() {
-  const [state, setState] = useState<State>({
-    status: "idle",
-    progress: null,
-    error: "",
-    summary: "",
-  });
+  const [state, setState] = useState<State>(INITIAL);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  async function handleSync() {
-    setState({ status: "syncing", progress: null, error: "", summary: "" });
-
-    try {
-      const res = await fetch("/api/sync", { method: "POST" });
-      if (!res.ok || !res.body) {
-        const data = await res.json().catch(() => ({ error: "Unknown error" }));
-        setState((s) => ({ ...s, status: "error", error: data.error ?? "Failed" }));
-        return;
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-
-        // SSE lines are separated by \n\n; process all complete events
-        const parts = buf.split("\n\n");
-        buf = parts.pop() ?? "";
-
-        for (const part of parts) {
-          const line = part.trim();
-          if (!line.startsWith("data: ")) continue;
-          try {
-            const event = JSON.parse(line.slice(6));
-
-            if (event.error) {
-              setState((s) => ({ ...s, status: "error", error: event.error }));
-              return;
-            }
-
-            if (event.done) {
-              const r = event.result;
-              setState((s) => ({
-                ...s,
-                status: "done",
-                progress: null,
-                summary: `+${r.newTransfers} token transfers · +${r.nativeEthTransfers ?? 0} ETH transfers · ${(
-                  r.durationMs / 1000
-                ).toFixed(1)}s`,
-              }));
-              setTimeout(() => window.location.reload(), 1500);
-              return;
-            }
-
-            // Progress event
-            setState((s) => ({ ...s, progress: event as SyncProgress }));
-          } catch {
-            // malformed event — ignore
-          }
-        }
-      }
-    } catch (e) {
-      setState((s) => ({ ...s, status: "error", error: (e as Error).message }));
+  function stopPolling() {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
     }
   }
 
-  const { status, progress, error, summary } = state;
+  useEffect(() => () => stopPolling(), []);
 
-  if (status === "idle" || status === "done" || status === "error") {
+  async function pollStatus(runId: number) {
+    try {
+      const res = await fetch(`/api/gh-sync/${runId}/status`);
+      if (!res.ok) return;
+      const data: RunStatus = await res.json();
+
+      setState((s) => ({
+        ...s,
+        jobs: data.jobs,
+        runUrl: data.htmlUrl,
+        conclusion: data.conclusion,
+        phase: data.status === "completed" ? "done" : "running",
+      }));
+
+      if (data.status === "completed") {
+        stopPolling();
+        // Reload after a short pause so fresh data appears
+        setTimeout(() => window.location.reload(), 2000);
+      }
+    } catch {
+      // transient — keep polling
+    }
+  }
+
+  async function handleSync() {
+    setState({ ...INITIAL, phase: "dispatching" });
+
+    try {
+      const res = await fetch("/api/gh-sync", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setState((s) => ({ ...s, phase: "error", error: data.error ?? "Dispatch failed" }));
+        return;
+      }
+
+      const { runId } = data as { runId: number };
+      setState((s) => ({ ...s, phase: "running", runId }));
+
+      // Start polling
+      await pollStatus(runId);
+      intervalRef.current = setInterval(() => pollStatus(runId), POLL_MS);
+    } catch (e) {
+      setState((s) => ({ ...s, phase: "error", error: (e as Error).message }));
+    }
+  }
+
+  const { phase, jobs, runUrl, conclusion, error } = state;
+
+  if (phase === "idle" || phase === "done" || phase === "error") {
+    const label =
+      phase === "done"
+        ? conclusion === "success"
+          ? "Synced ✅"
+          : `Sync ${conclusion ?? "done"}`
+        : "Sync";
     return (
       <div className="flex items-center gap-2">
         <Button
           onClick={handleSync}
-          variant={status === "error" ? "destructive" : "default"}
+          variant={phase === "error" ? "destructive" : "default"}
           size="sm"
         >
-          {status === "done" ? "Synced" : "Sync Now"}
+          {label}
         </Button>
-        {summary && <span className="text-xs text-muted-foreground">{summary}</span>}
         {error && <span className="text-xs text-destructive">{error}</span>}
       </div>
     );
   }
 
-  // Syncing — show step progress
-  const step = progress?.step ?? 0;
-  const total = progress?.totalSteps ?? 7;
-  // A step is "done" when it has a detail string and no innerPct (innerPct means mid-step).
-  const isStepDone = progress?.detail != null && progress?.innerPct == null;
-  const baseSteps = isStepDone ? step : Math.max(0, step - 1);
-  const inner = (progress?.innerPct ?? 0) / 100;
-  const pct = total > 0 ? Math.round(((baseSteps + inner) / total) * 100) : 0;
+  if (phase === "dispatching") {
+    return (
+      <div className="flex items-center gap-2">
+        <Button disabled size="sm" variant="outline">
+          <span className="animate-pulse">Dispatching…</span>
+        </Button>
+      </div>
+    );
+  }
 
+  // running
   return (
-    <div className="flex flex-col gap-1 min-w-[200px]">
-      <div className="flex items-center justify-between gap-4">
-        <span className="text-xs font-medium">
-          {progress
-            ? `Step ${step} of ${total}: ${progress.label}`
-            : "Starting…"}
-        </span>
-        <span className="text-xs text-muted-foreground tabular-nums">{pct}%</span>
+    <div className="flex flex-col gap-1 min-w-[220px]">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium">GitHub Actions running…</span>
+        {runUrl && (
+          <a
+            href={runUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+          >
+            view
+          </a>
+        )}
       </div>
-
-      {/* Progress bar */}
-      <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-        <div
-          className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-
-      {progress?.detail && (
-        <p className="text-xs text-muted-foreground">{progress.detail}</p>
+      {jobs.length === 0 ? (
+        <span className="text-xs text-muted-foreground animate-pulse">Queued…</span>
+      ) : (
+        <ul className="space-y-0.5">
+          {jobs.map((j) => (
+            <li key={j.name} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span>{jobIcon(j)}</span>
+              <span className={j.status === "in_progress" ? "font-medium text-foreground animate-pulse" : ""}>
+                {j.name}
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
