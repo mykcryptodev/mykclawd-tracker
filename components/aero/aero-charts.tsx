@@ -52,6 +52,73 @@ export function AeroTrendChart({ history }: { history: AeroHistoryPoint[] }) {
   );
 }
 
+// ───── Delta vs HODL over time ─────
+export function AeroDeltaChart({ history }: { history: AeroHistoryPoint[] }) {
+  if (history.length < 2) {
+    return (
+      <Card className="border-border/60">
+        <CardHeader><CardTitle>Δ vs HODL over time</CardTitle></CardHeader>
+        <CardContent className="flex items-center justify-center h-48 text-muted-foreground text-sm">
+          Need ≥2 snapshots — re-run sync to add another.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const data = history.map((h) => ({
+    label: tsShort(h.ts),
+    delta: h.deltaUsd,
+    fill: h.deltaUsd >= 0 ? "var(--chart-1)" : "var(--destructive)",
+  }));
+
+  const absMax = Math.max(...data.map((d) => Math.abs(d.delta)), 0.01);
+  const domain: [number, number] = [-absMax * 1.15, absMax * 1.15];
+
+  const latest = data[data.length - 1];
+  const sign = latest.delta >= 0 ? "+" : "";
+  const subtitle = `Currently ${sign}${usdFull(latest.delta)} vs holding`;
+
+  return (
+    <Card className="border-border/60">
+      <CardHeader>
+        <CardTitle>Δ vs HODL over time</CardTitle>
+        <p className="text-sm text-muted-foreground">{subtitle}</p>
+      </CardHeader>
+      <CardContent>
+        <ChartContainer config={{ delta: { label: "Δ vs HODL", color: "var(--chart-1)" } }} className="h-72">
+          <BarChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
+            <YAxis tickFormatter={usdShort} tick={{ fontSize: 11 }} domain={domain} />
+            <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1.5} />
+            <Tooltip
+              cursor={{ fill: "hsl(var(--muted))" }}
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const item = payload[0].payload as { label: string; delta: number };
+                const s = item.delta >= 0 ? "+" : "";
+                return (
+                  <div className="rounded-md border bg-background px-3 py-2 text-xs shadow-sm">
+                    <div className="font-medium">{item.label}</div>
+                    <div className={item.delta >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                      {s}{usdFull(item.delta)}
+                    </div>
+                  </div>
+                );
+              }}
+            />
+            <Bar dataKey="delta" radius={[4, 4, 4, 4]}>
+              {data.map((d, i) => (
+                <Cell key={i} fill={d.fill} fillOpacity={0.85} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ───── Composition pie ─────
 export function AeroCompositionChart({ latest }: { latest: AeroLatest }) {
   const { end, prices, sym0, sym1 } = latest;

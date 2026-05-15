@@ -3,7 +3,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Card, CardContent } from "@/components/ui/card";
 import { AeroSummaryCards } from "@/components/aero/aero-summary-cards";
-import { AeroTrendChart, AeroCompositionChart, AeroVsHodlChart, AeroWaterfallChart } from "@/components/aero/aero-charts";
+import { AeroTrendChart, AeroDeltaChart, AeroCompositionChart, AeroVsHodlChart, AeroWaterfallChart } from "@/components/aero/aero-charts";
 import { AeroPositionCard } from "@/components/aero/aero-position-card";
 import { AeroInflowsTable } from "@/components/aero/aero-inflows-table";
 import type { AeroInflow, AeroPayload, AeroPosition } from "@/components/aero/aero-types";
@@ -124,6 +124,10 @@ export default async function AeroPage() {
 
                   <div className="px-4 lg:px-6">
                     <AeroTrendChart history={history} />
+                  </div>
+
+                  <div className="px-4 lg:px-6">
+                    <AeroDeltaChart history={history} />
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 px-4 lg:grid-cols-2 lg:px-6">
