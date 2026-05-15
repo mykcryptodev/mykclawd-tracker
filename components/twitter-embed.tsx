@@ -25,11 +25,32 @@ export function TwitterEmbed({ tweetUrl }: TwitterEmbedProps) {
     const renderTweet = () => {
       if (window.twttr?.widgets) {
         container.innerHTML = "";
-        window.twttr.widgets.createTweet(
-          tweetUrl.split("/status/")[1]?.split("?")[0] ?? "",
-          container,
-          { theme: resolvedTheme === "light" ? "light" : "dark", dnt: true, align: "left", width: "550" }
-        );
+        window.twttr.widgets
+          .createTweet(
+            tweetUrl.split("/status/")[1]?.split("?")[0] ?? "",
+            container,
+            { theme: resolvedTheme === "light" ? "light" : "dark", dnt: true, align: "left", width: "550" }
+          )
+          // Strip Twitter's injected inline border/shadow after the widget renders
+          .then((el: HTMLElement | undefined) => {
+            if (!el) return;
+            const strip = (node: HTMLElement) => {
+              node.style.background = "transparent";
+              node.style.border = "none";
+              node.style.boxShadow = "none";
+              node.style.outline = "none";
+            };
+            strip(el);
+            // Also strip on child iframe when it eventually loads
+            const iframe = el.querySelector("iframe");
+            if (iframe) strip(iframe as HTMLElement);
+            // Watch for deferred iframe injection
+            const obs = new MutationObserver(() => {
+              const f = el.querySelector("iframe");
+              if (f) { strip(f as HTMLElement); obs.disconnect(); }
+            });
+            obs.observe(el, { childList: true, subtree: true });
+          });
       }
     };
 
