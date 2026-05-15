@@ -78,6 +78,13 @@ async function getAeroData(): Promise<AeroPayload | null> {
           totalGasEth: latest.totalGasEth,
           totalGasUsd: latest.totalGasUsd,
         },
+        health: {
+          netBenefitUsd: latest.netBenefitUsd ?? 0,
+          netBenefitPct: latest.netBenefitPct ?? 0,
+          coverageRatio: latest.coverageRatio ?? 0,
+          aeroVelocityPerHr: latest.aeroVelocityPerHr ?? null,
+          lpDeltaVelocityPerHr: latest.lpDeltaVelocityPerHr ?? null,
+        },
         txCount: latest.txCount,
         gasTxsCounted: latest.gasTxsCounted,
         positions,

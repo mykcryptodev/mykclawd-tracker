@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { discoverAeroPosition, DiscoveredPosition } from "./discover";
 import { ingestAeroTransfers } from "./transfers";
 import { computeAeroSnapshot, saveAeroSnapshot, AeroSnapshot } from "./snapshot";
+import { evaluateAndAlert, MonitorResult } from "./monitor";
 import { AERO_DEFAULT_ADDRESS } from "./constants";
 
 async function getMonitoredAddress(): Promise<string> {
@@ -26,19 +27,23 @@ export async function ingestAeroMonitor(daysBack = 14): Promise<{
   position: DiscoveredPosition | null;
   newTransfers: number;
   snapshot: AeroSnapshot | null;
+  monitor: MonitorResult | null;
 }> {
   const address = await getMonitoredAddress();
   const position = await discoverAeroPosition(address, daysBack);
   if (!position) {
-    return { address, position: null, newTransfers: 0, snapshot: null };
+    return { address, position: null, newTransfers: 0, snapshot: null, monitor: null };
   }
   const { newRows } = await ingestAeroTransfers(position, daysBack);
   const snapshot = await computeAeroSnapshot(position, daysBack);
   await saveAeroSnapshot(snapshot);
-  return { address, position, newTransfers: newRows, snapshot };
+  const monitor = await evaluateAndAlert(snapshot);
+  return { address, position, newTransfers: newRows, snapshot, monitor };
 }
 
 export { discoverAeroPosition } from "./discover";
 export { computeAeroSnapshot, saveAeroSnapshot } from "./snapshot";
+export { evaluateAndAlert } from "./monitor";
 export type { AeroSnapshot } from "./snapshot";
 export type { DiscoveredPosition } from "./discover";
+export type { MonitorResult } from "./monitor";

@@ -4,7 +4,7 @@ import { createPublicClient, http, parseAbi } from "viem";
 import { base } from "viem/chains";
 import { db } from "../../db/client";
 import { aeroTransfers, aeroSnapshots } from "../../db/schema";
-import { asc } from "drizzle-orm";
+import { asc, desc } from "drizzle-orm";
 import { AERO_AERO, AERO_NPM, AERO_COINGECKO_IDS, AERO_KNOWN_ROUTERS } from "./constants";
 import { DiscoveredPosition } from "./discover";
 import { ingestAeroGas } from "./gas";
@@ -90,6 +90,13 @@ export interface AeroSnapshot {
   inflows: { t0: number; t1: number; list: Array<{ ts: number; sym: string; amount: number; from: string; tx: string }> };
   end: { walletEth: number; walletT0: number; walletT1: number; walletAero: number; positionT0: number; positionT1: number; pendingAero: number };
   usd: { startUsd: number; hodlUsd: number; stratUsd: number; deltaUsd: number; lpOnlyDelta: number; aeroAddedUsd: number; deltaPct: number; apr: number; totalGasEth: number; totalGasUsd: number };
+  health: {
+    netBenefitUsd: number;
+    netBenefitPct: number;
+    coverageRatio: number;
+    aeroVelocityPerHr: number | null;
+    lpDeltaVelocityPerHr: number | null;
+  };
   txCount: number;
   gasTxsCounted: number;
   positions: Array<{ tokenId: string; tickLower: number; tickUpper: number; curTick: number; liquidity: string; a0: string; a1: string; earned: string }>;
@@ -231,6 +238,31 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
   const days = (lastTs - firstTs) / 86400;
   const apr = days > 0 ? (Math.pow(stratUsd / hodlUsd, 365 / days) - 1) * 100 : 0;
 
+  // ── Health / exit metrics ──
+  const netBenefitUsd = aeroAddedUsd + lpOnlyDelta;
+  const netBenefitPct = startUsd > 0 ? (netBenefitUsd / startUsd) * 100 : 0;
+  const coverageRatio = lpOnlyDelta >= 0
+    ? 99
+    : aeroAddedUsd > 0
+      ? aeroAddedUsd / Math.abs(lpOnlyDelta)
+      : 0;
+
+  const priorRow = await db.select().from(aeroSnapshots)
+    .orderBy(desc(aeroSnapshots.ts))
+    .limit(1)
+    .get();
+
+  let aeroVelocityPerHr: number | null = null;
+  let lpDeltaVelocityPerHr: number | null = null;
+  if (priorRow) {
+    const nowTs = Math.floor(Date.now() / 1000);
+    const dtHrs = (nowTs - priorRow.ts) / 3600;
+    if (dtHrs > 0) {
+      aeroVelocityPerHr = (aeroAddedUsd - priorRow.aeroAddedUsd) / dtHrs;
+      lpDeltaVelocityPerHr = (lpOnlyDelta - priorRow.lpOnlyDeltaUsd) / dtHrs;
+    }
+  }
+
   return {
     ts: Math.floor(Date.now() / 1000),
     address: pos.address,
@@ -254,6 +286,7 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
       startUsd, hodlUsd, stratUsd, deltaUsd, lpOnlyDelta, aeroAddedUsd, deltaPct, apr,
       totalGasEth, totalGasUsd: totalGasEth * p0Now,
     },
+    health: { netBenefitUsd, netBenefitPct, coverageRatio, aeroVelocityPerHr, lpDeltaVelocityPerHr },
     txCount: uniqHashes.length,
     gasTxsCounted: uniqHashes.length,
     positions,
@@ -309,5 +342,10 @@ export async function saveAeroSnapshot(s: AeroSnapshot): Promise<void> {
     gasTxsCounted: s.gasTxsCounted,
     positionsJson: JSON.stringify(s.positions),
     inflowsJson: JSON.stringify(s.inflows.list),
+    netBenefitUsd: s.health.netBenefitUsd,
+    netBenefitPct: s.health.netBenefitPct,
+    coverageRatio: s.health.coverageRatio,
+    aeroVelocityPerHr: s.health.aeroVelocityPerHr ?? undefined,
+    lpDeltaVelocityPerHr: s.health.lpDeltaVelocityPerHr ?? undefined,
   }).onConflictDoNothing().run();
 }

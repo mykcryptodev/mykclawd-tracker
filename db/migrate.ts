@@ -172,6 +172,13 @@ export async function runMigrations() {
     await client.execute(`ALTER TABLE tokens ADD COLUMN image_checked INTEGER NOT NULL DEFAULT 0`);
   } catch { /* column already exists */ }
 
+  // Additive migrations for aero_snapshots LP health columns
+  try { await client.execute(`ALTER TABLE aero_snapshots ADD COLUMN net_benefit_usd REAL NOT NULL DEFAULT 0`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE aero_snapshots ADD COLUMN net_benefit_pct REAL NOT NULL DEFAULT 0`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE aero_snapshots ADD COLUMN coverage_ratio REAL NOT NULL DEFAULT 0`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE aero_snapshots ADD COLUMN aero_velocity_per_hr REAL`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE aero_snapshots ADD COLUMN lp_delta_velocity_per_hr REAL`); } catch { /* exists */ }
+
   // Reset any rows that were checked with the broken pipeline (no image found but pipeline was wrong)
   await client.execute(`UPDATE tokens SET image_checked = 0 WHERE image_url IS NULL AND image_checked = 1`);
 

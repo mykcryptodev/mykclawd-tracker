@@ -41,6 +41,13 @@ export interface AeroLatest {
     deltaPct: number; apr: number;
     totalGasEth: number; totalGasUsd: number;
   };
+  health: {
+    netBenefitUsd: number;
+    netBenefitPct: number;
+    coverageRatio: number;
+    aeroVelocityPerHr: number | null;
+    lpDeltaVelocityPerHr: number | null;
+  };
   txCount: number;
   gasTxsCounted: number;
   positions: AeroPosition[];

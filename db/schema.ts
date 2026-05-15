@@ -179,6 +179,13 @@ export const aeroSnapshots = sqliteTable(
     gasTxsCounted: integer("gas_txs_counted").notNull(),
     positionsJson: text("positions_json").notNull(), // serialized array of {tokenId, ticks, liquidity, a0, a1, earned, curTick}
     inflowsJson: text("inflows_json").notNull(), // serialized list of external inflow rows
+
+    // LP health / exit monitoring metrics
+    netBenefitUsd: real("net_benefit_usd").notNull().default(0),
+    netBenefitPct: real("net_benefit_pct").notNull().default(0),
+    coverageRatio: real("coverage_ratio").notNull().default(0),   // aeroRewards / |lpOnlyDelta| ; >1 = rewards winning
+    aeroVelocityPerHr: real("aero_velocity_per_hr"),              // $/hr earned in AERO vs prior snapshot
+    lpDeltaVelocityPerHr: real("lp_delta_velocity_per_hr"),       // $/hr IL drag vs prior snapshot
   }
 );
 
