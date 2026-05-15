@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useTheme } from "next-themes";
 
 interface TwitterEmbedProps {
   tweetUrl: string;
@@ -15,6 +16,7 @@ declare global {
 
 export function TwitterEmbed({ tweetUrl }: TwitterEmbedProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { resolvedTheme } = useTheme();
 
   useEffect(() => {
     const container = containerRef.current;
@@ -26,7 +28,7 @@ export function TwitterEmbed({ tweetUrl }: TwitterEmbedProps) {
         window.twttr.widgets.createTweet(
           tweetUrl.split("/status/")[1]?.split("?")[0] ?? "",
           container,
-          { theme: "dark", dnt: true }
+          { theme: resolvedTheme === "light" ? "light" : "dark", dnt: true }
         );
       }
     };
@@ -46,7 +48,7 @@ export function TwitterEmbed({ tweetUrl }: TwitterEmbedProps) {
         script.addEventListener("load", renderTweet);
       }
     }
-  }, [tweetUrl]);
+  }, [tweetUrl, resolvedTheme]);
 
   return <div ref={containerRef} className="mt-4" />;
 }
