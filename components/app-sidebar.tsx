@@ -34,14 +34,14 @@ function BaseballCapIcon() {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      {/* brim */}
-      <path d="M3 15c0 0 2 2 9 2s11-3 11-3" />
-      {/* cap dome */}
-      <path d="M3 15 C3 8 7 4 12 4 C17 4 21 8 21 14" />
-      {/* crown seam */}
-      <path d="M12 4 L12 10" />
-      {/* brim underside */}
-      <path d="M3 15 Q1 15 1 17 Q1 19 3 19 L14 17" />
+      {/* dome - front-facing arch */}
+      <path d="M4 12C4 6 7 3 12 3C17 3 20 6 20 12" />
+      {/* center crease */}
+      <line x1="12" y1="3" x2="12" y2="12" />
+      {/* button on top */}
+      <circle cx="12" cy="3" r="1" fill="currentColor" stroke="none" />
+      {/* brim - flat bill wider than dome, with slight curve */}
+      <path d="M2 12H22Q22 15 20 15H4Q2 15 2 12Z" />
     </svg>
   )
 }
