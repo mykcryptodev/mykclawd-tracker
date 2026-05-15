@@ -28,7 +28,7 @@ export function TwitterEmbed({ tweetUrl }: TwitterEmbedProps) {
         window.twttr.widgets.createTweet(
           tweetUrl.split("/status/")[1]?.split("?")[0] ?? "",
           container,
-          { theme: resolvedTheme === "light" ? "light" : "dark", dnt: true }
+          { theme: resolvedTheme === "light" ? "light" : "dark", dnt: true, align: "left", width: "550" }
         );
       }
     };
@@ -50,5 +50,11 @@ export function TwitterEmbed({ tweetUrl }: TwitterEmbedProps) {
     }
   }, [tweetUrl, resolvedTheme]);
 
-  return <div ref={containerRef} className="mt-4" />;
+  return (
+    <div
+      ref={containerRef}
+      className="mt-4 [&_iframe]:!rounded-xl [&_.twitter-tweet]:!m-0 [&_iframe]:!border-0"
+      style={{ background: "transparent" }}
+    />
+  );
 }

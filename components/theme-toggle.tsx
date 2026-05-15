@@ -31,7 +31,6 @@ export function ThemeToggle() {
       className="w-full"
     >
       {isDark ? <SunIcon /> : <MoonIcon />}
-      <span>{isDark ? "Light mode" : "Dark mode"}</span>
     </SidebarMenuButton>
   );
 }
