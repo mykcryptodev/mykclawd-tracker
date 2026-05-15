@@ -21,10 +21,36 @@ import {
   ServerIcon,
 } from "lucide-react"
 
+function BaseballCapIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {/* brim */}
+      <path d="M3 15c0 0 2 2 9 2s11-3 11-3" />
+      {/* cap dome */}
+      <path d="M3 15 C3 8 7 4 12 4 C17 4 21 8 21 14" />
+      {/* crown seam */}
+      <path d="M12 4 L12 10" />
+      {/* brim underside */}
+      <path d="M3 15 Q1 15 1 17 Q1 19 3 19 L14 17" />
+    </svg>
+  )
+}
+
 const navMain = [
   { title: "Home", url: "/", icon: <HomeIcon /> },
   { title: "Portfolio", url: "/pnl", icon: <LayoutDashboardIcon /> },
   { title: "Aero LP", url: "/aero", icon: <DropletsIcon /> },
+  { title: "Hat Tap", url: "/hat", icon: <BaseballCapIcon /> },
   { title: "Server Health", url: "/health", icon: <ServerIcon /> },
 ]
 
