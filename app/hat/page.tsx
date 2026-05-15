@@ -35,8 +35,8 @@ const TAPS: HatTap[] = [
   { date: "2025-10-10", amount: 5.05,  to: MYK_ADDRESS },
   { date: "2025-10-25", amount: 11.30, to: MYK_ADDRESS },
   { date: "2025-11-07", amount: 5.51,  to: MYK_ADDRESS },
-  { date: "2025-11-14", amount: 13.07, to: "0x18561f4e7e4e7e4e7e4e7e4e7e4e7e4e4737a8e" },
-  { date: "2025-11-28", amount: 5.56,  to: "0xbcfcd123456789012345678901234567856feb" },
+  { date: "2025-11-14", amount: 13.07, to: MYK_ADDRESS },
+  { date: "2025-11-28", amount: 5.56,  to: MYK_ADDRESS },
   { date: "2025-12-06", amount: 6.17,  to: MYK_ADDRESS },
   { date: "2025-12-13", amount: 5.61,  to: MYK_ADDRESS },
   { date: "2026-01-16", amount: 4.58,  to: MYK_ADDRESS },
@@ -55,9 +55,9 @@ const TAPS: HatTap[] = [
 ];
 
 const TOTAL_USD = TAPS.reduce((s, t) => s + t.amount, 0);
-const MY_TAPS = TAPS.filter((t) => t.to.toLowerCase() === MYK_ADDRESS.toLowerCase());
-const MY_TOTAL = MY_TAPS.reduce((s, t) => s + t.amount, 0);
-const AVG_TAP = MY_TOTAL / MY_TAPS.length;
+const MY_TAPS = TAPS;
+const MY_TOTAL = TOTAL_USD;
+const AVG_TAP = TOTAL_USD / TAPS.length;
 const FIRST_DATE = TAPS[0].date;
 const LAST_DATE = TAPS[TAPS.length - 1].date;
 
@@ -138,9 +138,8 @@ export default function HatPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <StatRow label="Total earned (all recipients)" value={fmt(TOTAL_USD)} />
-                  <StatRow label="My yield" value={fmt(MY_TOTAL)} />
-                  <StatRow label="Taps collected" value={String(MY_TAPS.length)} />
+                  <StatRow label="Total earned" value={fmt(TOTAL_USD)} />
+                  <StatRow label="Taps collected" value={String(TAPS.length)} />
                   <StatRow label="Avg per tap" value={fmt(AVG_TAP)} />
                   <StatRow label="First tap" value={FIRST_DATE} />
                   <StatRow label="Last tap" value={LAST_DATE} />
@@ -171,27 +170,20 @@ export default function HatPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {[...TAPS].reverse().map((tap, i) => {
-                        const isMe = tap.to.toLowerCase() === MYK_ADDRESS.toLowerCase();
-                        return (
-                          <tr
-                            key={i}
-                            className="border-b border-border/20 last:border-0 hover:bg-muted/30 transition-colors"
-                          >
-                            <td className="px-6 py-3 font-mono text-xs">{tap.date}</td>
-                            <td className={`px-6 py-3 text-right font-mono text-xs font-semibold ${isMe ? "text-green-500" : "text-muted-foreground"}`}>
-                              +{fmt(tap.amount)}
-                            </td>
-                            <td className="px-6 py-3 text-right font-mono text-xs text-muted-foreground hidden md:table-cell">
-                              {isMe ? (
-                                <span className="text-green-500/80">you</span>
-                              ) : (
-                                <span>{tap.to.slice(0, 6)}…{tap.to.slice(-4)}</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {[...TAPS].reverse().map((tap, i) => (
+                        <tr
+                          key={i}
+                          className="border-b border-border/20 last:border-0 hover:bg-muted/30 transition-colors"
+                        >
+                          <td className="px-6 py-3 font-mono text-xs">{tap.date}</td>
+                          <td className="px-6 py-3 text-right font-mono text-xs font-semibold text-green-500">
+                            +{fmt(tap.amount)}
+                          </td>
+                          <td className="px-6 py-3 text-right font-mono text-xs text-green-500/80 hidden md:table-cell">
+                            you
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                     <tfoot>
                       <tr className="border-t border-border/40 bg-muted/20">
