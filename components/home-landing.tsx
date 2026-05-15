@@ -104,6 +104,7 @@ export function HomeLanding({
 
         <div className="react-tweet-theme mt-10 max-w-xl">
           <Tweet id="2015497689002037436" />
+          <Tweet id="2055334324145471718" />
         </div>
 
         <h2 className="mt-12 text-xl font-semibold tracking-tight">
