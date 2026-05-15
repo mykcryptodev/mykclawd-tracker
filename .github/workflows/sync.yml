@@ -6,37 +6,100 @@ on:
     - cron: '0 */6 * * *'
   workflow_dispatch: {}
 
+# Shared env injected into every job
+env:
+  TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+  TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+  BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+  CG_DEMO_KEY: ${{ secrets.CG_DEMO_KEY }}
+  NEXT_PUBLIC_THIRDWEB_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_THIRDWEB_CLIENT_ID }}
+
 jobs:
-  sync:
-    name: Run sync
+  # ── shared setup artifact ────────────────────────────────────────────────────
+  install:
+    name: Install dependencies
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
         with:
           version: 10.25.0
           run_install: false
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'pnpm'
 
-      - name: Install dependencies
+      - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Run full history sync
+      - name: Cache node_modules
+        uses: actions/cache/save@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ github.sha }}
+
+  # ── PnL / transfers sync ─────────────────────────────────────────────────────
+  sync-pnl:
+    name: PnL sync
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.25.0
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ github.sha }}
+
+      - name: Run PnL sync
         env:
-          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
-          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
-          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
           TRACKED_ADDRESS: ${{ secrets.TRACKED_ADDRESS }}
-          CG_DEMO_KEY: ${{ secrets.CG_DEMO_KEY }}
-          NEXT_PUBLIC_THIRDWEB_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_THIRDWEB_CLIENT_ID }}
         run: pnpm tsx scripts/sync.ts --full
+
+  # ── Aerodrome LP sync ────────────────────────────────────────────────────────
+  sync-aero:
+    name: Aerodrome LP sync
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.25.0
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ github.sha }}
+
+      - name: Run Aerodrome sync
+        env:
+          AERO_MONITOR_ADDRESS: ${{ secrets.AERO_MONITOR_ADDRESS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
+        run: pnpm tsx scripts/run-aero-sync.ts
