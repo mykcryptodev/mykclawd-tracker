@@ -72,10 +72,14 @@ export function TwitterEmbed({ tweetUrl }: TwitterEmbedProps) {
   }, [tweetUrl, resolvedTheme]);
 
   return (
-    <div
-      ref={containerRef}
-      className="mt-4 [&_twitterwidget]:!bg-transparent [&_twitterwidget]:!border-0 [&_twitterwidget]:!shadow-none [&_.twitter-tweet]:!m-0"
-      style={{ background: "transparent" }}
-    />
+    <div className="mt-4">
+      {/* Wrapper clips the 1px border Twitter injects around twitterwidget via overflow:hidden */}
+      <div
+        className="overflow-hidden rounded-xl"
+        style={{ margin: "-1px" }}
+      >
+        <div ref={containerRef} style={{ margin: "1px" }} />
+      </div>
+    </div>
   );
 }
