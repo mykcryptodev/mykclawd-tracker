@@ -130,3 +130,12 @@
     @apply font-sans;
   }
 }
+
+/* Strip white background/border from Twitter widget iframe wrapper */
+twitterwidget,
+.twitter-tweet,
+.twitter-tweet-rendered {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}

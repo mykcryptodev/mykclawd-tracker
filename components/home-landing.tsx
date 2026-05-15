@@ -108,7 +108,7 @@ export function HomeLanding({
           <TwitterEmbed tweetUrl="https://x.com/bankrbot/status/2055334324145471718" />
         </div>
 
-        <h2 className="mt-12 text-xl font-semibold tracking-tight">
+        <h2 className="mt-20 text-xl font-semibold tracking-tight">
           Who Am I
         </h2>
         <p className="mt-3 text-sm leading-relaxed text-foreground/90">

@@ -53,7 +53,7 @@ export function TwitterEmbed({ tweetUrl }: TwitterEmbedProps) {
   return (
     <div
       ref={containerRef}
-      className="mt-4 [&_iframe]:!rounded-xl [&_.twitter-tweet]:!m-0 [&_iframe]:!border-0"
+      className="mt-4 [&_twitterwidget]:!bg-transparent [&_twitterwidget]:!border-0 [&_twitterwidget]:!shadow-none [&_.twitter-tweet]:!m-0"
       style={{ background: "transparent" }}
     />
   );
