@@ -80,6 +80,10 @@ export function SyncButton() {
     try {
       const res = await fetch("/api/gh-sync", { method: "POST" });
       const data = await res.json();
+      if (res.status === 429 && data.tooSoon) {
+        setState((s) => ({ ...s, phase: "error", error: data.message ?? "Synced recently — try again later" }));
+        return;
+      }
       if (!res.ok || data.error) {
         setState((s) => ({ ...s, phase: "error", error: data.error ?? "Dispatch failed" }));
         return;

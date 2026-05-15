@@ -1,17 +1,47 @@
 // Dispatch the GitHub Actions sync workflow and return the new run ID.
-// Requires GITHUB_TOKEN env var with repo Actions write permission.
+// Requires GH_DISPATCH_TOKEN env var with repo Actions write permission.
+// Guard: will not dispatch if a snapshot was taken within the last hour.
 
 import { NextResponse } from "next/server";
+import { runMigrations } from "../../../db/migrate";
+import { db } from "../../../db/client";
+import { aeroSnapshots } from "../../../db/schema";
+import { desc } from "drizzle-orm";
 
 const OWNER = "mykcryptodev";
 const REPO  = "mykclawd-tracker";
 const WORKFLOW = "sync.yml";
 const BRANCH = "main";
 
+const MIN_SYNC_GAP_S = 60 * 60; // 1 hour
+
 export async function POST() {
   const token = process.env.GH_DISPATCH_TOKEN;
   if (!token) {
     return NextResponse.json({ error: "GH_DISPATCH_TOKEN not configured" }, { status: 500 });
+  }
+
+  // Guard: skip dispatch if a snapshot was taken within the last hour
+  try {
+    await runMigrations();
+    const latest = await db.select({ ts: aeroSnapshots.ts })
+      .from(aeroSnapshots)
+      .orderBy(desc(aeroSnapshots.ts))
+      .limit(1)
+      .get();
+
+    if (latest) {
+      const ageS = Math.floor(Date.now() / 1000) - latest.ts;
+      if (ageS < MIN_SYNC_GAP_S) {
+        const waitMin = Math.ceil((MIN_SYNC_GAP_S - ageS) / 60);
+        return NextResponse.json(
+          { tooSoon: true, message: `Last sync was ${Math.floor(ageS / 60)}m ago — next available in ${waitMin}m` },
+          { status: 429 }
+        );
+      }
+    }
+  } catch {
+    // DB check failed — allow dispatch anyway
   }
 
   // 1. Grab the timestamp before dispatch so we can find the new run
