@@ -52,6 +52,7 @@ const TAPS: HatTap[] = [
   { date: "2026-04-10", amount: 7.69,  to: MYK_ADDRESS },
   { date: "2026-04-18", amount: 7.22,  to: MYK_ADDRESS },
   { date: "2026-05-02", amount: 7.07,  to: MYK_ADDRESS },
+  { date: "2026-05-16", amount: 58.48, to: MYK_ADDRESS },
 ];
 
 const TOTAL_USD = TAPS.reduce((s, t) => s + t.amount, 0);
