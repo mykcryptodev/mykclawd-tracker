@@ -10,14 +10,19 @@ import type { AeroInflow, AeroPayload, AeroPosition } from "@/components/aero/ae
 import { runMigrations } from "@/db/migrate";
 import { db } from "@/db/client";
 import { aeroSnapshots } from "@/db/schema";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
+import { AeroAddressFilter } from "@/components/aero/aero-address-filter";
 
 export const dynamic = "force-dynamic";
 
-async function getAeroData(): Promise<AeroPayload | null> {
+const DEFAULT_ADDRESS = "0xf142022273602c6a6c0ea7a044d21082273bd686";
+
+async function getAeroData(address: string): Promise<AeroPayload | null> {
   try {
     await runMigrations();
-    const snapshots = await db.select().from(aeroSnapshots).orderBy(desc(aeroSnapshots.ts)).all();
+    const snapshots = await db.select().from(aeroSnapshots)
+      .where(eq(aeroSnapshots.address, address))
+      .orderBy(desc(aeroSnapshots.ts)).all();
     if (snapshots.length === 0) {
       return { latest: null, history: [] };
     }
@@ -96,8 +101,14 @@ async function getAeroData(): Promise<AeroPayload | null> {
   }
 }
 
-export default async function AeroPage() {
-  const data = await getAeroData();
+export default async function AeroPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ address?: string }>;
+}) {
+  const params = await searchParams;
+  const selectedAddress = (params.address ?? DEFAULT_ADDRESS).toLowerCase();
+  const data = await getAeroData(selectedAddress);
   const latest = data?.latest ?? null;
   const history = data?.history ?? [];
 
@@ -117,6 +128,9 @@ export default async function AeroPage() {
         <div className="flex flex-1 flex-col">
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-6 py-6 md:gap-8 md:py-8">
+              <div className="px-4 lg:px-6">
+                <AeroAddressFilter selected={selectedAddress} />
+              </div>
               {!latest ? (
                 <div className="px-4 lg:px-6">
                   <Card className="border-border/60">

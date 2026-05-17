@@ -4,7 +4,7 @@ import { createPublicClient, http, parseAbi } from "viem";
 import { base } from "viem/chains";
 import { db } from "../../db/client";
 import { aeroTransfers, aeroSnapshots } from "../../db/schema";
-import { asc, desc } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { AERO_AERO, AERO_NPM, AERO_COINGECKO_IDS, AERO_KNOWN_ROUTERS } from "./constants";
 import { DiscoveredPosition } from "./discover";
 import { ingestAeroGas } from "./gas";
@@ -103,8 +103,10 @@ export interface AeroSnapshot {
 }
 
 export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: number): Promise<AeroSnapshot> {
-  // Pull cached transfers
-  const allRows = await db.select().from(aeroTransfers).orderBy(asc(aeroTransfers.blockTimestamp)).all();
+  // Pull cached transfers filtered by wallet address
+  const allRows = await db.select().from(aeroTransfers)
+    .where(eq(aeroTransfers.walletAddress, pos.address.toLowerCase()))
+    .orderBy(asc(aeroTransfers.blockTimestamp)).all();
   const windowFloor = Math.floor(Date.now() / 1000) - daysBack * 86400;
   const rows = allRows.filter((r) => r.blockTimestamp >= windowFloor);
   if (rows.length === 0) throw new Error("No cached aero_transfers in window — run sync first.");
@@ -248,6 +250,7 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
       : 0;
 
   const priorRow = await db.select().from(aeroSnapshots)
+    .where(eq(aeroSnapshots.address, pos.address.toLowerCase()))
     .orderBy(desc(aeroSnapshots.ts))
     .limit(1)
     .get();

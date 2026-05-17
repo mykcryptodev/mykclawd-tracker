@@ -1,13 +1,18 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { runMigrations } from "../../../db/migrate";
 import { db } from "../../../db/client";
 import { aeroSnapshots } from "../../../db/schema";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   await runMigrations();
 
-  const snapshots = await db.select().from(aeroSnapshots).orderBy(desc(aeroSnapshots.ts)).all();
+  const rawAddress = req.nextUrl.searchParams.get("address");
+  const address = rawAddress?.toLowerCase() ?? "0xf142022273602c6a6c0ea7a044d21082273bd686";
+
+  const snapshots = await db.select().from(aeroSnapshots)
+    .where(eq(aeroSnapshots.address, address))
+    .orderBy(desc(aeroSnapshots.ts)).all();
   if (snapshots.length === 0) {
     return NextResponse.json({ latest: null, history: [] });
   }

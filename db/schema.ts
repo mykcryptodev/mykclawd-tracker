@@ -105,11 +105,13 @@ export const aeroTransfers = sqliteTable(
     direction: text("direction", { enum: ["in", "out"] }).notNull(),
     counterparty: text("counterparty").notNull(),
     rawAmount: text("raw_amount").notNull(),
+    walletAddress: text("wallet_address").notNull().default("0xf142022273602c6a6c0ea7a044d21082273bd686"),
   },
   (t) => ({
     pk: primaryKey({ columns: [t.txHash, t.logIndex] }),
     tsIdx: index("aero_transfers_ts_idx").on(t.blockTimestamp),
     blockIdx: index("aero_transfers_block_idx").on(t.blockNumber),
+    addrIdx: index("aero_transfers_addr_idx").on(t.walletAddress),
   })
 );
 

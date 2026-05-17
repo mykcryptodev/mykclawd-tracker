@@ -179,6 +179,10 @@ export async function runMigrations() {
   try { await client.execute(`ALTER TABLE aero_snapshots ADD COLUMN aero_velocity_per_hr REAL`); } catch { /* exists */ }
   try { await client.execute(`ALTER TABLE aero_snapshots ADD COLUMN lp_delta_velocity_per_hr REAL`); } catch { /* exists */ }
 
+  // Additive migrations for aero_transfers multi-address support
+  try { await client.execute(`ALTER TABLE aero_transfers ADD COLUMN wallet_address TEXT NOT NULL DEFAULT '0xf142022273602c6a6c0ea7a044d21082273bd686'`); } catch { /* exists */ }
+  try { await client.execute(`CREATE INDEX IF NOT EXISTS aero_transfers_addr_idx ON aero_transfers(wallet_address)`); } catch { /* exists */ }
+
   // Reset any rows that were checked with the broken pipeline (no image found but pipeline was wrong)
   await client.execute(`UPDATE tokens SET image_checked = 0 WHERE image_url IS NULL AND image_checked = 1`);
 

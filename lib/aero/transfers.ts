@@ -187,6 +187,7 @@ export async function ingestAeroTransfers(
           direction: dir,
           counterparty,
           rawAmount,
+          walletAddress: pos.address.toLowerCase(),
         }).onConflictDoNothing().run();
         if (changedRows(result) > 0) newRows++;
         if (Number(e.block_number) > maxBlockSeen) maxBlockSeen = Number(e.block_number);
