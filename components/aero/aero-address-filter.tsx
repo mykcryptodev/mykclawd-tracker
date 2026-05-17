@@ -16,13 +16,16 @@ const TRACKED_ADDRESSES = [
 
 export function AeroAddressFilter({ selected }: { selected: string }) {
   const router = useRouter();
+  const selectedLabel = TRACKED_ADDRESSES.find(
+    (a) => a.address === selected.toLowerCase()
+  )?.label ?? selected;
   return (
     <Select
       value={selected.toLowerCase()}
       onValueChange={(val) => router.push(`/aero?address=${val}`)}
     >
       <SelectTrigger className="w-[200px]">
-        <SelectValue />
+        <SelectValue>{selectedLabel}</SelectValue>
       </SelectTrigger>
       <SelectContent>
         {TRACKED_ADDRESSES.map((a) => (
