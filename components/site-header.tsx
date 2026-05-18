@@ -2,9 +2,13 @@ import { CircleHelpIcon } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { SyncButton } from "@/components/sync-button"
+import { LocalDateTime } from "@/components/local-datetime"
 
 interface Props {
   address?: string
+  /** Unix timestamp (seconds). When provided, rendered in the user's local timezone. */
+  asOfTs?: number | null
+  /** Fallback plain string when asOfTs is not available. */
   asOf?: string
   title?: string
   /** When set, a circle-help icon links here (e.g. article) next to the title. */
@@ -15,6 +19,7 @@ interface Props {
 
 export function SiteHeader({
   address = "",
+  asOfTs,
   asOf = "—",
   title = "PnL Tracker",
   titleHelpHref,
@@ -51,9 +56,9 @@ export function SiteHeader({
             {address.slice(0, 6)}…{address.slice(-4)}
           </span>
         )}
-        {full && asOf !== "—" && (
+        {full && (asOfTs != null || asOf !== "—") && (
           <span className="hidden md:block text-[11px] text-muted-foreground ml-1">
-            · {asOf}
+            · {asOfTs != null ? <LocalDateTime ts={asOfTs} /> : asOf}
           </span>
         )}
         {full && (

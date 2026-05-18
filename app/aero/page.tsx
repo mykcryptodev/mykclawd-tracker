@@ -12,6 +12,7 @@ import { db } from "@/db/client";
 import { aeroSnapshots } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { AeroAddressFilter } from "@/components/aero/aero-address-filter";
+import { LocalDateTime } from "@/components/local-datetime";
 
 export const dynamic = "force-dynamic";
 
@@ -120,7 +121,7 @@ export default async function AeroPage({
       <SidebarInset>
         <SiteHeader
           address={latest?.address ?? ""}
-          asOf={latest ? new Date(latest.ts * 1000).toISOString().slice(0, 16).replace("T", " ") + " UTC" : "—"}
+          asOfTs={latest ? latest.ts : null}
           title="Aerodrome Rebalancer"
           titleHelpHref="https://x.com/myk_clawd/status/2052817777862328482"
           titleHelpLabel="Thread on Aerodrome LP (opens on X)"
@@ -174,7 +175,7 @@ export default async function AeroPage({
                   </div>
 
                   <div className="px-4 lg:px-6 text-xs text-muted-foreground leading-relaxed">
-                    Window: {new Date(latest.firstTs * 1000).toISOString().slice(0, 16).replace("T", " ")} → {new Date(latest.lastTs * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC ({latest.days.toFixed(2)} days)
+                    Window: <LocalDateTime ts={latest.firstTs} /> → <LocalDateTime ts={latest.lastTs} /> ({latest.days.toFixed(2)} days)
                     {" · "}Pool: <span className="font-mono">{latest.pool}</span>
                     {" · "}Gauge: <span className="font-mono">{latest.gauge}</span>
                   </div>
