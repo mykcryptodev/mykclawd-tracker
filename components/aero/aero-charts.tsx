@@ -3,10 +3,12 @@
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine,
+  LineChart, Line,
 } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AeroLatest, AeroHistoryPoint } from "./aero-types";
+import type { AeroPricePoint } from "@/lib/aero-price";
 
 function usdShort(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 }).format(n);
@@ -176,6 +178,77 @@ export function AeroVsHodlChart({ latest }: { latest: AeroLatest }) {
               {data.map((d, i) => <Cell key={i} fill={d.color} />)}
             </Bar>
           </BarChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ───── AERO price over time ─────
+export function AeroAeroPriceChart({ priceHistory }: { priceHistory: AeroPricePoint[] }) {
+  if (priceHistory.length < 2) {
+    return (
+      <Card className="border-border/60">
+        <CardHeader><CardTitle>AERO price</CardTitle></CardHeader>
+        <CardContent className="flex items-center justify-center h-48 text-muted-foreground text-sm">
+          No price data available.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const data = priceHistory.map((p) => ({
+    label: new Date(p.ts * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    price: p.close,
+  }));
+
+  const currentPrice = data[data.length - 1].price;
+  const startPrice = data[0].price;
+  const changePct = ((currentPrice - startPrice) / startPrice) * 100;
+  const positive = changePct >= 0;
+
+  return (
+    <Card className="border-border/60">
+      <CardHeader>
+        <CardTitle>AERO price</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          ${currentPrice.toFixed(4)}{" "}
+          <span className={positive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+            ({positive ? "+" : ""}{changePct.toFixed(1)}% {data.length}d)
+          </span>
+        </p>
+      </CardHeader>
+      <CardContent>
+        <ChartContainer config={{ price: { label: "AERO", color: "var(--chart-4)" } }} className="h-72">
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={Math.floor(data.length / 6)} />
+            <YAxis
+              tickFormatter={(v: number) => `$${v.toFixed(3)}`}
+              tick={{ fontSize: 11 }}
+              domain={["auto", "auto"]}
+            />
+            <Tooltip
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const item = payload[0].payload as { label: string; price: number };
+                return (
+                  <div className="rounded-md border bg-background px-3 py-2 text-xs shadow-sm">
+                    <div className="font-medium">{item.label}</div>
+                    <div className="text-muted-foreground">${item.price.toFixed(4)}</div>
+                  </div>
+                );
+              }}
+            />
+            <Line
+              type="monotone"
+              dataKey="price"
+              stroke="var(--color-price)"
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4 }}
+            />
+          </LineChart>
         </ChartContainer>
       </CardContent>
     </Card>

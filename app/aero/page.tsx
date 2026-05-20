@@ -3,11 +3,12 @@ import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Card, CardContent } from "@/components/ui/card";
 import { AeroSummaryCards } from "@/components/aero/aero-summary-cards";
-import { AeroTrendChart, AeroDeltaChart, AeroCompositionChart, AeroVsHodlChart, AeroWaterfallChart } from "@/components/aero/aero-charts";
+import { AeroTrendChart, AeroDeltaChart, AeroCompositionChart, AeroVsHodlChart, AeroWaterfallChart, AeroAeroPriceChart } from "@/components/aero/aero-charts";
 import { AeroPositionCard } from "@/components/aero/aero-position-card";
 import { AeroInflowsTable } from "@/components/aero/aero-inflows-table";
 import type { AeroInflow, AeroPayload, AeroPosition } from "@/components/aero/aero-types";
 import { runMigrations } from "@/db/migrate";
+import { fetchAeroPriceHistory } from "@/lib/aero-price";
 import { db } from "@/db/client";
 import { aeroSnapshots } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
@@ -109,7 +110,10 @@ export default async function AeroPage({
 }) {
   const params = await searchParams;
   const selectedAddress = (params.address ?? DEFAULT_ADDRESS).toLowerCase();
-  const data = await getAeroData(selectedAddress);
+  const [data, aeroPriceHistory] = await Promise.all([
+    getAeroData(selectedAddress),
+    fetchAeroPriceHistory(),
+  ]);
   const latest = data?.latest ?? null;
   const history = data?.history ?? [];
 
@@ -154,9 +158,12 @@ export default async function AeroPage({
                     <AeroVsHodlChart latest={latest} />
                   </div>
 
-                  <div className="px-4 lg:px-6">
+                  <div className="grid grid-cols-1 gap-4 px-4 lg:grid-cols-2 lg:px-6">
                     <AeroWaterfallChart latest={latest} />
-                    <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
+                    <AeroAeroPriceChart priceHistory={aeroPriceHistory} />
+                  </div>
+                  <div className="px-4 lg:px-6">
+                    <p className="mt-0 text-xs text-muted-foreground leading-relaxed">
                       AERO rewards added <strong className="text-green-600 dark:text-green-400">+${latest.usd.aeroAddedUsd.toFixed(2)}</strong>;
                       the LP itself produced <strong className={latest.usd.lpOnlyDelta >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>{latest.usd.lpOnlyDelta >= 0 ? "+" : ""}${latest.usd.lpOnlyDelta.toFixed(2)}</strong> relative
                       to holding the same tokens (impermanent loss + rebalance slippage).
