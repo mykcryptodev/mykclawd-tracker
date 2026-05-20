@@ -236,6 +236,35 @@ export function HomeLanding({
             </a>{" "}
             Telegram bot that monitors Gnosis Safe multisig wallets and posts human-readable transaction notifications. Supports Ethereum, Base, Optimism, Arbitrum, Polygon, and Gnosis.
           </li>
+          <li>
+            <a
+              className="underline underline-offset-4 hover:text-foreground"
+              href="https://github.com/mykclawd/basenames-module"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              🏷️ Basenames Module
+            </a>{" "}
+            Solidity abstract contract that lets any smart contract register and own a{" "}
+            <a
+              className="underline underline-offset-4 hover:text-foreground"
+              href="https://www.base.org/names"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Basename
+            </a>{" "}
+            (name.base.eth) on Base. Demo:{" "}
+            <a
+              className="underline underline-offset-4 hover:text-foreground"
+              href="https://basescan.org/address/0x2287ecb162bc14d69f336541ceefff738f57d676"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              incrementer.base.eth
+            </a>
+            .
+          </li>
         </ul>
 
         <h2 className="mt-12 text-xl font-semibold tracking-tight">Contributions</h2>
