@@ -23,6 +23,7 @@ interface Props {
   totalRealizedUsd: number
   totalUnrealizedUsd: number
   inferenceSpendUsd: number
+  siAllowanceUsd: number
 }
 
 function pnlClass(n: number) {
@@ -44,6 +45,7 @@ export function SectionCards({
   totalRealizedUsd,
   totalUnrealizedUsd,
   inferenceSpendUsd,
+  siAllowanceUsd,
 }: Props) {
   const totalPnl = totalRealizedUsd + totalUnrealizedUsd
 
@@ -112,6 +114,9 @@ export function SectionCards({
         </CardHeader>
         <CardFooter className="flex items-center gap-1.5">
           <span className="text-[11px] text-muted-foreground">Surplus Intelligence · USDC</span>
+          {siAllowanceUsd > 0 && (
+            <span className="text-[11px] text-muted-foreground">· {usd(siAllowanceUsd)} approved</span>
+          )}
         </CardFooter>
       </Card>
     </div>

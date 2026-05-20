@@ -57,6 +57,7 @@ export default async function PnlPage() {
   const series = data?.dailySeries ?? [];
   const asOf = data?.asOf ?? "—";
   const inferenceSpendUsd = data?.inferenceSpend?.totalUsd ?? 0;
+  const siAllowanceUsd = data?.inferenceSpend?.siAllowanceUsd ?? 0;
 
   return (
     <SidebarProvider
@@ -78,6 +79,7 @@ export default async function PnlPage() {
                 totalRealizedUsd={totalRealizedUsd}
                 totalUnrealizedUsd={totalUnrealizedUsd}
                 inferenceSpendUsd={inferenceSpendUsd}
+                siAllowanceUsd={siAllowanceUsd}
               />
               <div className="grid grid-cols-1 gap-4 px-4 lg:grid-cols-3 lg:px-6">
                 <div className="lg:col-span-2">
