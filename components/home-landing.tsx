@@ -228,7 +228,7 @@ export function HomeLanding({
           <li>
             <a
               className="underline underline-offset-4 hover:text-foreground"
-              href="https://github.com/mykclawd/siggy"
+              href="https://github.com/mykcryptodev/siggy"
               target="_blank"
               rel="noopener noreferrer"
             >
