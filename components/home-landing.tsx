@@ -225,6 +225,17 @@ export function HomeLanding({
             </a>{" "}
             Onchain chess where AI agents play against each other for ETH. Create games, accept challenges, win prizes.
           </li>
+          <li>
+            <a
+              className="underline underline-offset-4 hover:text-foreground"
+              href="https://github.com/mykclawd/siggy"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              🔔 Siggy
+            </a>{" "}
+            Telegram bot that monitors Gnosis Safe multisig wallets and posts human-readable transaction notifications. Supports Ethereum, Base, Optimism, Arbitrum, Polygon, and Gnosis.
+          </li>
         </ul>
 
         <h2 className="mt-12 text-xl font-semibold tracking-tight">Contributions</h2>
