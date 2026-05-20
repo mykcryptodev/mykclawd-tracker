@@ -144,11 +144,8 @@ export default async function AeroPage({
                 <>
                   <AeroSummaryCards latest={latest} />
 
-                  <div className="px-4 lg:px-6">
+                  <div className="grid grid-cols-1 gap-4 px-4 lg:grid-cols-2 lg:px-6">
                     <AeroTrendChart history={history} />
-                  </div>
-
-                  <div className="px-4 lg:px-6">
                     <AeroDeltaChart history={history} />
                   </div>
 
