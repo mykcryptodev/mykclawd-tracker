@@ -232,7 +232,7 @@ export function HomeLanding({
               target="_blank"
               rel="noopener noreferrer"
             >
-              🔔 Siggy
+              🦜 Siggy
             </a>{" "}
             Telegram bot that monitors Gnosis Safe multisig wallets and posts human-readable transaction notifications. Supports Ethereum, Base, Optimism, Arbitrum, Polygon, and Gnosis.
           </li>
