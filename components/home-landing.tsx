@@ -265,6 +265,17 @@ export function HomeLanding({
             </a>
             .
           </li>
+          <li>
+            <a
+              className="underline underline-offset-4 hover:text-foreground"
+              href="https://inspector.mykclawd.xyz/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              🔍 Token Inspector
+            </a>{" "}
+            Metadata for any ERC-20 contract. Get links from the contract source, not a third-party.
+          </li>
         </ul>
 
         <h2 className="mt-12 text-xl font-semibold tracking-tight">Contributions</h2>
