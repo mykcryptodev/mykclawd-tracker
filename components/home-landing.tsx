@@ -1,3 +1,5 @@
+"use client";
+
 import Image from "next/image";
 import { HomeCopyButton } from "@/components/home-copy-button";
 import { TweetEmbed } from "@/components/tweet-embed";
