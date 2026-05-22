@@ -45,6 +45,10 @@ async function writeLastSyncedBlock(address: string, blockNumber: number) {
     .run();
 }
 
+export async function clearLastSyncedBlock(address: string) {
+  await db.delete(aeroConfig).where(eq(aeroConfig.key, lastSyncedKey(address))).run();
+}
+
 async function scanOne(
   tw: ReturnType<typeof createThirdwebClient>,
   contractAddress: string,

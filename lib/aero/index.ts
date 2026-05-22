@@ -43,6 +43,7 @@ export async function ingestAeroMonitor(daysBack = 14): Promise<{
 
 export { discoverAeroPosition } from "./discover";
 export { computeAeroSnapshot, saveAeroSnapshot } from "./snapshot";
+export { clearLastSyncedBlock } from "./transfers";
 export { evaluateAndAlert } from "./monitor";
 export type { AeroSnapshot } from "./snapshot";
 export type { DiscoveredPosition } from "./discover";
