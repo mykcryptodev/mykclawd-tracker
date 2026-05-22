@@ -20,6 +20,7 @@ const npmAbi = parseAbi([
 ]);
 const gaugeAbi = parseAbi([
   "function earned(address account, uint256 tokenId) view returns (uint256)",
+  "function stakedValues(address depositor) view returns (uint256[])",
 ]);
 const poolAbi = parseAbi([
   "function slot0() view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, bool unlocked)",
@@ -103,20 +104,22 @@ export interface AeroSnapshot {
 }
 
 export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: number): Promise<AeroSnapshot> {
-  // Pull cached transfers filtered by wallet address
+  // Pull cached transfers — use full history so HODL baseline is anchored at the
+  // actual first deposit, not the start of a rolling window. At the start of a
+  // rolling window the capital is already deployed in the LP and the wallet
+  // balance is near $0, producing a wildly understated HODL baseline.
   const allRows = await db.select().from(aeroTransfers)
     .where(eq(aeroTransfers.walletAddress, pos.address.toLowerCase()))
     .orderBy(asc(aeroTransfers.blockTimestamp)).all();
-  const windowFloor = Math.floor(Date.now() / 1000) - daysBack * 86400;
-  const rows = allRows.filter((r) => r.blockTimestamp >= windowFloor);
-  if (rows.length === 0) throw new Error("No cached aero_transfers in window — run sync first.");
+  if (allRows.length === 0) throw new Error("No cached aero_transfers — run sync first.");
 
-  const firstTs = rows[0].blockTimestamp;
-  const lastTs  = rows[rows.length - 1].blockTimestamp;
-  const firstBlock = BigInt(rows[0].blockNumber);
+  const firstTs = allRows[0].blockTimestamp;
+  const lastTs  = allRows[allRows.length - 1].blockTimestamp;
+  const firstBlock = BigInt(allRows[0].blockNumber);
 
-  // Prices
-  const cgDays = Math.min(90, Math.max(daysBack + 3, 14));
+  // Prices — cover the full position duration so p0Start/p1Start are accurate.
+  const actualDays = Math.ceil((Date.now() / 1000 - firstTs) / 86400) + 3;
+  const cgDays = Math.min(365, Math.max(actualDays, 14));
   const [p0, p1, pA] = await Promise.all([
     coingeckoSeries(AERO_COINGECKO_IDS[pos.token0] ?? "ethereum", cgDays),
     coingeckoSeries(AERO_COINGECKO_IDS[pos.token1] ?? "bitcoin", cgDays),
@@ -128,7 +131,7 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
   const paStart = priceAt(pA.series, firstTs);
 
   // Starting balances (block before first event)
-  const before = firstBlock - 1n;
+  const before = firstBlock > 1n ? firstBlock - 1n : firstBlock;
   const [startEth, startT0, startT1, startAero] = await Promise.all([
     ethAt(pos.address, before),
     balanceAt(pos.token0, pos.address, before),
@@ -136,21 +139,56 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
     balanceAt(AERO_AERO, pos.address, before),
   ]);
 
-  // External inflows during the window — transfers IN from counterparties that
-  // are NOT the pool/gauge/known routers. These represent capital deposited
-  // mid-window and must be added to the HODL baseline so we're comparing apples
-  // to apples.
+  // HODL baseline via net LP flows — more robust than wallet-balance-at-start.
+  //
+  // Insight: HODL_T0 = (T0 deposited into LP) − (T0 received from LP) + (T0 in wallet now)
+  //
+  // This identity holds because every fee round-trip and rebalance round-trip cancels:
+  //   collect 0.1 WETH fee → withdrawT0 += 0.1, nowT0N += 0.1  → net 0
+  //   rebalance (withdraw 5 then re-deposit 5) → ±5 cancel       → net 0
+  //
+  // Only genuine initial/additional deposits remain, regardless of how many times the
+  // position was rebalanced or fees were collected, and regardless of which specific block
+  // the LP was first created (no archive read of historical LP position needed).
+  //
+  // STRAT = all LP-ecosystem contracts whose transfers are NOT external capital events.
+  // NPM must be included so fee collections routed through it cancel correctly.
   const ZERO = "0x0000000000000000000000000000000000000000";
-  const STRAT = new Set([pos.pool, pos.gauge, ...Object.keys(AERO_KNOWN_ROUTERS)]);
-  let extT0 = 0, extT1 = 0;
+  const STRAT = new Set([
+    pos.pool, pos.gauge,
+    AERO_NPM.toLowerCase(),
+    ...Object.keys(AERO_KNOWN_ROUTERS),
+  ]);
+
+  let depositT0 = 0, depositT1 = 0;  // T0/T1 sent INTO the LP ecosystem
+  let withdrawT0 = 0, withdrawT1 = 0; // T0/T1 received BACK from the LP ecosystem
+  let extT0 = 0, extT1 = 0;          // external capital additions (for display)
   const inflowList: Array<{ ts: number; sym: string; amount: number; from: string; tx: string }> = [];
-  for (const r of rows) {
-    if (r.direction !== "in") continue;
-    if (STRAT.has(r.counterparty) || r.counterparty === ZERO) continue;
+
+  for (const r of allRows) {
     const amount = Number(BigInt(r.rawAmount)) / 10 ** r.decimals;
-    if (r.tokenAddress === pos.token0) extT0 += amount;
-    if (r.tokenAddress === pos.token1) extT1 += amount;
-    inflowList.push({ ts: r.blockTimestamp, sym: r.symbol, amount, from: r.counterparty, tx: r.txHash });
+    const isT0 = r.tokenAddress === pos.token0;
+    const isT1 = r.tokenAddress === pos.token1;
+    if (!isT0 && !isT1) {
+      // AERO rewards — not part of T0/T1 HODL comparison; track external for display
+      if (r.direction === "in" && !STRAT.has(r.counterparty) && r.counterparty !== ZERO)
+        inflowList.push({ ts: r.blockTimestamp, sym: r.symbol, amount, from: r.counterparty, tx: r.txHash });
+      continue;
+    }
+    if (r.direction === "out" && STRAT.has(r.counterparty)) {
+      if (isT0) depositT0 += amount;
+      if (isT1) depositT1 += amount;
+    } else if (r.direction === "in" && STRAT.has(r.counterparty)) {
+      if (isT0) withdrawT0 += amount;
+      if (isT1) withdrawT1 += amount;
+    } else if (r.direction === "in" && !STRAT.has(r.counterparty) && r.counterparty !== ZERO) {
+      // External inflow — could be user's own wallet topping up; display it.
+      // It's already captured in nowT0N/nowT1N (if still in wallet) or in depositT0/depositT1
+      // (if subsequently deposited into LP), so no separate term needed in the formula.
+      if (isT0) extT0 += amount;
+      if (isT1) extT1 += amount;
+      inflowList.push({ ts: r.blockTimestamp, sym: r.symbol, amount, from: r.counterparty, tx: r.txHash });
+    }
   }
 
   // Current state
@@ -201,7 +239,7 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
   }
 
   // Gas cost (uses the cache)
-  const uniqHashes = Array.from(new Set(rows.map((r) => r.txHash)));
+  const uniqHashes = Array.from(new Set(allRows.map((r) => r.txHash)));
   const { totalGasWei } = await ingestAeroGas(uniqHashes);
   const totalGasEth = Number(totalGasWei) / 1e18;
 
@@ -219,10 +257,11 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
   const posT1N = num(posT1, pos.tokenMeta1.dec);
   const pendingAeroN = num(pendingAero, 18);
 
-  // HODL baseline: starting tokens + external inflows, valued at current prices.
-  // Native ETH and WETH are treated as a single asset for this math.
-  const hodlEthEq = startEthN + startT0N + extT0;
-  const hodlBtc   = startT1N + extT1;
+  // HODL baseline: net LP deposits + current wallet (ETH for gas treated as T0-equivalent).
+  // The identity HODL_T0 = depositT0 − withdrawT0 + nowT0N means fee/rebalance round-trips
+  // cancel automatically; only net capital ever committed to the LP counts.
+  const hodlEthEq = startEthN + (depositT0 - withdrawT0 + nowT0N);
+  const hodlBtc   = depositT1 - withdrawT1 + nowT1N;
   const hodlAero  = startAeroN;
   const hodlUsd = hodlEthEq * p0Now + hodlBtc * p1Now + hodlAero * paNow;
 
@@ -232,7 +271,8 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
     (nowT1N + posT1N) * p1Now +
     totalAeroN * paNow;
 
-  const startUsd = startEthN * p0Start + startT0N * p0Start + startT1N * p1Start + startAeroN * paStart;
+  // startUsd: USD value of the HODL amount at entry prices
+  const startUsd = hodlEthEq * p0Start + hodlBtc * p1Start + hodlAero * paStart;
   const aeroAddedUsd = (totalAeroN - startAeroN) * paNow;
   const deltaUsd = stratUsd - hodlUsd;
   const lpOnlyDelta = deltaUsd - aeroAddedUsd;
