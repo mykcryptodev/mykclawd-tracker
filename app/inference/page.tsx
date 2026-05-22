@@ -69,7 +69,8 @@ export default function InferencePage() {
               <iframe
                 src={TOTAL_SPEND_EMBED}
                 title="Total USDC Spent"
-                className="w-full h-24 border-0"
+                className="w-full border-0"
+                style={{ height: "160px" }}
                 loading="lazy"
               />
             </div>
@@ -77,7 +78,8 @@ export default function InferencePage() {
               <iframe
                 src={UNIQUE_SUPPLIERS_EMBED}
                 title="Unique Suppliers"
-                className="w-full h-24 border-0"
+                className="w-full border-0"
+                style={{ height: "160px" }}
                 loading="lazy"
               />
             </div>
@@ -85,7 +87,8 @@ export default function InferencePage() {
               <iframe
                 src={TOTAL_PAYMENTS_EMBED}
                 title="Total Payments"
-                className="w-full h-24 border-0"
+                className="w-full border-0"
+                style={{ height: "160px" }}
                 loading="lazy"
               />
             </div>
