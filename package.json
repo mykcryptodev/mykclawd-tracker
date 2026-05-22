@@ -16,7 +16,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "sync": "tsx --env-file=.env.local scripts/sync.ts"
+    "sync": "tsx --env-file=.env.local scripts/sync.ts",
+    "test": "vitest run --exclude '**/__tests__/build-smoke*'",
+    "test:watch": "vitest --exclude '**/__tests__/build-smoke*'",
+    "test:build": "vitest run __tests__/build-smoke.test.ts",
+    "test:all": "vitest run"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
@@ -50,14 +54,19 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.7"
   }
 }
