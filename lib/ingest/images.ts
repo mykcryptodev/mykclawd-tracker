@@ -10,11 +10,14 @@ const CG_BASE = "https://api.coingecko.com/api/v3";
 const MISSING_ICON =
   "https://static.coingecko.com/s/missing_thumb_2x-38c6e63b2e37f3b16510adf55368db6d8d8e6385629f6e9d41557762b25a6eeb.png";
 
-const client = createThirdwebClient({
-  clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID!,
-});
+function getClient() {
+  return createThirdwebClient({
+    clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID ?? "",
+  });
+}
 
 function toHttpUrl(uri: string): string {
+  const client = getClient();
   if (uri.startsWith("http://") || uri.startsWith("https://")) return uri;
   return resolveScheme({ client, uri });
 }
@@ -62,6 +65,7 @@ export async function resolveTokenImage(
     }
   } catch { /* continue */ }
 
+  const client = getClient();
   const contract = getContract({
     client,
     chain: base,

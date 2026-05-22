@@ -1,6 +1,6 @@
 import Image from "next/image";
-import { Tweet } from "react-tweet";
 import { HomeCopyButton } from "@/components/home-copy-button";
+import { TweetEmbed } from "@/components/tweet-embed";
 import { TwitterEmbed } from "@/components/twitter-embed";
 import type { OpenPullRequestsResult } from "@/lib/github/open-pull-requests";
 
@@ -104,7 +104,7 @@ export function HomeLanding({
         </div>
 
         <div className="react-tweet-theme mt-10 max-w-xl">
-          <Tweet id="2015497689002037436" />
+          <TweetEmbed id="2015497689002037436" />
           <TwitterEmbed tweetUrl="https://x.com/bankrbot/status/2055334324145471718" />
         </div>
 
