@@ -22,8 +22,6 @@ interface Props {
   totalValueUsd: number
   totalRealizedUsd: number
   totalUnrealizedUsd: number
-  inferenceSpendUsd: number
-  siAllowanceUsd: number
 }
 
 function pnlClass(n: number) {
@@ -44,13 +42,11 @@ export function SectionCards({
   totalValueUsd,
   totalRealizedUsd,
   totalUnrealizedUsd,
-  inferenceSpendUsd,
-  siAllowanceUsd,
 }: Props) {
   const totalPnl = totalRealizedUsd + totalUnrealizedUsd
 
   return (
-    <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @4xl/main:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @4xl/main:grid-cols-3">
       <Card className="@container/card border-border/60">
         <CardHeader className="gap-3">
           <CardDescription className="text-[11px] uppercase tracking-widest font-medium">
@@ -103,22 +99,7 @@ export function SectionCards({
         </CardFooter>
       </Card>
 
-      <Card className="@container/card border-border/60">
-        <CardHeader className="gap-3">
-          <CardDescription className="text-[11px] uppercase tracking-widest font-medium">
-            Inference Spend
-          </CardDescription>
-          <CardTitle className="text-4xl font-[family-name:var(--font-segment)] font-bold tabular-nums tracking-tight @[250px]/card:text-5xl text-black dark:text-white">
-            {usd(inferenceSpendUsd)}
-          </CardTitle>
-        </CardHeader>
-        <CardFooter className="flex items-center gap-1.5">
-          <span className="text-[11px] text-muted-foreground">Surplus Intelligence · USDC</span>
-          {siAllowanceUsd > 0 && (
-            <span className="text-[11px] text-muted-foreground">· {usd(siAllowanceUsd)} approved</span>
-          )}
-        </CardFooter>
-      </Card>
+
     </div>
   )
 }

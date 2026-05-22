@@ -21,6 +21,7 @@ import {
   DropletsIcon,
   HomeIcon,
   ServerIcon,
+  CpuIcon,
 } from "lucide-react"
 
 function BaseballCapIcon() {
@@ -52,6 +53,7 @@ const navMain = [
   { title: "Home", url: "/", icon: <HomeIcon /> },
   { title: "Portfolio", url: "/pnl", icon: <LayoutDashboardIcon /> },
   { title: "Aero LP", url: "/aero", icon: <DropletsIcon /> },
+  { title: "Inference", url: "/inference", icon: <CpuIcon /> },
   { title: "Hat Tap", url: "/hat", icon: <BaseballCapIcon /> },
   { title: "Server Health", url: "/health", icon: <ServerIcon /> },
 ]
