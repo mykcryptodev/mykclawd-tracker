@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Providers } from "@/components/providers";
+import { PostHogProvider } from "@/components/posthog-provider";
 import "./globals.css";
 
 const segment = localFont({
@@ -82,7 +83,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col overflow-x-hidden">
         <Providers>
-          <TooltipProvider>{children}</TooltipProvider>
+          <PostHogProvider>
+            <TooltipProvider>{children}</TooltipProvider>
+          </PostHogProvider>
         </Providers>
       </body>
     </html>
