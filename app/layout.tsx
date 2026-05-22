@@ -3,7 +3,6 @@ import localFont from "next/font/local";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Providers } from "@/components/providers";
 import "./globals.css";
-import "react-tweet/theme.css";
 
 const segment = localFont({
   variable: "--font-segment",
