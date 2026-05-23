@@ -196,3 +196,27 @@ export const aeroConfig = sqliteTable("aero_config", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bounty / project job tracker
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const bountyJobs = sqliteTable("bounty_jobs", {
+  id: text("id").primaryKey(),              // listing slug
+  listingId: text("listing_id").notNull(),
+  title: text("title").notNull(),
+  reward: real("reward"),
+  rewardToken: text("reward_token"),
+  deadline: text("deadline"),
+  type: text("type").notNull().default("bounty"),
+  status: text("status").notNull().default("discovered"),
+  cursorRunId: text("cursor_run_id"),
+  prUrl: text("pr_url"),
+  repoUrl: text("repo_url"),
+  submissionId: text("submission_id"),
+  errorMessage: text("error_message"),
+  discoveredAt: text("discovered_at").notNull(),
+  submittedAt: text("submitted_at"),
+  updatedAt: text("updated_at").notNull(),
+  otherInfo: text("other_info"),
+});
