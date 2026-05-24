@@ -50,6 +50,9 @@ export async function clearLastSyncedBlock(address: string) {
   await db.delete(aeroConfig).where(eq(aeroConfig.key, lastSyncedKey(address))).run();
 }
 
+// ThirdWeb Insight 500s on large time windows; chunk into 30-day slices.
+const TW_CHUNK_DAYS = 30;
+
 async function scanOne(
   tw: ReturnType<typeof createThirdwebClient>,
   contractAddress: string,
@@ -58,25 +61,34 @@ async function scanOne(
   fromBlock: number,
   sinceTs: number,
 ): Promise<InsightLog[]> {
+  const nowTs = Math.floor(Date.now() / 1000);
+  const chunkSecs = TW_CHUNK_DAYS * 86400;
   const out: InsightLog[] = [];
-  let page = 0;
-  while (true) {
-    const events = (await Insight.getContractEvents({
-      client: tw, chains: [twBase],
-      contractAddress: contractAddress as `0x${string}`,
-      event: ERC20_TRANSFER, decodeLogs: false,
-      queryOptions: {
-        filter_block_timestamp_gte: sinceTs,
-        filter_block_number_gte: fromBlock > 0 ? fromBlock : undefined,
-        [filterKey]: addrPadded,
-        sort_by: "block_number", sort_order: "asc",
-        limit: 500, page,
-      },
-    } as Parameters<typeof Insight.getContractEvents>[0])) as unknown as InsightLog[];
-    if (!events.length) break;
-    out.push(...events);
-    if (events.length < 500) break;
-    page++;
+
+  let chunkStart = sinceTs;
+  while (chunkStart < nowTs) {
+    const chunkEnd = Math.min(chunkStart + chunkSecs - 1, nowTs);
+    let page = 0;
+    while (true) {
+      const events = (await Insight.getContractEvents({
+        client: tw, chains: [twBase],
+        contractAddress: contractAddress as `0x${string}`,
+        event: ERC20_TRANSFER, decodeLogs: false,
+        queryOptions: {
+          filter_block_timestamp_gte: chunkStart,
+          filter_block_timestamp_lte: chunkEnd,
+          filter_block_number_gte: fromBlock > 0 ? fromBlock : undefined,
+          [filterKey]: addrPadded,
+          sort_by: "block_number", sort_order: "asc",
+          limit: 500, page,
+        },
+      } as Parameters<typeof Insight.getContractEvents>[0])) as unknown as InsightLog[];
+      if (!events.length) break;
+      out.push(...events);
+      if (events.length < 500) break;
+      page++;
+    }
+    chunkStart = chunkEnd + 1;
   }
   return out;
 }

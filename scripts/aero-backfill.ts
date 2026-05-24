@@ -1,8 +1,13 @@
-// One-time backfill: clears the incremental-sync checkpoint for each address
-// so the next run fetches the full 365-day history instead of just the recent tail.
-// Run via GitHub Actions (uses production secrets) or locally with the correct env.
+// One-time backfill: clears the incremental-sync checkpoint and stale snapshot rows
+// for each address so the next run fetches the full 365-day history instead of just
+// the recent tail, and recomputes all snapshots with the corrected formula.
+// Run via GitHub Actions (uses production secrets) or locally:
+//   npx tsx --env-file=.env.local scripts/aero-backfill.ts
 import "dotenv/config";
 import { runMigrations } from "../db/migrate";
+import { db } from "../db/client";
+import { aeroSnapshots } from "../db/schema";
+import { eq } from "drizzle-orm";
 import { ingestAeroMonitor, setMonitoredAddress, clearLastSyncedBlock } from "../lib/aero";
 
 const ADDRESSES = [
@@ -11,12 +16,21 @@ const ADDRESSES = [
   { address: "0x4d63da43f74e864f069f908465f2f3f13977976e", label: "yield.myk.eth" },
 ];
 
-const DAYS_BACK = 365;
+// LP inception: Apr 18 2026 2:23:49 PM UTC-04 (first deposit block)
+const LP_SINCE_TS = 1776551029;
+const DAYS_BACK = Math.ceil((Date.now() / 1000 - LP_SINCE_TS) / 86400) + 1;
 
 async function main() {
   await runMigrations();
   for (const { address, label } of ADDRESSES) {
     console.log(`\n=== Backfilling ${label} (${address}) ===`);
+
+    // Delete stale snapshots so they are recomputed with the corrected HODL formula.
+    const deleted = await db.delete(aeroSnapshots)
+      .where(eq(aeroSnapshots.address, address.toLowerCase()))
+      .run();
+    console.log(`  Deleted ${(deleted as unknown as { rowsAffected?: number }).rowsAffected ?? "?"} stale snapshot row(s)`);
+
     await clearLastSyncedBlock(address);
     console.log(`  Cleared lastSyncedBlock — cold-starting from ${DAYS_BACK} days back`);
     await setMonitoredAddress(address);

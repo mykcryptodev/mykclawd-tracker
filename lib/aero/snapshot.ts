@@ -257,22 +257,39 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
   const posT1N = num(posT1, pos.tokenMeta1.dec);
   const pendingAeroN = num(pendingAero, 18);
 
-  // HODL baseline: net LP deposits + current wallet (ETH for gas treated as T0-equivalent).
-  // The identity HODL_T0 = depositT0 − withdrawT0 + nowT0N means fee/rebalance round-trips
-  // cancel automatically; only net capital ever committed to the LP counts.
-  const hodlEthEq = startEthN + (depositT0 - withdrawT0 + nowT0N);
-  const hodlBtc   = depositT1 - withdrawT1 + nowT1N;
-  const hodlAero  = startAeroN;
-  const hodlUsd = hodlEthEq * p0Now + hodlBtc * p1Now + hodlAero * paNow;
+  // HODL baseline: only WETH and cbBTC capital ever committed to the LP.
+  //
+  // Identity: hodlWeth = depositT0 − withdrawT0 + nowT0N
+  //   • depositT0  = all WETH sent INTO the LP ecosystem (pool / NPM / router)
+  //   • withdrawT0 = all WETH received BACK from the LP ecosystem (fees, rebalances)
+  //   • nowT0N     = WETH currently sitting in wallet
+  //
+  // Fee and rebalance round-trips cancel automatically.  External inflows (e.g. topping
+  // up capital from another wallet) are captured: they either appear in depositT0 (if
+  // subsequently LP'd) or in nowT0N (if still in wallet).
+  //
+  // IMPORTANT: this formula is correct only when the full transfer history is present
+  // (i.e. the initial deposit is visible in the DB).  Run aero-backfill.ts whenever
+  // a cold-start sync window may have missed the original deposit.
+  //
+  // Excluded intentionally:
+  //   • startEthN  — native ETH is the gas reserve, not LP capital (ETH ≠ WETH)
+  //   • startAeroN — AERO is the reward token; pre-existing AERO is not LP capital
+  const hodlWeth = depositT0 - withdrawT0 + nowT0N;
+  const hodlBtc  = depositT1 - withdrawT1 + nowT1N;
+  const hodlUsd  = hodlWeth * p0Now + hodlBtc * p1Now;
 
   const totalAeroN = nowAeroN + pendingAeroN;
+  // stratUsd counts only WETH + cbBTC + AERO rewards (no native ETH) so the
+  // comparison with hodlUsd is symmetric — both exclude native ETH gas funds.
   const stratUsd =
-    (nowEthN + nowT0N + posT0N) * p0Now +
+    (nowT0N + posT0N) * p0Now +
     (nowT1N + posT1N) * p1Now +
     totalAeroN * paNow;
 
-  // startUsd: USD value of the HODL amount at entry prices
-  const startUsd = hodlEthEq * p0Start + hodlBtc * p1Start + hodlAero * paStart;
+  // startUsd: USD value of the same WETH+cbBTC HODL quantities at entry prices
+  // (used to express returns as a % of initial invested capital).
+  const startUsd = hodlWeth * p0Start + hodlBtc * p1Start;
   const aeroAddedUsd = (totalAeroN - startAeroN) * paNow;
   const deltaUsd = stratUsd - hodlUsd;
   const lpOnlyDelta = deltaUsd - aeroAddedUsd;

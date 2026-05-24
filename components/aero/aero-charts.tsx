@@ -127,7 +127,8 @@ export function AeroCompositionChart({ latest }: { latest: AeroLatest }) {
   const posT0Usd = end.positionT0 * prices.p0Now;
   const posT1Usd = end.positionT1 * prices.p1Now;
   const aeroAllUsd = (end.walletAero + end.pendingAero) * prices.paNow;
-  const walletUsd = (end.walletEth + end.walletT0) * prices.p0Now + end.walletT1 * prices.p1Now;
+  // walletEth (native ETH gas reserve) excluded — only WETH + cbBTC counted, matching stratUsd
+  const walletUsd = end.walletT0 * prices.p0Now + end.walletT1 * prices.p1Now;
 
   const data = [
     { name: `LP ${sym0}`, value: posT0Usd },
