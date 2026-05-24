@@ -6,7 +6,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, CalendarPlusIcon, ExternalLinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -158,6 +158,68 @@ function toLocalDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
 
+// ── Polymarket bet data (server-side would be ideal; hardcoded for now) ────────
+const POLYMARKET_BETS = [
+  {
+    date: "2026-04-23",
+    opponent: "BOS",
+    side: "YES" as const,
+    amount: 15,
+    odds: 0.575,
+    payout: 25.75,
+    result: "WIN" as const,
+    profit: 10.75,
+    note: "5-game win streak + series lead vs BOS",
+  },
+  {
+    date: "2026-04-24",
+    opponent: "HOU",
+    side: "YES" as const,
+    amount: 10,
+    odds: 0.57,
+    payout: 17.54,
+    result: "WIN" as const,
+    profit: 7.54,
+    note: "6-game win streak",
+  },
+  {
+    date: "2026-04-25",
+    opponent: "HOU",
+    side: "YES" as const,
+    amount: 15,
+    odds: 0.58,
+    payout: 25.86,
+    result: "WIN" as const,
+    profit: 10.86,
+    note: "7-game win streak + series lead vs HOU",
+  },
+  {
+    date: "2026-04-26",
+    opponent: "HOU",
+    side: "YES" as const,
+    amount: 5,
+    odds: 0.555,
+    payout: 8.93,
+    result: "LOSS" as const,
+    profit: -5,
+    note: "8-game win streak + series lead vs HOU (G3)",
+  },
+  {
+    date: "2026-05-24",
+    opponent: "TB",
+    side: "NO" as const,
+    amount: 10,
+    odds: 0.51,
+    payout: null,
+    result: null,
+    profit: null,
+    note: "3-game losing streak — bet placement failed (TLS error)",
+  },
+] as const;
+
+const GOOGLE_CALENDAR_URL =
+  "https://calendar.google.com/calendar/u/0?cid=MTNjYzcxNDg2OTliMTYyYzk3ODZhM2NiZGFkMDdiNzUxZDVlNDIyNjRjYjFhMWFkNjcyNjU2YmU1OWQ1OGEwOUBncm91cC5jYWxlbmRhci5nb29nbGUuY29t";
+
 // ── component ────────────────────────────────────────────────────────────────
 
 export default function YankeesPage() {
@@ -242,7 +304,7 @@ export default function YankeesPage() {
             <div className="flex flex-col gap-6 py-6 md:gap-8 md:py-8 px-4 lg:px-6">
 
               {/* Season record banner */}
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 flex-wrap">
                 <div className="flex items-center gap-2">
                   <span className="text-2xl font-bold font-[family-name:var(--font-segment)]">⚾ Yankees</span>
                   <span className="text-sm text-muted-foreground">{viewYear} Season</span>
@@ -258,6 +320,15 @@ export default function YankeesPage() {
                 {error && (
                   <span className="text-xs text-destructive">Error: {error}</span>
                 )}
+                <a
+                  href={GOOGLE_CALENDAR_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-auto flex items-center gap-1.5 rounded-md border border-border/60 px-3 py-1.5 text-xs font-medium hover:bg-muted/60 transition-colors"
+                >
+                  <CalendarPlusIcon className="h-3.5 w-3.5" />
+                  Add to Google Calendar
+                </a>
               </div>
 
               {/* Calendar card */}
@@ -460,6 +531,110 @@ export default function YankeesPage() {
                   </CardContent>
                 </Card>
               )}
+
+              {/* Polymarket P&L */}
+              <Card className="border-border/60">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <CardTitle className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
+                      🎰 Polymarket Strategy
+                    </CardTitle>
+                    <a
+                      href="https://polymarket.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      polymarket.com <ExternalLinkIcon className="h-3 w-3" />
+                    </a>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Strategy blurb */}
+                  <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground leading-relaxed space-y-1.5">
+                    <p>
+                      <span className="font-semibold text-foreground">The strategy:</span> Bet YES (Yankees win) on Polymarket when momentum is on our side. Rules, in priority order:
+                    </p>
+                    <ol className="list-decimal list-inside space-y-1 pl-1">
+                      <li><span className="text-foreground font-medium">$15 high-confidence</span> — Yankees won their last 2+ games AND today is Game 2+ of a series they lead</li>
+                      <li><span className="text-foreground font-medium">$10 standard</span> — Yankees won their last 2+ games (any context)</li>
+                      <li><span className="text-foreground font-medium">$10 bounce-back</span> — Lost exactly 1 after a 3+ game win streak</li>
+                    </ol>
+                    <p className="pt-0.5">
+                      <span className="font-semibold text-foreground">Skip when:</span> 3+ game losing streak, opponent is Tampa Bay Rays (historically tough), or none of the above rules apply.
+                    </p>
+                    <p className="text-[10px] opacity-60">Bets placed automatically each game day via Polymarket. This is not financial advice.</p>
+                  </div>
+
+                  {/* P&L summary */}
+                  {(() => {
+                    const resolved = POLYMARKET_BETS.filter(b => b.result !== null);
+                    const totalProfit = resolved.reduce((s, b) => s + (b.profit ?? 0), 0);
+                    const wins = resolved.filter(b => b.result === "WIN").length;
+                    const totalRisked = resolved.reduce((s, b) => s + b.amount, 0);
+                    const roi = totalRisked > 0 ? (totalProfit / totalRisked) * 100 : 0;
+                    return (
+                      <div className="grid grid-cols-4 gap-2">
+                        {[
+                          { label: "Net P&L", value: `${totalProfit >= 0 ? "+" : ""}$${totalProfit.toFixed(2)}`, positive: totalProfit >= 0 },
+                          { label: "Record", value: `${wins}-${resolved.length - wins}`, positive: wins >= resolved.length - wins },
+                          { label: "ROI", value: `${roi >= 0 ? "+" : ""}${roi.toFixed(0)}%`, positive: roi >= 0 },
+                          { label: "Bets", value: String(POLYMARKET_BETS.length), positive: true },
+                        ].map(({ label, value, positive }) => (
+                          <div key={label} className="rounded-lg border border-border/40 p-2 text-center">
+                            <div className={`text-sm font-bold font-mono ${positive ? "text-green-400" : "text-red-400"}`}>{value}</div>
+                            <div className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">{label}</div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Bet history table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border/40">
+                          {["Date", "Opp", "Side", "Bet", "Odds", "Result", "P&L"].map(h => (
+                            <th key={h} className="px-2 py-1.5 text-left text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...POLYMARKET_BETS].reverse().map((b, i) => (
+                          <tr key={i} className="border-b border-border/10 last:border-0 hover:bg-muted/20 transition-colors">
+                            <td className="px-2 py-2 font-mono text-muted-foreground">{b.date}</td>
+                            <td className="px-2 py-2 font-semibold">{b.opponent}</td>
+                            <td className="px-2 py-2">
+                              <span className={`rounded px-1 py-0.5 font-mono ${b.side === "YES" ? "bg-green-500/15 text-green-400" : "bg-blue-500/15 text-blue-400"}`}>{b.side}</span>
+                            </td>
+                            <td className="px-2 py-2 font-mono">${b.amount}</td>
+                            <td className="px-2 py-2 font-mono text-muted-foreground">{(b.odds * 100).toFixed(0)}¢</td>
+                            <td className="px-2 py-2">
+                              {b.result === null ? (
+                                <span className="text-muted-foreground">—</span>
+                              ) : b.result === "WIN" ? (
+                                <span className="text-green-400 font-medium">WIN</span>
+                              ) : (
+                                <span className="text-red-400 font-medium">LOSS</span>
+                              )}
+                            </td>
+                            <td className="px-2 py-2 font-mono">
+                              {b.profit === null ? (
+                                <span className="text-muted-foreground">—</span>
+                              ) : (
+                                <span className={b.profit >= 0 ? "text-green-400" : "text-red-400"}>
+                                  {b.profit >= 0 ? "+" : ""}${b.profit.toFixed(2)}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Legend */}
               <div className="flex gap-3 text-[10px] text-muted-foreground flex-wrap">
