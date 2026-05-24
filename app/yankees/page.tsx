@@ -375,21 +375,22 @@ export default function YankeesPage() {
                                   className={`mt-1 rounded px-1 py-0.5 text-[10px] leading-tight ${chipColor}`}
                                 >
                                   <div className="flex items-center gap-0.5 font-medium">
-                                    <span className="opacity-60">{isHome ? "vs" : "@"}</span>
-                                    <span>{abbrev(opp.team.name)}</span>
+                                    {/* Home/away dot indicator instead of vs/@ text */}
+                                    <span className={`w-1 h-1 rounded-full shrink-0 ${isHome ? "bg-current opacity-70" : "opacity-0"}`} />
+                                    <span className="truncate">{abbrev(opp.team.name)}</span>
                                     {result && (
-                                      <span className="ml-auto font-bold">
-                                        {result} {ys.score}–{opp.score}
+                                      <span className="ml-auto font-bold shrink-0">
+                                        {ys.score}–{opp.score}
                                       </span>
                                     )}
-                                    {state === "Live" && <span className="ml-auto font-bold">LIVE</span>}
+                                    {state === "Live" && <span className="ml-auto font-bold shrink-0">LIVE</span>}
                                     {state === "Preview" && !g.status.startTimeTBD && (
-                                      <span className="ml-auto opacity-70">
-                                        {formatTime(g.gameDate).replace(/ (EDT|EST|ET)/, "")}
+                                      <span className="ml-auto opacity-70 shrink-0 tabular-nums">
+                                        {formatTime(g.gameDate).replace(/:00 (EDT|EST|ET)/, "p").replace(/ (EDT|EST|ET)/, "")}
                                       </span>
                                     )}
                                     {state === "Preview" && g.status.startTimeTBD && (
-                                      <span className="ml-auto opacity-70">TBD</span>
+                                      <span className="ml-auto opacity-70 shrink-0">TBD</span>
                                     )}
                                   </div>
                                 </div>
@@ -611,16 +612,19 @@ export default function YankeesPage() {
               {/* Legend */}
               <div className="flex gap-3 text-[10px] text-muted-foreground flex-wrap">
                 <span className="flex items-center gap-1">
-                  <span className="rounded px-1 py-0.5 bg-green-500/20 text-green-400">W</span> Win
+                  <span className="w-3 h-3 rounded-sm bg-green-500/20" /> Win
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="rounded px-1 py-0.5 bg-red-500/20 text-red-400">L</span> Loss
+                  <span className="w-3 h-3 rounded-sm bg-red-500/20" /> Loss
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="rounded px-1 py-0.5 bg-yellow-500/20 text-yellow-400">LIVE</span> In progress
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="rounded px-1 py-0.5 bg-muted/60 text-muted-foreground">7:05p</span> Scheduled
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" /> Home
                 </span>
                 <span className="flex items-center gap-1 ml-auto">Data: MLB Stats API
                 </span>
