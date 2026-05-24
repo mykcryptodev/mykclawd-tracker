@@ -158,64 +158,20 @@ function toLocalDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
 
-// ── Polymarket bet data (server-side would be ideal; hardcoded for now) ────────
-const POLYMARKET_BETS = [
-  {
-    date: "2026-04-23",
-    opponent: "BOS",
-    side: "YES" as const,
-    amount: 15,
-    odds: 0.575,
-    payout: 25.75,
-    result: "WIN" as const,
-    profit: 10.75,
-    note: "5-game win streak + series lead vs BOS",
-  },
-  {
-    date: "2026-04-24",
-    opponent: "HOU",
-    side: "YES" as const,
-    amount: 10,
-    odds: 0.57,
-    payout: 17.54,
-    result: "WIN" as const,
-    profit: 7.54,
-    note: "6-game win streak",
-  },
-  {
-    date: "2026-04-25",
-    opponent: "HOU",
-    side: "YES" as const,
-    amount: 15,
-    odds: 0.58,
-    payout: 25.86,
-    result: "WIN" as const,
-    profit: 10.86,
-    note: "7-game win streak + series lead vs HOU",
-  },
-  {
-    date: "2026-04-26",
-    opponent: "HOU",
-    side: "YES" as const,
-    amount: 5,
-    odds: 0.555,
-    payout: 8.93,
-    result: "LOSS" as const,
-    profit: -5,
-    note: "8-game win streak + series lead vs HOU (G3)",
-  },
-  {
-    date: "2026-05-24",
-    opponent: "TB",
-    side: "NO" as const,
-    amount: 10,
-    odds: 0.51,
-    payout: null,
-    result: null,
-    profit: null,
-    note: "3-game losing streak — bet placement failed (TLS error)",
-  },
-] as const;
+// ── Polymarket bet type ────────────────────────────────────────────────────────────────
+interface PolyBet {
+  date: string;
+  opponent: string;
+  side: "YES" | "NO";
+  amount: number;
+  odds: number;
+  payout: number | null;
+  result: "WIN" | "LOSS" | null;
+  profit: number | null;
+  note: string | null;
+  betPlaced: boolean;
+  tweetId: string | null;
+}
 
 const GOOGLE_CALENDAR_URL =
   "https://calendar.google.com/calendar/u/0?cid=MTNjYzcxNDg2OTliMTYyYzk3ODZhM2NiZGFkMDdiNzUxZDVlNDIyNjRjYjFhMWFkNjcyNjU2YmU1OWQ1OGEwOUBncm91cC5jYWxlbmRhci5nb29nbGUuY29t";
@@ -230,6 +186,15 @@ export default function YankeesPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [selectedDate, setSelectedDate] = React.useState<string | null>(null);
+  const [bets, setBets] = React.useState<PolyBet[]>([]);
+
+  // Fetch bets from DB
+  React.useEffect(() => {
+    fetch("/api/yankees/bets")
+      .then((r) => r.json())
+      .then((d) => setBets(d.bets ?? []))
+      .catch(() => {});
+  }, []);
 
   // Fetch full season schedule once (or when year changes)
   const fetchedYears = React.useRef<Set<number>>(new Set());
@@ -561,14 +526,14 @@ export default function YankeesPage() {
                       <li><span className="text-foreground font-medium">$10 bounce-back</span> — Lost exactly 1 after a 3+ game win streak</li>
                     </ol>
                     <p className="pt-0.5">
-                      <span className="font-semibold text-foreground">Skip when:</span> 3+ game losing streak, opponent is Tampa Bay Rays (historically tough), or none of the above rules apply.
+                      <span className="font-semibold text-foreground">Skip when:</span> 3+ game losing streak or none of the above rules apply.
                     </p>
                     <p className="text-[10px] opacity-60">Bets placed automatically each game day via Polymarket. This is not financial advice.</p>
                   </div>
 
                   {/* P&L summary */}
                   {(() => {
-                    const resolved = POLYMARKET_BETS.filter(b => b.result !== null);
+                    const resolved = bets.filter(b => b.result !== null);
                     const totalProfit = resolved.reduce((s, b) => s + (b.profit ?? 0), 0);
                     const wins = resolved.filter(b => b.result === "WIN").length;
                     const totalRisked = resolved.reduce((s, b) => s + b.amount, 0);
@@ -579,7 +544,7 @@ export default function YankeesPage() {
                           { label: "Net P&L", value: `${totalProfit >= 0 ? "+" : ""}$${totalProfit.toFixed(2)}`, positive: totalProfit >= 0 },
                           { label: "Record", value: `${wins}-${resolved.length - wins}`, positive: wins >= resolved.length - wins },
                           { label: "ROI", value: `${roi >= 0 ? "+" : ""}${roi.toFixed(0)}%`, positive: roi >= 0 },
-                          { label: "Bets", value: String(POLYMARKET_BETS.length), positive: true },
+                          { label: "Bets", value: String(bets.length), positive: true },
                         ].map(({ label, value, positive }) => (
                           <div key={label} className="rounded-lg border border-border/40 p-2 text-center">
                             <div className={`text-sm font-bold font-mono ${positive ? "text-green-400" : "text-red-400"}`}>{value}</div>
@@ -601,7 +566,7 @@ export default function YankeesPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {[...POLYMARKET_BETS].reverse().map((b, i) => (
+                        {[...bets].map((b, i) => (
                           <tr key={i} className="border-b border-border/10 last:border-0 hover:bg-muted/20 transition-colors">
                             <td className="px-2 py-2 font-mono text-muted-foreground">{b.date}</td>
                             <td className="px-2 py-2 font-semibold">{b.opponent}</td>

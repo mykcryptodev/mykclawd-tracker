@@ -247,6 +247,26 @@ export async function runMigrations() {
     `);
   } catch { /* already migrated or table doesn't exist yet */ }
 
+  // Yankees bets table
+  try {
+    await client.executeMultiple(`
+      CREATE TABLE IF NOT EXISTS yankees_bets (
+        date TEXT PRIMARY KEY,
+        opponent TEXT NOT NULL,
+        side TEXT NOT NULL CHECK(side IN ('YES', 'NO')),
+        amount REAL NOT NULL,
+        odds REAL NOT NULL,
+        payout REAL,
+        result TEXT CHECK(result IN ('WIN', 'LOSS')),
+        profit REAL,
+        note TEXT,
+        bet_placed INTEGER NOT NULL DEFAULT 1,
+        tweet_id TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+  } catch { /* exists */ }
+
   // Reset any rows that were checked with the broken pipeline (no image found but pipeline was wrong)
   await client.execute(`UPDATE tokens SET image_checked = 0 WHERE image_url IS NULL AND image_checked = 1`);
 

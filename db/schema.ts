@@ -202,6 +202,25 @@ export const aeroConfig = sqliteTable("aero_config", {
 // Bounty / project job tracker
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Yankees Polymarket bets
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const yankeesBets = sqliteTable("yankees_bets", {
+  date: text("date").primaryKey(),            // YYYY-MM-DD game date
+  opponent: text("opponent").notNull(),       // e.g. "BOS"
+  side: text("side", { enum: ["YES", "NO"] }).notNull(),
+  amount: real("amount").notNull(),           // USD bet size
+  odds: real("odds").notNull(),              // share price 0–1
+  payout: real("payout"),                    // gross payout if win
+  result: text("result", { enum: ["WIN", "LOSS"] }),
+  profit: real("profit"),                    // net profit/loss (negative for loss)
+  note: text("note"),
+  betPlaced: integer("bet_placed", { mode: "boolean" }).notNull().default(true),
+  tweetId: text("tweet_id"),
+  createdAt: text("created_at").notNull().default(new Date().toISOString()),
+});
+
 export const bountyJobs = sqliteTable("bounty_jobs", {
   id: text("id").primaryKey(),              // listing slug
   listingId: text("listing_id").notNull(),
