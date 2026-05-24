@@ -7,6 +7,9 @@ import { Insight, createThirdwebClient, prepareEvent } from "thirdweb";
 import { base as twBase } from "thirdweb/chains";
 import { AERO_AERO, AERO_SYMBOLS, TokenMeta } from "./constants";
 import { CdpSqlError, cdpQuery, sqlDateTimeFromUnix, sqlString } from "../cdp-sql";
+import { db } from "../../db/client";
+import { aeroConfig } from "../../db/schema";
+import { eq } from "drizzle-orm";
 
 const rpc = createPublicClient({
   chain: base,
@@ -62,6 +65,23 @@ interface InsightLog {
   data: string;
 }
 
+function gaugeKey(address: string): string {
+  return `aero_gauge_${address.toLowerCase()}`;
+}
+
+async function readCachedGauge(address: string): Promise<string | null> {
+  const row = await db.select().from(aeroConfig)
+    .where(eq(aeroConfig.key, gaugeKey(address))).get();
+  return row ? row.value : null;
+}
+
+async function writeCachedGauge(address: string, gauge: string): Promise<void> {
+  await db.insert(aeroConfig)
+    .values({ key: gaugeKey(address), value: gauge.toLowerCase() })
+    .onConflictDoUpdate({ target: aeroConfig.key, set: { value: gauge.toLowerCase() } })
+    .run();
+}
+
 async function fetchAeroRewardSendersSql(address: string, sinceTs: number): Promise<Set<string> | null> {
   const senders = new Set<string>();
   let offset = 0;
@@ -94,14 +114,51 @@ async function fetchAeroRewardSendersSql(address: string, sinceTs: number): Prom
 
 export async function discoverAeroPosition(address: string, daysBack = 14): Promise<DiscoveredPosition | null> {
   const clientId = process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID;
-  if (!clientId) throw new Error("NEXT_PUBLIC_THIRDWEB_CLIENT_ID is required");
+  const secretKey = process.env.THIRDWEB_SECRET_KEY;
+  if (!clientId && !secretKey) throw new Error("NEXT_PUBLIC_THIRDWEB_CLIENT_ID or THIRDWEB_SECRET_KEY is required");
+
+  // --- Check cache first ---
+  const cachedGauge = await readCachedGauge(address);
+  if (cachedGauge) {
+    try {
+      const staked = await rpc.readContract({
+        address: cachedGauge as `0x${string}`,
+        abi: gaugeAbi,
+        functionName: "stakedValues",
+        args: [address as `0x${string}`],
+      }) as bigint[];
+      if (staked.length > 0) {
+        const pool = (await rpc.readContract({
+          address: cachedGauge as `0x${string}`, abi: gaugeAbi, functionName: "pool",
+        }) as string).toLowerCase();
+        const [t0, t1] = await Promise.all([
+          rpc.readContract({ address: pool as `0x${string}`, abi: poolAbi, functionName: "token0" }) as Promise<string>,
+          rpc.readContract({ address: pool as `0x${string}`, abi: poolAbi, functionName: "token1" }) as Promise<string>,
+        ]);
+        const [m0, m1] = await Promise.all([fetchTokenMeta(t0), fetchTokenMeta(t1)]);
+        return {
+          address: address.toLowerCase(),
+          gauge: cachedGauge,
+          pool,
+          token0: t0.toLowerCase(),
+          token1: t1.toLowerCase(),
+          tokenMeta0: m0,
+          tokenMeta1: m1,
+          stakedTokenIds: staked,
+        };
+      }
+      // staked is empty — position closed, fall through to full re-discovery
+    } catch {
+      // Cache hit but RPC failed — fall through to full re-discovery
+    }
+  }
 
   const ADDR_PADDED = "0x000000000000000000000000" + address.toLowerCase().slice(2);
   const sinceTs = Math.floor(Date.now() / 1000) - daysBack * 86400;
 
   // AERO senders (i.e. gauges that paid this address)
   const senders = await fetchAeroRewardSendersSql(address, sinceTs) ?? await (async () => {
-    const tw = createThirdwebClient({ clientId });
+    const tw = clientId ? createThirdwebClient({ clientId }) : createThirdwebClient({ secretKey: secretKey! });
     const fallbackSenders = new Set<string>();
     let page = 0;
     while (true) {
@@ -140,6 +197,7 @@ export async function discoverAeroPosition(address: string, daysBack = 14): Prom
         rpc.readContract({ address: pool as `0x${string}`, abi: poolAbi, functionName: "token1" }) as Promise<string>,
       ]);
       const [m0, m1] = await Promise.all([fetchTokenMeta(t0), fetchTokenMeta(t1)]);
+      await writeCachedGauge(address, g);
       return {
         address: address.toLowerCase(),
         gauge: g.toLowerCase(),

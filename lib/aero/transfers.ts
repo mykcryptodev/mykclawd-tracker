@@ -25,8 +25,9 @@ const ERC20_TRANSFER = prepareEvent({
 
 function getClient() {
   const clientId = process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID;
-  if (!clientId) throw new Error("NEXT_PUBLIC_THIRDWEB_CLIENT_ID is required");
-  return createThirdwebClient({ clientId });
+  const secretKey = process.env.THIRDWEB_SECRET_KEY;
+  if (!clientId && !secretKey) throw new Error("NEXT_PUBLIC_THIRDWEB_CLIENT_ID or THIRDWEB_SECRET_KEY is required");
+  return clientId ? createThirdwebClient({ clientId }) : createThirdwebClient({ secretKey: secretKey! });
 }
 
 function lastSyncedKey(address: string): string {
@@ -89,37 +90,51 @@ interface CdpAeroLog {
   parameters?: { from?: string; to?: string; value?: string };
 }
 
-function isCdpAeroLog(event: InsightLog | CdpAeroLog): event is CdpAeroLog {
-  return "parameters" in event;
-}
-
-async function scanOneSql(
-  contractAddress: string,
-  dir: "in" | "out",
-  address: string,
+async function scanAllTransfersSql(
+  tokenAddresses: string[],
+  walletAddress: string,
   fromBlock: number,
   sinceTs: number,
-): Promise<CdpAeroLog[] | null> {
-  const out: CdpAeroLog[] = [];
-  const param = dir === "in" ? "to" : "from";
-  let offset = 0;
+): Promise<Array<CdpAeroLog & { _dir: "in" | "out" }> | null> {
+  const wallet = walletAddress.toLowerCase();
+  const addrs = tokenAddresses.map((a) => sqlString(a.toLowerCase())).join(", ");
+  const out: Array<CdpAeroLog & { _dir: "in" | "out" }> = [];
+  let lastBlock = fromBlock;
+  let lastLogIdx = -1;
 
   try {
     while (true) {
+      const cursorClause =
+        lastBlock > 0 || lastLogIdx >= 0
+          ? `AND (block_number > ${lastBlock} OR (block_number = ${lastBlock} AND log_index > ${lastLogIdx}))`
+          : "";
+
       const rows = (await cdpQuery(`
-        SELECT block_number, block_timestamp, transaction_hash, log_index, address, parameters
+        SELECT block_number, block_timestamp, transaction_hash,
+               log_index, address, parameters
         FROM base.events
-        WHERE address = ${sqlString(contractAddress.toLowerCase())}
-          AND event_signature = 'Transfer(address,address,uint256)'
-          AND parameters[${sqlString(param)}] = ${sqlString(address.toLowerCase())}
+        WHERE event_signature = 'Transfer(address,address,uint256)'
           AND block_timestamp >= ${sqlDateTimeFromUnix(sinceTs)}
-          ${fromBlock > 0 ? `AND block_number >= ${fromBlock}` : ""}
+          AND address IN (${addrs})
+          AND (
+            parameters['to']   = ${sqlString(wallet)}
+            OR parameters['from'] = ${sqlString(wallet)}
+          )
+          ${cursorClause}
         ORDER BY block_number ASC, log_index ASC
-        LIMIT 1000 OFFSET ${offset}
+        LIMIT 1000
       `)) as CdpAeroLog[];
-      out.push(...rows);
+
+      for (const row of rows) {
+        const toAddr = (row.parameters?.to ?? "").toLowerCase();
+        out.push({ ...row, _dir: toAddr === wallet ? "in" : "out" });
+      }
+
       if (rows.length < 1000) break;
-      offset += rows.length;
+
+      const last = rows[rows.length - 1];
+      lastBlock = Number(last.block_number);
+      lastLogIdx = Number(last.log_index);
     }
     return out;
   } catch (e) {
@@ -156,45 +171,69 @@ export async function ingestAeroTransfers(
   let newRows = 0;
   let maxBlockSeen = lastBlock;
 
-  for (const { addr, meta } of tokensToScan) {
-    for (const dir of ["in", "out"] as const) {
-      const sqlEvents = await scanOneSql(addr, dir, pos.address, fromBlock, sinceTs);
-      const events = sqlEvents ?? await (async () => {
-        tw ??= getClient();
+  const tokenAddrs = tokensToScan.map((t) => t.addr);
+  const sqlEvents = await scanAllTransfersSql(tokenAddrs, pos.address, fromBlock, sinceTs);
+
+  if (sqlEvents !== null) {
+    const metaByAddr = new Map(tokensToScan.map((t) => [t.addr.toLowerCase(), t.meta]));
+
+    for (const e of sqlEvents) {
+      const tokenAddr = (e.address as string ?? "").toLowerCase();
+      const meta = metaByAddr.get(tokenAddr);
+      if (!meta) continue;
+
+      const from = (e.parameters?.from ?? "").toLowerCase();
+      const to = (e.parameters?.to ?? "").toLowerCase();
+      const rawAmount = (e.parameters?.value ?? "0").toString();
+      const blockTimestamp = parseSqlTimestamp(e.block_timestamp as string | number);
+      const counterparty = e._dir === "in" ? from : to;
+
+      const result = await db.insert(aeroTransfers).values({
+        txHash: e.transaction_hash as string,
+        logIndex: Number(e.log_index),
+        blockNumber: Number(e.block_number),
+        blockTimestamp,
+        tokenAddress: tokenAddr,
+        symbol: meta.sym,
+        decimals: meta.dec,
+        direction: e._dir,
+        counterparty,
+        rawAmount,
+        walletAddress: pos.address.toLowerCase(),
+      }).onConflictDoNothing().run();
+      if (changedRows(result) > 0) newRows++;
+      if (Number(e.block_number) > maxBlockSeen) maxBlockSeen = Number(e.block_number);
+    }
+  } else {
+    // fallback to ThirdWeb Insight
+    tw ??= getClient();
+    for (const { addr, meta } of tokensToScan) {
+      for (const dir of ["in", "out"] as const) {
         const filterKey: "filter_topic_1" | "filter_topic_2" =
           dir === "in" ? "filter_topic_2" : "filter_topic_1";
-        return scanOne(tw, addr, filterKey, ADDR_PADDED, fromBlock, sinceTs);
-      })();
-      for (const e of events) {
-        const isSqlEvent = isCdpAeroLog(e);
-        const from = isSqlEvent
-          ? (e.parameters?.from ?? "").toLowerCase()
-          : "0x" + e.topics[1].slice(26);
-        const to = isSqlEvent
-          ? (e.parameters?.to ?? "").toLowerCase()
-          : "0x" + e.topics[2].slice(26);
-        const rawAmount = isSqlEvent
-          ? (e.parameters?.value ?? "0").toString()
-          : BigInt(e.data).toString();
-        const blockTimestamp = isSqlEvent
-          ? parseSqlTimestamp(e.block_timestamp as string | number)
-          : e.block_timestamp;
-        const counterparty = dir === "in" ? from : to;
-        const result = await db.insert(aeroTransfers).values({
-          txHash: e.transaction_hash as string,
-          logIndex: Number(e.log_index),
-          blockNumber: Number(e.block_number),
-          blockTimestamp,
-          tokenAddress: addr.toLowerCase(),
-          symbol: meta.sym,
-          decimals: meta.dec,
-          direction: dir,
-          counterparty,
-          rawAmount,
-          walletAddress: pos.address.toLowerCase(),
-        }).onConflictDoNothing().run();
-        if (changedRows(result) > 0) newRows++;
-        if (Number(e.block_number) > maxBlockSeen) maxBlockSeen = Number(e.block_number);
+        const events = await scanOne(tw, addr, filterKey, ADDR_PADDED, fromBlock, sinceTs);
+        for (const e of events) {
+          const from = "0x" + e.topics[1].slice(26);
+          const to = "0x" + e.topics[2].slice(26);
+          const rawAmount = BigInt(e.data).toString();
+          const blockTimestamp = e.block_timestamp;
+          const counterparty = dir === "in" ? from : to;
+          const result = await db.insert(aeroTransfers).values({
+            txHash: e.transaction_hash as string,
+            logIndex: Number(e.log_index),
+            blockNumber: Number(e.block_number),
+            blockTimestamp,
+            tokenAddress: addr.toLowerCase(),
+            symbol: meta.sym,
+            decimals: meta.dec,
+            direction: dir,
+            counterparty,
+            rawAmount,
+            walletAddress: pos.address.toLowerCase(),
+          }).onConflictDoNothing().run();
+          if (changedRows(result) > 0) newRows++;
+          if (Number(e.block_number) > maxBlockSeen) maxBlockSeen = Number(e.block_number);
+        }
       }
     }
   }
