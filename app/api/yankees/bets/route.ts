@@ -41,14 +41,26 @@ export async function GET() {
     migrated = true;
   }
 
-  // Auto-seed if empty (first deploy, new Turso DB, etc.)
+  // Auto-upsert seed data if DB has fewer rows than the canonical list.
+  // This handles: first deploy, new Turso DB, and backfill additions.
   const count = await db
     .select({ n: sql<number>`count(*)` })
     .from(yankeesBets)
     .then((r) => Number(r[0]?.n ?? 0));
 
-  if (count === 0) {
-    await db.insert(yankeesBets).values(SEED_BETS).onConflictDoNothing();
+  if (count < SEED_BETS.length) {
+    await db
+      .insert(yankeesBets)
+      .values(SEED_BETS)
+      .onConflictDoUpdate({
+        target: yankeesBets.date,
+        set: {
+          result: sql`excluded.result`,
+          profit: sql`excluded.profit`,
+          payout: sql`excluded.payout`,
+          tweetId: sql`excluded.tweet_id`,
+        },
+      });
   }
 
   const bets = await db
