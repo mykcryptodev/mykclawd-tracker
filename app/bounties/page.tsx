@@ -26,9 +26,11 @@ type BountyJob = typeof bountyJobs.$inferSelect;
 
 async function getBountyJobs(): Promise<BountyJob[]> {
   try {
+    const { ne } = await import("drizzle-orm");
     return await db
       .select()
       .from(bountyJobs)
+      .where(ne(bountyJobs.status, "skipped"))
       .orderBy(desc(bountyJobs.discoveredAt))
       .all();
   } catch {
@@ -131,7 +133,7 @@ function TypeBadge({ type }: { type: string }) {
 export default async function BountiesPage() {
   const jobs = await getBountyJobs();
 
-  // Compute stats
+  // Compute stats (skipped jobs already excluded from query)
   const totalJobs = jobs.length;
   const submitted = jobs.filter((j) => j.status === "submitted" || j.status === "won").length;
   const won = jobs.filter((j) => j.status === "won").length;
