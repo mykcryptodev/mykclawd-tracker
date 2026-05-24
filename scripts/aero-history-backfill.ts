@@ -11,8 +11,9 @@
 // Safe to re-run — uses onConflictDoNothing so existing rows are preserved.
 
 import "dotenv/config";
-import { db } from "../db/client";
+import { db, changedRows } from "../db/client";
 import { aeroTransfers, aeroSnapshots, aeroConfig } from "../db/schema";
+import { sql } from "drizzle-orm";
 import { asc, eq } from "drizzle-orm";
 import {
   AERO_AERO, AERO_WETH, AERO_CBBTC,
@@ -153,6 +154,13 @@ async function backfillAddress(address: string, label: string, prices: {
   const startDay = Math.floor(LP_SINCE_TS / 86400) * 86400 + 86400;
   const endDay   = Math.floor(nowTs / 86400) * 86400; // today midnight (exclusive)
 
+  // Delete existing synthetic (midnight-aligned) rows for this address so
+  // re-runs always reflect the latest formula, regardless of which DB backend
+  // (Turso or local SQLite) is configured in the environment.
+  await db.delete(aeroSnapshots).where(
+    sql`${aeroSnapshots.address} = ${addr} AND ${aeroSnapshots.ts} % 86400 = 0`,
+  ).run();
+
   let inserted = 0;
   for (let dayTs = startDay; dayTs < endDay; dayTs += 86400) {
     const p0 = priceAt(prices.weth, dayTs);
@@ -215,9 +223,9 @@ async function backfillAddress(address: string, label: string, prices: {
       netBenefitUsd,
       netBenefitPct,
       coverageRatio,
-    }).onConflictDoNothing().run();
+    }).run();
 
-    if ((result as unknown as { rowsAffected?: number }).rowsAffected) inserted++;
+    inserted++;
   }
 
   console.log(`  Inserted ${inserted} daily snapshot rows (${new Date(startDay * 1000).toISOString().slice(0,10)} → ${new Date((endDay - 86400) * 1000).toISOString().slice(0,10)})`);
