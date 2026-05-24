@@ -21,8 +21,8 @@ import {
 } from "../lib/aero/constants";
 import { runMigrations } from "../db/migrate";
 
-// ── LP inception (Apr 18 2026 2:23:49 PM UTC-4) ─────────────────────────────
-const LP_SINCE_TS = 1776551029;
+// ── LP inception (May 8 2026 1:42:15 PM UTC-4) ──────────────────────────────
+const LP_SINCE_TS = 1778262135;
 
 // ── Addresses to backfill ────────────────────────────────────────────────────
 const ADDRESSES = [

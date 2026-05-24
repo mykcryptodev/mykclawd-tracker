@@ -16,8 +16,8 @@ const ADDRESSES = [
   { address: "0x4d63da43f74e864f069f908465f2f3f13977976e", label: "yield.myk.eth" },
 ];
 
-// LP inception: Apr 18 2026 2:23:49 PM UTC-04 (first deposit block)
-const LP_SINCE_TS = 1776551029;
+// LP inception: May 8 2026 1:42:15 PM UTC-04 (first deposit block)
+const LP_SINCE_TS = 1778262135;
 const DAYS_BACK = Math.ceil((Date.now() / 1000 - LP_SINCE_TS) / 86400) + 1;
 
 async function main() {
