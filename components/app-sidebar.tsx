@@ -23,6 +23,7 @@ import {
   ServerIcon,
   CpuIcon,
   TrophyIcon,
+  CalendarIcon,
 } from "lucide-react"
 
 function BaseballCapIcon() {
@@ -57,6 +58,7 @@ const navMain = [
   { title: "Inference", url: "/inference", icon: <CpuIcon /> },
   { title: "Bounties", url: "/bounties", icon: <TrophyIcon /> },
   { title: "Hat Tap", url: "/hat", icon: <BaseballCapIcon /> },
+  { title: "Yankees", url: "/yankees", icon: <CalendarIcon /> },
   { title: "Server Health", url: "/health", icon: <ServerIcon /> },
 ]
 
