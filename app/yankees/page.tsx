@@ -518,15 +518,21 @@ export default function YankeesPage() {
                   {/* Strategy blurb */}
                   <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground leading-relaxed space-y-1.5">
                     <p>
-                      <span className="font-semibold text-foreground">The strategy:</span> Bet YES (Yankees win) on Polymarket when momentum is on our side. Rules, in priority order:
+                      <span className="font-semibold text-foreground">The strategy:</span> Bet YES or NO on the Yankees each game day based on momentum. Fully automated via Polymarket.
                     </p>
-                    <ol className="list-decimal list-inside space-y-1 pl-1">
-                      <li><span className="text-foreground font-medium">$15 high-confidence</span> — Yankees won their last 2+ games AND today is Game 2+ of a series they lead</li>
-                      <li><span className="text-foreground font-medium">$10 standard</span> — Yankees won their last 2+ games (any context)</li>
-                      <li><span className="text-foreground font-medium">$10 bounce-back</span> — Lost exactly 1 after a 3+ game win streak</li>
+                    <p className="font-medium text-foreground">Bet YES (Yankees win) — highest priority first:</p>
+                    <ol className="list-decimal list-inside space-y-0.5 pl-1">
+                      <li><span className="text-green-400 font-medium">$15</span> — Won 2+ in a row AND Game 2+ of a series they currently lead</li>
+                      <li><span className="text-green-400 font-medium">$10</span> — Won 2+ in a row (any context)</li>
+                      <li><span className="text-green-400 font-medium">$10</span> — Lost exactly 1 after a 3+ game win streak (bounce-back)</li>
                     </ol>
-                    <p className="pt-0.5">
-                      <span className="font-semibold text-foreground">Skip when:</span> none of the above rules apply.
+                    <p className="font-medium text-foreground pt-0.5">Bet NO (Yankees lose) — only when no YES rule fires:</p>
+                    <ol className="list-decimal list-inside space-y-0.5 pl-1" start={4}>
+                      <li><span className="text-red-400 font-medium">$10</span> — Lost 3+ in a row</li>
+                      <li><span className="text-red-400 font-medium">$10</span> — Game 2+ of a series the opponent is currently leading</li>
+                    </ol>
+                    <p className="pt-0.5 text-muted-foreground">
+                      Skip when none of the above rules apply.
                     </p>
                     <p className="text-[10px] opacity-60">Bets placed automatically each game day via Polymarket. This is not financial advice.</p>
                   </div>
@@ -560,7 +566,7 @@ export default function YankeesPage() {
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="border-b border-border/40">
-                          {["Date", "Opp", "Side", "Bet", "Odds", "Result", "P&L"].map(h => (
+                          {["Date", "Opp", "Side", "Bet", "Odds", "Result", "P&L", "Rule"].map(h => (
                             <th key={h} className="px-2 py-1.5 text-left text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{h}</th>
                           ))}
                         </tr>
@@ -571,7 +577,7 @@ export default function YankeesPage() {
                             <td className="px-2 py-2 font-mono text-muted-foreground">{b.date}</td>
                             <td className="px-2 py-2 font-semibold">{b.opponent}</td>
                             <td className="px-2 py-2">
-                              <span className={`rounded px-1 py-0.5 font-mono ${b.side === "YES" ? "bg-green-500/15 text-green-400" : "bg-blue-500/15 text-blue-400"}`}>{b.side}</span>
+                              <span className={`rounded px-1 py-0.5 font-mono ${b.side === "YES" ? "bg-green-500/15 text-green-400" : "bg-orange-500/15 text-orange-400"}`} title={b.side === "NO" ? "Bet against Yankees (WIN when Yankees lose)" : "Bet for Yankees"}>{b.side}</span>
                             </td>
                             <td className="px-2 py-2 font-mono">${b.amount}</td>
                             <td className="px-2 py-2 font-mono text-muted-foreground">{(b.odds * 100).toFixed(0)}¢</td>
@@ -593,6 +599,7 @@ export default function YankeesPage() {
                                 </span>
                               )}
                             </td>
+                            <td className="px-2 py-2 text-muted-foreground max-w-[140px] truncate" title={b.note ?? ""}>{b.note ?? "—"}</td>
                           </tr>
                         ))}
                       </tbody>
