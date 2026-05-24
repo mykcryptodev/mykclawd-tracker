@@ -136,10 +136,11 @@ async function backfillAddress(address: string, label: string, prices: {
   const paStart = priceAt(prices.aero, firstTs);
   const startUsd = hodlWeth * p0Start + hodlBtc * p1Start;
 
-  // Build cumulative AERO series: for each day, how much AERO has been earned
-  // (direction=in from gauge counts as earned; sold AERO goes out to STRAT/external)
+  // Build cumulative AERO series: AERO claimed from gauge (counterparty IS in STRAT).
+  // Do NOT filter out STRAT counterparties here — the gauge is STRAT and that's
+  // exactly where rewards come from.
   const aeroRows = transfers
-    .filter(r => r.tokenAddress === AERO_AERO && r.direction === "in" && !STRAT.has(r.counterparty) && r.counterparty !== ZERO)
+    .filter(r => r.tokenAddress === AERO_AERO && r.direction === "in")
     .map(r => ({ ts: r.blockTimestamp, amount: Number(BigInt(r.rawAmount)) / 1e18 }));
 
   // Count unique tx hashes for txCount
