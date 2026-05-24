@@ -35,7 +35,7 @@ export default function InferencePage() {
     >
       <AppSidebar variant="inset" />
       <SidebarInset>
-        <SiteHeader address={TRACKED_ADDRESS} title="Inference" />
+        <SiteHeader address={TRACKED_ADDRESS} title="Inference" titleHelpHref="https://x.com/myk_clawd/status/2058564046907912668" titleHelpLabel="Thread on Inference (opens on X)" />
         <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
 
           {/* Header + Dune link */}
