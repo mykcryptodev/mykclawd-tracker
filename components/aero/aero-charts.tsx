@@ -8,6 +8,9 @@ import {
 
 // bankr has been down since May 19 2026 9:00 AM EDT — shade this on all timeseries
 const BANKR_DOWN_TS = Math.floor(new Date("2026-05-19T09:00:00-04:00").getTime() / 1000);
+// Bright red-400 (#f87171) — visible on both light and dark backgrounds
+const BANKR_FILL = "#f87171";
+const BANKR_FILL_OPACITY = 0.18;
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AeroLatest, AeroHistoryPoint } from "./aero-types";
@@ -52,8 +55,8 @@ export function AeroTrendChart({ history }: { history: AeroHistoryPoint[] }) {
             <YAxis tickFormatter={usdShort} tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
             <ChartTooltip content={<ChartTooltipContent formatter={(v) => usdFull(Number(v))} />} />
             {bankrLabel && lastLabel && (
-              <ReferenceArea x1={bankrLabel} x2={lastLabel} fill="hsl(var(--destructive))" fillOpacity={0.07}
-                label={{ value: "bankr ⚠︎", position: "insideTopLeft", fontSize: 10, fill: "hsl(var(--destructive))" }} />
+              <ReferenceArea x1={bankrLabel} x2={lastLabel} fill={BANKR_FILL} fillOpacity={BANKR_FILL_OPACITY} stroke={BANKR_FILL} strokeOpacity={0.5}
+                label={{ value: "bankr ⚠︎", position: "insideTopLeft", fontSize: 10, fill: BANKR_FILL }} />
             )}
             <Area type="monotone" dataKey="strategy" stroke="var(--color-strategy)" fill="var(--color-strategy)" fillOpacity={0.2} strokeWidth={2} />
             <Area type="monotone" dataKey="hodl" stroke="var(--color-hodl)" fill="var(--color-hodl)" fillOpacity={0.05} strokeWidth={2} strokeDasharray="5 5" />
@@ -108,8 +111,8 @@ export function AeroDeltaChart({ history }: { history: AeroHistoryPoint[] }) {
             <YAxis tickFormatter={usdShort} tick={{ fontSize: 11 }} domain={domain} />
             <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1.5} />
             {bankrLabel && lastLabel && (
-              <ReferenceArea x1={bankrLabel} x2={lastLabel} fill="hsl(var(--destructive))" fillOpacity={0.07}
-                label={{ value: "bankr ⚠︎", position: "insideTopLeft", fontSize: 10, fill: "hsl(var(--destructive))" }} />
+              <ReferenceArea x1={bankrLabel} x2={lastLabel} fill={BANKR_FILL} fillOpacity={BANKR_FILL_OPACITY} stroke={BANKR_FILL} strokeOpacity={0.5}
+                label={{ value: "bankr ⚠︎", position: "insideTopLeft", fontSize: 10, fill: BANKR_FILL }} />
             )}
             <Tooltip
               cursor={{ fill: "hsl(var(--muted))" }}
@@ -263,8 +266,8 @@ export function AeroAeroPriceChart({ priceHistory }: { priceHistory: AeroPricePo
               }}
             />
             {bankrPriceLabel && lastPriceLabel && (
-              <ReferenceArea x1={bankrPriceLabel} x2={lastPriceLabel} fill="hsl(var(--destructive))" fillOpacity={0.07}
-                label={{ value: "bankr ⚠︎", position: "insideTopLeft", fontSize: 10, fill: "hsl(var(--destructive))" }} />
+              <ReferenceArea x1={bankrPriceLabel} x2={lastPriceLabel} fill={BANKR_FILL} fillOpacity={BANKR_FILL_OPACITY} stroke={BANKR_FILL} strokeOpacity={0.5}
+                label={{ value: "bankr ⚠︎", position: "insideTopLeft", fontSize: 10, fill: BANKR_FILL }} />
             )}
             <Line
               type="monotone"
