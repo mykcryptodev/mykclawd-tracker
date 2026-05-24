@@ -126,7 +126,7 @@ export const aeroGasCache = sqliteTable("aero_gas_cache", {
 export const aeroSnapshots = sqliteTable(
   "aero_snapshots",
   {
-    ts: integer("ts").primaryKey(), // unix seconds when the snapshot was taken
+    ts: integer("ts").notNull(), // unix seconds when the snapshot was taken
     address: text("address").notNull(),
     pool: text("pool").notNull(),
     gauge: text("gauge").notNull(),
@@ -188,7 +188,8 @@ export const aeroSnapshots = sqliteTable(
     coverageRatio: real("coverage_ratio").notNull().default(0),   // aeroRewards / |lpOnlyDelta| ; >1 = rewards winning
     aeroVelocityPerHr: real("aero_velocity_per_hr"),              // $/hr earned in AERO vs prior snapshot
     lpDeltaVelocityPerHr: real("lp_delta_velocity_per_hr"),       // $/hr IL drag vs prior snapshot
-  }
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.ts, t.address] }) }),
 );
 
 // Stored configuration for the monitored Safe (last-discovered pool/gauge, last-synced block, etc).

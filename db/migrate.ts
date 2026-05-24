@@ -183,6 +183,70 @@ export async function runMigrations() {
   try { await client.execute(`ALTER TABLE aero_transfers ADD COLUMN wallet_address TEXT NOT NULL DEFAULT '0xf142022273602c6a6c0ea7a044d21082273bd686'`); } catch { /* exists */ }
   try { await client.execute(`CREATE INDEX IF NOT EXISTS aero_transfers_addr_idx ON aero_transfers(wallet_address)`); } catch { /* exists */ }
 
+  // Migrate aero_snapshots from single ts PK → composite (ts, address) PK so
+  // multiple wallets can each have a snapshot at the same timestamp.
+  try {
+    await client.executeMultiple(`
+      CREATE TABLE IF NOT EXISTS aero_snapshots_new (
+        ts INTEGER NOT NULL,
+        address TEXT NOT NULL,
+        pool TEXT NOT NULL,
+        gauge TEXT NOT NULL,
+        token0 TEXT NOT NULL,
+        token1 TEXT NOT NULL,
+        sym0 TEXT NOT NULL,
+        sym1 TEXT NOT NULL,
+        dec0 INTEGER NOT NULL,
+        dec1 INTEGER NOT NULL,
+        first_ts INTEGER NOT NULL,
+        last_ts INTEGER NOT NULL,
+        days REAL NOT NULL,
+        p0_now REAL NOT NULL,
+        p1_now REAL NOT NULL,
+        pa_now REAL NOT NULL,
+        p0_start REAL NOT NULL,
+        p1_start REAL NOT NULL,
+        pa_start REAL NOT NULL,
+        start_eth REAL NOT NULL,
+        start_t0 REAL NOT NULL,
+        start_t1 REAL NOT NULL,
+        start_aero REAL NOT NULL,
+        ext_inflow_t0 REAL NOT NULL DEFAULT 0,
+        ext_inflow_t1 REAL NOT NULL DEFAULT 0,
+        wallet_eth REAL NOT NULL,
+        wallet_t0 REAL NOT NULL,
+        wallet_t1 REAL NOT NULL,
+        wallet_aero REAL NOT NULL,
+        position_t0 REAL NOT NULL,
+        position_t1 REAL NOT NULL,
+        pending_aero REAL NOT NULL,
+        start_usd REAL NOT NULL,
+        hodl_usd REAL NOT NULL,
+        strat_usd REAL NOT NULL,
+        delta_usd REAL NOT NULL,
+        lp_only_delta_usd REAL NOT NULL,
+        aero_added_usd REAL NOT NULL,
+        delta_pct REAL NOT NULL,
+        apr REAL NOT NULL,
+        total_gas_eth REAL NOT NULL,
+        total_gas_usd REAL NOT NULL,
+        tx_count INTEGER NOT NULL,
+        gas_txs_counted INTEGER NOT NULL,
+        positions_json TEXT NOT NULL,
+        inflows_json TEXT NOT NULL,
+        net_benefit_usd REAL NOT NULL DEFAULT 0,
+        net_benefit_pct REAL NOT NULL DEFAULT 0,
+        coverage_ratio REAL NOT NULL DEFAULT 0,
+        aero_velocity_per_hr REAL,
+        lp_delta_velocity_per_hr REAL,
+        PRIMARY KEY (ts, address)
+      );
+      INSERT OR IGNORE INTO aero_snapshots_new SELECT * FROM aero_snapshots;
+      DROP TABLE aero_snapshots;
+      ALTER TABLE aero_snapshots_new RENAME TO aero_snapshots;
+    `);
+  } catch { /* already migrated or table doesn't exist yet */ }
+
   // Reset any rows that were checked with the broken pipeline (no image found but pipeline was wrong)
   await client.execute(`UPDATE tokens SET image_checked = 0 WHERE image_url IS NULL AND image_checked = 1`);
 

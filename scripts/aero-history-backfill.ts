@@ -154,11 +154,10 @@ async function backfillAddress(address: string, label: string, prices: {
   const startDay = Math.floor(LP_SINCE_TS / 86400) * 86400 + 86400;
   const endDay   = Math.floor(nowTs / 86400) * 86400; // today midnight (exclusive)
 
-  // Delete existing synthetic (midnight-aligned) rows for this address so
-  // re-runs always reflect the latest formula, regardless of which DB backend
-  // (Turso or local SQLite) is configured in the environment.
+  // Delete all existing synthetic rows for this address in the backfill window.
+  // Uses the drizzle client so it targets the correct backend (Turso or local SQLite).
   await db.delete(aeroSnapshots).where(
-    sql`${aeroSnapshots.address} = ${addr} AND ${aeroSnapshots.ts} % 86400 = 0`,
+    sql`${aeroSnapshots.address} = ${addr} AND ${aeroSnapshots.ts} >= ${startDay} AND ${aeroSnapshots.ts} < ${endDay}`,
   ).run();
 
   let inserted = 0;
