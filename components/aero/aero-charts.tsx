@@ -2,9 +2,12 @@
 
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine,
+  XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceArea,
   LineChart, Line,
 } from "recharts";
+
+// bankr has been down since May 19 2026 9:00 AM EDT — shade this on all timeseries
+const BANKR_DOWN_TS = Math.floor(new Date("2026-05-19T09:00:00-04:00").getTime() / 1000);
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AeroLatest, AeroHistoryPoint } from "./aero-types";
@@ -33,6 +36,9 @@ export function AeroTrendChart({ history }: { history: AeroHistoryPoint[] }) {
     );
   }
   const data = history.map((h) => ({ label: tsShort(h.ts), strategy: h.stratUsd, hodl: h.hodlUsd }));
+  const bankrIdx = history.findIndex((h) => h.ts >= BANKR_DOWN_TS);
+  const bankrLabel = bankrIdx >= 0 ? data[bankrIdx].label : null;
+  const lastLabel = data.at(-1)?.label;
   return (
     <Card className="border-border/60">
       <CardHeader>
@@ -45,6 +51,10 @@ export function AeroTrendChart({ history }: { history: AeroHistoryPoint[] }) {
             <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
             <YAxis tickFormatter={usdShort} tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
             <ChartTooltip content={<ChartTooltipContent formatter={(v) => usdFull(Number(v))} />} />
+            {bankrLabel && lastLabel && (
+              <ReferenceArea x1={bankrLabel} x2={lastLabel} fill="hsl(var(--destructive))" fillOpacity={0.07}
+                label={{ value: "bankr ⚠︎", position: "insideTopLeft", fontSize: 10, fill: "hsl(var(--destructive))" }} />
+            )}
             <Area type="monotone" dataKey="strategy" stroke="var(--color-strategy)" fill="var(--color-strategy)" fillOpacity={0.2} strokeWidth={2} />
             <Area type="monotone" dataKey="hodl" stroke="var(--color-hodl)" fill="var(--color-hodl)" fillOpacity={0.05} strokeWidth={2} strokeDasharray="5 5" />
           </AreaChart>
@@ -80,6 +90,10 @@ export function AeroDeltaChart({ history }: { history: AeroHistoryPoint[] }) {
   const sign = latest.delta >= 0 ? "+" : "";
   const subtitle = `Currently ${sign}${usdFull(latest.delta)} vs holding`;
 
+  const bankrIdx = history.findIndex((h) => h.ts >= BANKR_DOWN_TS);
+  const bankrLabel = bankrIdx >= 0 ? data[bankrIdx].label : null;
+  const lastLabel = data.at(-1)?.label;
+
   return (
     <Card className="border-border/60">
       <CardHeader>
@@ -93,6 +107,10 @@ export function AeroDeltaChart({ history }: { history: AeroHistoryPoint[] }) {
             <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
             <YAxis tickFormatter={usdShort} tick={{ fontSize: 11 }} domain={domain} />
             <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1.5} />
+            {bankrLabel && lastLabel && (
+              <ReferenceArea x1={bankrLabel} x2={lastLabel} fill="hsl(var(--destructive))" fillOpacity={0.07}
+                label={{ value: "bankr ⚠︎", position: "insideTopLeft", fontSize: 10, fill: "hsl(var(--destructive))" }} />
+            )}
             <Tooltip
               cursor={{ fill: "hsl(var(--muted))" }}
               content={({ active, payload }) => {
@@ -202,6 +220,9 @@ export function AeroAeroPriceChart({ priceHistory }: { priceHistory: AeroPricePo
     label: new Date(p.ts * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
     price: p.close,
   }));
+  const bankrPriceIdx = priceHistory.findIndex((p) => p.ts >= BANKR_DOWN_TS);
+  const bankrPriceLabel = bankrPriceIdx >= 0 ? data[bankrPriceIdx].label : null;
+  const lastPriceLabel = data.at(-1)?.label;
 
   const currentPrice = data[data.length - 1].price;
   const startPrice = data[0].price;
@@ -241,6 +262,10 @@ export function AeroAeroPriceChart({ priceHistory }: { priceHistory: AeroPricePo
                 );
               }}
             />
+            {bankrPriceLabel && lastPriceLabel && (
+              <ReferenceArea x1={bankrPriceLabel} x2={lastPriceLabel} fill="hsl(var(--destructive))" fillOpacity={0.07}
+                label={{ value: "bankr ⚠︎", position: "insideTopLeft", fontSize: 10, fill: "hsl(var(--destructive))" }} />
+            )}
             <Line
               type="monotone"
               dataKey="price"
