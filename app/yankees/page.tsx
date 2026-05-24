@@ -526,7 +526,7 @@ export default function YankeesPage() {
                       <li><span className="text-foreground font-medium">$10 bounce-back</span> — Lost exactly 1 after a 3+ game win streak</li>
                     </ol>
                     <p className="pt-0.5">
-                      <span className="font-semibold text-foreground">Skip when:</span> 3+ game losing streak or none of the above rules apply.
+                      <span className="font-semibold text-foreground">Skip when:</span> none of the above rules apply.
                     </p>
                     <p className="text-[10px] opacity-60">Bets placed automatically each game day via Polymarket. This is not financial advice.</p>
                   </div>
