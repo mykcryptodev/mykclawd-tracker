@@ -55,7 +55,8 @@ export async function GET() {
     .from(yankeesBets)
     .then((r) => Number(r[0]?.n ?? 0));
 
-  if (count < SEED_BETS.length) {
+  // Always upsert so result/profit corrections in SEED_BETS propagate to the DB.
+  {
     await db
       .insert(yankeesBets)
       .values(SEED_BETS)
