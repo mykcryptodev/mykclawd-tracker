@@ -211,8 +211,10 @@ export function AeroVsHodlChart({ latest }: { latest: AeroLatest }) {
 }
 
 // ───── AERO price over time ─────
-export function AeroAeroPriceChart({ priceHistory }: { priceHistory: AeroPricePoint[] }) {
-  if (priceHistory.length < 2) {
+export function AeroAeroPriceChart({ priceHistory, startTs }: { priceHistory: AeroPricePoint[]; startTs?: number }) {
+  // Align start with the LP performance window
+  const filteredHistory = startTs ? priceHistory.filter((p) => p.ts >= startTs) : priceHistory;
+  if (filteredHistory.length < 2) {
     return (
       <Card className="border-border/60">
         <CardHeader><CardTitle>AERO price</CardTitle></CardHeader>
@@ -223,13 +225,13 @@ export function AeroAeroPriceChart({ priceHistory }: { priceHistory: AeroPricePo
     );
   }
 
-  const data = priceHistory.map((p) => ({
+  const data = filteredHistory.map((p) => ({
     label: new Date(p.ts * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
     price: p.close,
   }));
-  const bankrPriceIdx = priceHistory.findIndex((p) => p.ts >= BANKR_DOWN_TS);
+  const bankrPriceIdx = filteredHistory.findIndex((p) => p.ts >= BANKR_DOWN_TS);
   const bankrPriceLabel = bankrPriceIdx >= 0 ? data[bankrPriceIdx].label : null;
-  const bankrPriceEndIdx = [...priceHistory].map((p, i) => ({ ts: p.ts, i })).filter((x) => x.ts <= BANKR_END_TS).at(-1)?.i ?? priceHistory.length - 1;
+  const bankrPriceEndIdx = [...filteredHistory].map((p, i) => ({ ts: p.ts, i })).filter((x) => x.ts <= BANKR_END_TS).at(-1)?.i ?? filteredHistory.length - 1;
   const bankrPriceEndLabel = data[bankrPriceEndIdx]?.label ?? data.at(-1)?.label;
 
   const currentPrice = data[data.length - 1].price;
