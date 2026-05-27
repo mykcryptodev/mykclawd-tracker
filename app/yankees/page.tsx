@@ -187,6 +187,14 @@ export default function YankeesPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [selectedDate, setSelectedDate] = React.useState<string | null>(null);
   const [bets, setBets] = React.useState<PolyBet[]>([]);
+  const [colorMode, setColorMode] = React.useState<"yankee" | "bet">("yankee");
+
+  // Build a lookup: date string → bet
+  const betsByDate = React.useMemo(() => {
+    const map: Record<string, PolyBet> = {};
+    for (const b of bets) map[b.date] = b;
+    return map;
+  }, [bets]);
 
   // Fetch bets from DB
   React.useEffect(() => {
@@ -296,6 +304,27 @@ export default function YankeesPage() {
                 </a>
               </div>
 
+              {/* Color mode toggle */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Color by:</span>
+                <div className="flex rounded-md border border-border/60 overflow-hidden">
+                  {(["yankee", "bet"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setColorMode(mode)}
+                      className={[
+                        "px-3 py-1.5 text-xs font-medium transition-colors",
+                        colorMode === mode
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-transparent text-muted-foreground hover:bg-muted/60",
+                      ].join(" ")}
+                    >
+                      {mode === "yankee" ? "Yankee W/L" : "Bet W/L"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Calendar card */}
               <Card className="border-border/60">
                 <CardHeader className="pb-3">
@@ -365,9 +394,21 @@ export default function YankeesPage() {
                               const state = g.status.abstractGameState;
 
                               let chipColor = "bg-muted/60 text-muted-foreground";
-                              if (result === "W") chipColor = "bg-green-500/20 text-green-400";
-                              if (result === "L") chipColor = "bg-red-500/20 text-red-400";
-                              if (state === "Live") chipColor = "bg-yellow-500/20 text-yellow-400 animate-pulse";
+                              if (colorMode === "yankee") {
+                                if (result === "W") chipColor = "bg-green-500/20 text-green-400";
+                                if (result === "L") chipColor = "bg-red-500/20 text-red-400";
+                                if (state === "Live") chipColor = "bg-yellow-500/20 text-yellow-400 animate-pulse";
+                              } else {
+                                // Bet W/L mode
+                                const bet = betsByDate[key];
+                                if (bet) {
+                                  if (bet.result === "WIN") chipColor = "bg-green-500/20 text-green-400";
+                                  else if (bet.result === "LOSS") chipColor = "bg-red-500/20 text-red-400";
+                                  else if (state === "Live") chipColor = "bg-yellow-500/20 text-yellow-400 animate-pulse";
+                                  else chipColor = "bg-yellow-500/10 text-yellow-500"; // pending / not yet resolved
+                                }
+                                // no bet → stays grey (default)
+                              }
 
                               return (
                                 <div
@@ -612,16 +653,27 @@ export default function YankeesPage() {
               {/* Legend */}
               <div className="flex gap-3 text-[10px] text-muted-foreground flex-wrap">
                 <span className="flex items-center gap-1">
-                  <span className="w-3 h-3 rounded-sm bg-green-500/20" /> Win
+                  <span className="w-3 h-3 rounded-sm bg-green-500/20" />
+                  {colorMode === "yankee" ? "Win" : "Bet won"}
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-3 h-3 rounded-sm bg-red-500/20" /> Loss
+                  <span className="w-3 h-3 rounded-sm bg-red-500/20" />
+                  {colorMode === "yankee" ? "Loss" : "Bet lost"}
                 </span>
+                {colorMode === "yankee" ? (
+                  <span className="flex items-center gap-1">
+                    <span className="rounded px-1 py-0.5 bg-yellow-500/20 text-yellow-400">LIVE</span> In progress
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1">
+                    <span className="w-3 h-3 rounded-sm bg-yellow-500/10" /> Bet pending
+                  </span>
+                )}
                 <span className="flex items-center gap-1">
-                  <span className="rounded px-1 py-0.5 bg-yellow-500/20 text-yellow-400">LIVE</span> In progress
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="rounded px-1 py-0.5 bg-muted/60 text-muted-foreground">7:05p</span> Scheduled
+                  <span className="rounded px-1 py-0.5 bg-muted/60 text-muted-foreground">
+                    {colorMode === "yankee" ? "7:05p" : "—"}
+                  </span>
+                  {colorMode === "yankee" ? "Scheduled" : "No bet"}
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" /> Home
