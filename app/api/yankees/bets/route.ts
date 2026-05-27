@@ -64,9 +64,14 @@ export async function GET() {
       .onConflictDoUpdate({
         target: yankeesBets.date,
         set: {
+          opponent: sql`excluded.opponent`,
+          side: sql`excluded.side`,
+          amount: sql`excluded.amount`,
+          odds: sql`excluded.odds`,
           result: sql`excluded.result`,
           profit: sql`excluded.profit`,
           payout: sql`excluded.payout`,
+          note: sql`excluded.note`,
           tweetId: sql`excluded.tweet_id`,
         },
       });

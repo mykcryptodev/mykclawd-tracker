@@ -8,6 +8,8 @@ import {
 
 // bankr has been down since May 19 2026 9:00 AM EDT — shade this on all timeseries
 const BANKR_DOWN_TS = Math.floor(new Date("2026-05-19T09:00:00-04:00").getTime() / 1000);
+// bankr overlay ends May 27 2026 midnight New York time (i.e. end of May 26 / start of May 27)
+const BANKR_END_TS = Math.floor(new Date("2026-05-27T00:00:00-04:00").getTime() / 1000);
 // Bright red-400 (#f87171) — visible on both light and dark backgrounds
 const BANKR_FILL = "#f87171";
 const BANKR_FILL_OPACITY = 0.18;
@@ -41,7 +43,8 @@ export function AeroTrendChart({ history }: { history: AeroHistoryPoint[] }) {
   const data = history.map((h) => ({ label: tsShort(h.ts), strategy: h.stratUsd, hodl: h.hodlUsd }));
   const bankrIdx = history.findIndex((h) => h.ts >= BANKR_DOWN_TS);
   const bankrLabel = bankrIdx >= 0 ? data[bankrIdx].label : null;
-  const lastLabel = data.at(-1)?.label;
+  const bankrEndIdxT = [...history].map((h, i) => ({ ts: h.ts, i })).filter((x) => x.ts <= BANKR_END_TS).at(-1)?.i ?? history.length - 1;
+  const bankrEndLabel = data[bankrEndIdxT]?.label ?? data.at(-1)?.label;
   return (
     <Card className="border-border/60">
       <CardHeader>
@@ -54,8 +57,8 @@ export function AeroTrendChart({ history }: { history: AeroHistoryPoint[] }) {
             <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
             <YAxis tickFormatter={usdShort} tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
             <ChartTooltip content={<ChartTooltipContent formatter={(v) => usdFull(Number(v))} />} />
-            {bankrLabel && lastLabel && (
-              <ReferenceArea x1={bankrLabel} x2={lastLabel} fill={BANKR_FILL} fillOpacity={BANKR_FILL_OPACITY} stroke={BANKR_FILL} strokeOpacity={0.5}
+            {bankrLabel && bankrEndLabel && (
+              <ReferenceArea x1={bankrLabel} x2={bankrEndLabel} fill={BANKR_FILL} fillOpacity={BANKR_FILL_OPACITY} stroke={BANKR_FILL} strokeOpacity={0.5}
                 label={{ value: "bankr ⚠︎", position: "insideTopLeft", fontSize: 10, fill: BANKR_FILL }} />
             )}
             <Area type="monotone" dataKey="strategy" stroke="var(--color-strategy)" fill="var(--color-strategy)" fillOpacity={0.2} strokeWidth={2} />
@@ -95,7 +98,8 @@ export function AeroDeltaChart({ history }: { history: AeroHistoryPoint[] }) {
 
   const bankrIdx = history.findIndex((h) => h.ts >= BANKR_DOWN_TS);
   const bankrLabel = bankrIdx >= 0 ? data[bankrIdx].label : null;
-  const lastLabel = data.at(-1)?.label;
+  const bankrEndIdxD = [...history].map((h, i) => ({ ts: h.ts, i })).filter((x) => x.ts <= BANKR_END_TS).at(-1)?.i ?? history.length - 1;
+  const bankrEndLabelD = data[bankrEndIdxD]?.label ?? data.at(-1)?.label;
 
   return (
     <Card className="border-border/60">
@@ -110,8 +114,8 @@ export function AeroDeltaChart({ history }: { history: AeroHistoryPoint[] }) {
             <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
             <YAxis tickFormatter={usdShort} tick={{ fontSize: 11 }} domain={domain} />
             <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1.5} />
-            {bankrLabel && lastLabel && (
-              <ReferenceArea x1={bankrLabel} x2={lastLabel} fill={BANKR_FILL} fillOpacity={BANKR_FILL_OPACITY} stroke={BANKR_FILL} strokeOpacity={0.5}
+            {bankrLabel && bankrEndLabelD && (
+              <ReferenceArea x1={bankrLabel} x2={bankrEndLabelD} fill={BANKR_FILL} fillOpacity={BANKR_FILL_OPACITY} stroke={BANKR_FILL} strokeOpacity={0.5}
                 label={{ value: "bankr ⚠︎", position: "insideTopLeft", fontSize: 10, fill: BANKR_FILL }} />
             )}
             <Tooltip
@@ -225,7 +229,8 @@ export function AeroAeroPriceChart({ priceHistory }: { priceHistory: AeroPricePo
   }));
   const bankrPriceIdx = priceHistory.findIndex((p) => p.ts >= BANKR_DOWN_TS);
   const bankrPriceLabel = bankrPriceIdx >= 0 ? data[bankrPriceIdx].label : null;
-  const lastPriceLabel = data.at(-1)?.label;
+  const bankrPriceEndIdx = [...priceHistory].map((p, i) => ({ ts: p.ts, i })).filter((x) => x.ts <= BANKR_END_TS).at(-1)?.i ?? priceHistory.length - 1;
+  const bankrPriceEndLabel = data[bankrPriceEndIdx]?.label ?? data.at(-1)?.label;
 
   const currentPrice = data[data.length - 1].price;
   const startPrice = data[0].price;
@@ -265,8 +270,8 @@ export function AeroAeroPriceChart({ priceHistory }: { priceHistory: AeroPricePo
                 );
               }}
             />
-            {bankrPriceLabel && lastPriceLabel && (
-              <ReferenceArea x1={bankrPriceLabel} x2={lastPriceLabel} fill={BANKR_FILL} fillOpacity={BANKR_FILL_OPACITY} stroke={BANKR_FILL} strokeOpacity={0.5}
+            {bankrPriceLabel && bankrPriceEndLabel && (
+              <ReferenceArea x1={bankrPriceLabel} x2={bankrPriceEndLabel} fill={BANKR_FILL} fillOpacity={BANKR_FILL_OPACITY} stroke={BANKR_FILL} strokeOpacity={0.5}
                 label={{ value: "bankr ⚠︎", position: "insideTopLeft", fontSize: 10, fill: BANKR_FILL }} />
             )}
             <Line
