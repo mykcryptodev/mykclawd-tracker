@@ -206,36 +206,25 @@ export function HomeLanding({
           <li>
             <a
               className="underline underline-offset-4 hover:text-foreground"
-              href="https://spend.mykclawd.xyz/"
+              href="https://birdbets.mykclawd.xyz/"
               target="_blank"
               rel="noopener noreferrer"
             >
-              💸 Spend
+              🐦 BirdBets
             </a>{" "}
-            AI transaction tracker. Upload a video of your credit card app and AI extracts every transaction
-            automatically.
+            Prediction markets powered by a live Bird Buddy feeder. Bet on daily bird visits as the feeder tracks them
+            in real time.
           </li>
           <li>
             <a
               className="underline underline-offset-4 hover:text-foreground"
-              href="https://chess.mykclawd.xyz/"
+              href="https://inspector.mykclawd.xyz/"
               target="_blank"
               rel="noopener noreferrer"
             >
-              ♟️ Agent Chess
+              🔍 Token Inspector
             </a>{" "}
-            Onchain chess where AI agents play against each other for ETH. Create games, accept challenges, win prizes.
-          </li>
-          <li>
-            <a
-              className="underline underline-offset-4 hover:text-foreground"
-              href="https://github.com/mykcryptodev/siggy"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              🦜 Siggy
-            </a>{" "}
-            Telegram bot that monitors Gnosis Safe multisig wallets and posts human-readable transaction notifications. Supports Ethereum, Base, Optimism, Arbitrum, Polygon, and Gnosis.
+            Metadata for any ERC-20 contract. Get links from the contract source, not a third-party.
           </li>
           <li>
             <a
@@ -269,13 +258,37 @@ export function HomeLanding({
           <li>
             <a
               className="underline underline-offset-4 hover:text-foreground"
-              href="https://inspector.mykclawd.xyz/"
+              href="https://github.com/mykcryptodev/siggy"
               target="_blank"
               rel="noopener noreferrer"
             >
-              🔍 Token Inspector
+              🦜 Siggy
             </a>{" "}
-            Metadata for any ERC-20 contract. Get links from the contract source, not a third-party.
+            Telegram bot that monitors Gnosis Safe multisig wallets and posts human-readable transaction notifications.
+            Supports Ethereum, Base, Optimism, Arbitrum, Polygon, and Gnosis.
+          </li>
+          <li>
+            <a
+              className="underline underline-offset-4 hover:text-foreground"
+              href="https://chess.mykclawd.xyz/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              ♟️ Agent Chess
+            </a>{" "}
+            Onchain chess where AI agents play against each other for ETH. Create games, accept challenges, win prizes.
+          </li>
+          <li>
+            <a
+              className="underline underline-offset-4 hover:text-foreground"
+              href="https://spend.mykclawd.xyz/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              💸 Spend
+            </a>{" "}
+            AI transaction tracker. Upload a video of your credit card app and AI extracts every transaction
+            automatically.
           </li>
         </ul>
 
