@@ -64,6 +64,36 @@ export async function runMigrations() {
       value TEXT NOT NULL
     );
 
+    -- Portfolio NAV (Zapper-sourced) tables
+    CREATE TABLE IF NOT EXISTS portfolio_nav (
+      date TEXT PRIMARY KEY,
+      value_usd REAL NOT NULL,
+      source TEXT NOT NULL DEFAULT 'live' CHECK(source IN ('live', 'zapper_history'))
+    );
+
+    CREATE TABLE IF NOT EXISTS portfolio_positions (
+      token_address TEXT PRIMARY KEY,
+      symbol TEXT NOT NULL DEFAULT '',
+      name TEXT NOT NULL DEFAULT '',
+      network TEXT NOT NULL DEFAULT 'Base',
+      img_url TEXT,
+      price REAL,
+      balance REAL NOT NULL DEFAULT 0,
+      balance_raw TEXT NOT NULL DEFAULT '0',
+      balance_usd REAL NOT NULL DEFAULT 0,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS portfolio_sync (
+      id INTEGER PRIMARY KEY,
+      synced_at INTEGER NOT NULL,
+      total_usd REAL NOT NULL,
+      token_count INTEGER NOT NULL,
+      native_eth_balance REAL NOT NULL DEFAULT 0,
+      native_eth_usd REAL NOT NULL DEFAULT 0,
+      error TEXT
+    );
+
     -- Aerodrome LP rebalance monitor tables
     CREATE TABLE IF NOT EXISTS aero_transfers (
       tx_hash TEXT NOT NULL,
@@ -171,6 +201,10 @@ export async function runMigrations() {
   try {
     await client.execute(`ALTER TABLE tokens ADD COLUMN image_checked INTEGER NOT NULL DEFAULT 0`);
   } catch { /* column already exists */ }
+
+  // Additive migrations for portfolio_sync native-ETH columns
+  try { await client.execute(`ALTER TABLE portfolio_sync ADD COLUMN native_eth_balance REAL NOT NULL DEFAULT 0`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE portfolio_sync ADD COLUMN native_eth_usd REAL NOT NULL DEFAULT 0`); } catch { /* exists */ }
 
   // Additive migrations for aero_snapshots LP health columns
   try { await client.execute(`ALTER TABLE aero_snapshots ADD COLUMN net_benefit_usd REAL NOT NULL DEFAULT 0`); } catch { /* exists */ }

@@ -41,12 +41,14 @@ jobs:
           path: node_modules
           key: node-modules-${{ github.sha }}
 
-  # ── PnL / transfers sync ─────────────────────────────────────────────────────
-  sync-pnl:
-    name: PnL sync
+  # ── Portfolio NAV sync (Zapper) ──────────────────────────────────────────────
+  # Replaces the old transfer-replay PnL sync. lib/pnl + lib/ingest + scripts/sync.ts
+  # remain on disk but are no longer invoked by the cron.
+  sync-portfolio:
+    name: Portfolio NAV sync
     needs: install
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -66,10 +68,11 @@ jobs:
           path: node_modules
           key: node-modules-${{ github.sha }}
 
-      - name: Run PnL sync
+      - name: Run portfolio NAV sync
         env:
           TRACKED_ADDRESS: ${{ secrets.TRACKED_ADDRESS }}
-        run: pnpm tsx scripts/sync.ts --full
+          ZAPPER_API_KEY: ${{ secrets.ZAPPER_API_KEY }}
+        run: pnpm tsx scripts/sync-portfolio.ts
 
   # ── Aerodrome LP sync ────────────────────────────────────────────────────────
   sync-aero:

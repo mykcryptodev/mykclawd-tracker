@@ -1,6 +1,11 @@
 packages:
   - "."
 
+# Supply-chain guard: newly published versions can't be installed until they are
+# at least 24h (1440 min) old. Applies to new installs/updates; frozen-lockfile
+# CI installs of already-pinned versions are unaffected.
+minimumReleaseAge: 1440
+
 onlyBuiltDependencies:
   - better-sqlite3
   - bufferutil

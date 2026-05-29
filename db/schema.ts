@@ -86,6 +86,48 @@ export const syncState = sqliteTable("sync_state", {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Portfolio NAV (Zapper-sourced) — replaces the transfer-replay PnL model
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Daily net-asset-value series for the history chart. `source` distinguishes our
+// own live snapshots from the one-time Zapper historicalPortfolio backfill so a
+// live point for a given day always wins over a backfilled one.
+export const portfolioNav = sqliteTable("portfolio_nav", {
+  date: text("date").primaryKey(), // YYYY-MM-DD (UTC)
+  valueUsd: real("value_usd").notNull(),
+  source: text("source", { enum: ["live", "zapper_history"] })
+    .notNull()
+    .default("live"),
+});
+
+// Current token holdings, fully replaced on every sync (tokens only — no app/NFT).
+export const portfolioPositions = sqliteTable("portfolio_positions", {
+  tokenAddress: text("token_address").primaryKey(),
+  symbol: text("symbol").notNull().default(""),
+  name: text("name").notNull().default(""),
+  network: text("network").notNull().default("Base"),
+  imgUrl: text("img_url"),
+  price: real("price"),
+  balance: real("balance").notNull().default(0),
+  balanceRaw: text("balance_raw").notNull().default("0"),
+  balanceUsd: real("balance_usd").notNull().default(0),
+  updatedAt: integer("updated_at").notNull(), // unix seconds
+});
+
+// Single-row (id = 1) sync metadata: when we last pulled from Zapper + headline totals.
+// totalUsd / tokenCount EXCLUDE native ETH (so they match Zapper's historical basis);
+// native ETH is tracked separately and shown on its own card, outside NAV.
+export const portfolioSync = sqliteTable("portfolio_sync", {
+  id: integer("id").primaryKey(), // always 1
+  syncedAt: integer("synced_at").notNull(), // unix seconds
+  totalUsd: real("total_usd").notNull(), // NAV, excludes native ETH
+  tokenCount: integer("token_count").notNull(), // excludes native ETH
+  nativeEthBalance: real("native_eth_balance").notNull().default(0),
+  nativeEthUsd: real("native_eth_usd").notNull().default(0),
+  error: text("error"),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Aerodrome LP rebalance monitor
 // ─────────────────────────────────────────────────────────────────────────────
 

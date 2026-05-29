@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import { CircleHelpIcon } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -15,6 +16,8 @@ interface Props {
   titleHelpHref?: string
   titleHelpLabel?: string
   variant?: "full" | "minimal"
+  /** Replaces the default GitHub-Actions SyncButton (e.g. the page's own sync control). */
+  syncSlot?: ReactNode
 }
 
 export function SiteHeader({
@@ -25,6 +28,7 @@ export function SiteHeader({
   titleHelpHref,
   titleHelpLabel = "Read article",
   variant = "full",
+  syncSlot,
 }: Props) {
   const full = variant === "full"
   const showMeta = full && address.length >= 10
@@ -63,7 +67,7 @@ export function SiteHeader({
         )}
         {full && (
           <div className="ml-auto">
-            <SyncButton />
+            {syncSlot ?? <SyncButton />}
           </div>
         )}
       </div>

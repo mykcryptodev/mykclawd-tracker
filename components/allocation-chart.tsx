@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 interface Position {
   symbol: string;
   valueUsd: number;
-  isPriced: boolean;
 }
 
 interface Props {
@@ -38,12 +37,12 @@ const usdFormatter = new Intl.NumberFormat("en-US", {
 
 export function AllocationChart({ positions }: Props) {
   const data = useMemo(() => {
-    const priced = positions
-      .filter((p) => p.isPriced && p.valueUsd > 0)
+    const ranked = positions
+      .filter((p) => p.valueUsd > 0)
       .sort((a, b) => b.valueUsd - a.valueUsd);
 
-    const top = priced.slice(0, TOP_N);
-    const othersValue = priced.slice(TOP_N).reduce((s, p) => s + p.valueUsd, 0);
+    const top = ranked.slice(0, TOP_N);
+    const othersValue = ranked.slice(TOP_N).reduce((s, p) => s + p.valueUsd, 0);
 
     return [
       ...top.map((p) => ({ name: p.symbol, value: p.valueUsd })),
