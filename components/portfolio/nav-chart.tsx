@@ -85,7 +85,10 @@ export function NavChart({ series }: Props) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <CardTitle>NAV over time</CardTitle>
+        <div className="flex flex-col gap-0.5">
+          <CardTitle>NAV over time</CardTitle>
+          <span className="text-[11px] text-muted-foreground">Excludes native ETH</span>
+        </div>
         <div className="flex items-center gap-1">
           {TIMEFRAMES.map((t) => (
             <button

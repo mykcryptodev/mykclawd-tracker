@@ -103,7 +103,7 @@ export function NavCards({ totalUsd, deltas }: Props) {
         </CardHeader>
         <CardFooter className="flex items-center gap-1.5">
           <span className="text-[11px] text-muted-foreground">
-            Base · tokens only · excludes native ETH
+            Base · all token holdings incl. native ETH
           </span>
         </CardFooter>
       </Card>

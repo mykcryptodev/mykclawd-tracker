@@ -4,6 +4,11 @@
 import { db } from "../../db/client";
 import { portfolioNav, portfolioPositions, portfolioSync } from "../../db/schema";
 import { asc, desc, eq } from "drizzle-orm";
+import { NATIVE_ETH_ADDRESS } from "./zapper";
+
+/** Zapper's CDN icon for native ETH on Base (same source as our other token logos). */
+const ETH_IMG_URL =
+  "https://storage.googleapis.com/zapper-fi-assets/tokens/base/0x0000000000000000000000000000000000000000.png";
 
 export interface NavPoint {
   date: string; // YYYY-MM-DD (UTC)
@@ -38,8 +43,12 @@ export interface PortfolioMeta {
 
 export interface PortfolioOverview {
   meta: PortfolioMeta | null;
-  totalUsd: number;
+  /** Headline NAV — INCLUDES native ETH (= navExEthUsd + native ETH). */
+  totalValueUsd: number;
+  /** Ex-native-ETH total — the basis the chart series and deltas are computed on. */
+  navExEthUsd: number;
   series: NavPoint[];
+  /** All token holdings INCLUDING native ETH (pinned first by the table). */
   positions: PortfolioPosition[];
   deltas: {
     d1: Delta | null;
@@ -149,21 +158,50 @@ export async function getPositions(totalUsd: number): Promise<PortfolioPosition[
   }));
 }
 
+/** Synthetic holdings row for native ETH (it's not stored in portfolio_positions). */
+function nativeEthPosition(
+  balance: number,
+  usd: number,
+  totalValueUsd: number
+): PortfolioPosition {
+  return {
+    tokenAddress: NATIVE_ETH_ADDRESS,
+    symbol: "ETH",
+    name: "Ethereum",
+    network: "Base",
+    imgUrl: ETH_IMG_URL,
+    price: balance > 0 ? usd / balance : null,
+    balance,
+    balanceUsd: usd,
+    pctOfNav: totalValueUsd > 0 ? (usd / totalValueUsd) * 100 : 0,
+  };
+}
+
 export async function getPortfolioOverview(): Promise<PortfolioOverview> {
   const [meta, rows] = await Promise.all([getPortfolioMeta(), getNavSeries()]);
-  // Prefer the live sync total; fall back to the latest chart point if no sync yet.
-  const totalUsd = meta?.totalUsd ?? rows.at(-1)?.valueUsd ?? 0;
-  const positions = await getPositions(totalUsd);
 
-  // Live NAV and Zapper history both exclude native ETH, so the whole series is on
-  // one basis — deltas can use it directly (accurate from the first backfill).
+  // The chart/deltas run on the ex-native-ETH basis (matches Zapper history). The
+  // headline NAV and holdings ADD native ETH back in (the chart intentionally won't
+  // line up with the headline — native ETH has no historical series).
+  const navExEthUsd = meta?.totalUsd ?? rows.at(-1)?.valueUsd ?? 0;
+  const nativeEthUsd = meta?.nativeEthUsd ?? 0;
+  const nativeEthBalance = meta?.nativeEthBalance ?? 0;
+  const totalValueUsd = navExEthUsd + nativeEthUsd;
+
+  const tokenPositions = await getPositions(totalValueUsd);
+  const positions =
+    nativeEthBalance > 0 || nativeEthUsd > 0
+      ? [nativeEthPosition(nativeEthBalance, nativeEthUsd, totalValueUsd), ...tokenPositions]
+      : tokenPositions;
+
   const series: NavPoint[] = rows.map((r) => ({ date: r.date, valueUsd: r.valueUsd }));
 
   return {
     meta,
-    totalUsd,
+    totalValueUsd,
+    navExEthUsd,
     series,
     positions,
-    deltas: computeDeltas(series, totalUsd),
+    deltas: computeDeltas(series, navExEthUsd),
   };
 }

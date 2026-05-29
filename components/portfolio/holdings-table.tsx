@@ -97,13 +97,14 @@ export function HoldingsTable({ positions, trackedAddress }: Props) {
     [sortKey]
   );
 
-  const rows = useMemo(
-    () =>
-      [...positions].sort((a, b) =>
-        asc ? a[sortKey] - b[sortKey] : b[sortKey] - a[sortKey]
-      ),
-    [positions, sortKey, asc]
-  );
+  // Native ETH is pinned to the top row; the rest sort normally.
+  const rows = useMemo(() => {
+    const eth = positions.filter((p) => p.tokenAddress === ZERO_ADDRESS);
+    const rest = positions
+      .filter((p) => p.tokenAddress !== ZERO_ADDRESS)
+      .sort((a, b) => (asc ? a[sortKey] - b[sortKey] : b[sortKey] - a[sortKey]));
+    return [...eth, ...rest];
+  }, [positions, sortKey, asc]);
 
   return (
     <Table>
