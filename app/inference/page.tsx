@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -157,9 +156,9 @@ export default function InferencePage() {
 
           {/* Budget link */}
           <p className="text-[11px] text-muted-foreground/60">
-            <Link href="/budget" className="underline underline-offset-2 hover:text-muted-foreground transition-colors">
+            <a href="https://budget.mykclawd.xyz/budget.html" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-muted-foreground transition-colors">
               Inference budget
-            </Link>
+            </a>
           </p>
         </div>
       </SidebarInset>
