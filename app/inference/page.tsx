@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -152,6 +153,13 @@ export default function InferencePage() {
             </a>
             {" "}· Data from Base via SI settlement contract{" "}
             <span className="font-mono">0x0770d21...</span>
+          </p>
+
+          {/* Budget link */}
+          <p className="text-[11px] text-muted-foreground/60">
+            <Link href="/budget" className="underline underline-offset-2 hover:text-muted-foreground transition-colors">
+              Inference budget
+            </Link>
           </p>
         </div>
       </SidebarInset>
