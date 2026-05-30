@@ -154,12 +154,6 @@ export default function InferencePage() {
             <span className="font-mono">0x0770d21...</span>
           </p>
 
-          {/* Budget link */}
-          <p className="text-[11px] text-muted-foreground/60">
-            <a href="https://budget.mykclawd.xyz/budget.html" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-muted-foreground transition-colors">
-              Inference budget
-            </a>
-          </p>
         </div>
       </SidebarInset>
     </SidebarProvider>
