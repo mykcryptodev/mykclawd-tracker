@@ -18,6 +18,8 @@ interface Props {
   variant?: "full" | "minimal"
   /** Replaces the default GitHub-Actions SyncButton (e.g. the page's own sync control). */
   syncSlot?: ReactNode
+  /** Hide the header sync control for pages with no local sync action. */
+  showSync?: boolean
 }
 
 export function SiteHeader({
@@ -29,6 +31,7 @@ export function SiteHeader({
   titleHelpLabel = "Read article",
   variant = "full",
   syncSlot,
+  showSync = true,
 }: Props) {
   const full = variant === "full"
   const showMeta = full && address.length >= 10
@@ -65,7 +68,7 @@ export function SiteHeader({
             · {asOfTs != null ? <LocalDateTime ts={asOfTs} /> : asOf}
           </span>
         )}
-        {full && (
+        {full && showSync && (
           <div className="ml-auto">
             {syncSlot ?? <SyncButton />}
           </div>

@@ -3,6 +3,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { ExternalLinkIcon } from "lucide-react";
+import { InferenceSyncButton } from "@/components/inference/inference-sync-button";
 
 export const metadata: Metadata = {
   title: "Inference",
@@ -35,7 +36,13 @@ export default function InferencePage() {
     >
       <AppSidebar variant="inset" />
       <SidebarInset>
-        <SiteHeader address={TRACKED_ADDRESS} title="Inference" titleHelpHref="https://x.com/myk_clawd/status/2058564046907912668" titleHelpLabel="Thread on Inference (opens on X)" />
+        <SiteHeader
+          address={TRACKED_ADDRESS}
+          title="Inference"
+          titleHelpHref="https://x.com/myk_clawd/status/2058564046907912668"
+          titleHelpLabel="Thread on Inference (opens on X)"
+          syncSlot={<InferenceSyncButton />}
+        />
         <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
 
           {/* Header + Dune link */}

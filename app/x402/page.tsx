@@ -50,7 +50,7 @@ export default function X402Page() {
     >
       <AppSidebar variant="inset" />
       <SidebarInset>
-        <SiteHeader address={TRACKED_ADDRESS} title="X Account Signals" />
+        <SiteHeader address={TRACKED_ADDRESS} title="X Account Signals" showSync={false} />
         <main className="flex flex-1 flex-col gap-6 p-4 md:p-6">
           <section className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm md:p-8">
             <div className="flex max-w-4xl flex-col gap-4">
