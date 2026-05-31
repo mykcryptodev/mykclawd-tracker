@@ -24,6 +24,7 @@ import {
   CpuIcon,
   TrophyIcon,
   CalendarIcon,
+  AtSignIcon,
 } from "lucide-react"
 
 function BaseballCapIcon() {
@@ -56,6 +57,7 @@ const navMain = [
   { title: "Portfolio", url: "/pnl", icon: <LayoutDashboardIcon /> },
   { title: "Aero LP", url: "/aero", icon: <DropletsIcon /> },
   { title: "Inference", url: "/inference", icon: <CpuIcon /> },
+  { title: "X Signals", url: "/x402", icon: <AtSignIcon /> },
   { title: "Bounties", url: "/bounties", icon: <TrophyIcon /> },
   { title: "Hat Tap", url: "/hat", icon: <BaseballCapIcon /> },
   { title: "Yankees", url: "/yankees", icon: <CalendarIcon /> },
