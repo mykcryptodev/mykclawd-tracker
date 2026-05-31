@@ -26,8 +26,15 @@ const responseShape = `{
     "windowEnd": "ISO date | null",
     "windowCapped": boolean,
     "windowCapNote": "string | null",
-    "geo": { "location": "string | null", "source": "string | null" },
-    "usernameChanges": "number | null"
+    "about": {
+      "accountBasedIn": "string | null",
+      "connectedVia": "string | null",
+      "isVerified": "boolean | null",
+      "verifiedSince": "ISO date | null",
+      "affiliateUsername": "string | null",
+      "usernameChanges": "number | null",
+      "usernameLastChangedAt": "ISO date | null"
+    } | null
   }
 }`;
 
@@ -58,7 +65,8 @@ export default function X402Page() {
                 <p className="max-w-3xl text-base leading-7 text-muted-foreground md:text-lg">
                   A pay-per-use API powered by x402. Enter any X/Twitter
                   handle to get account signals — tweet activity patterns,
-                  location, and username change count — for $2.00 USDC per lookup.
+                  account location, verification status, affiliate, client,
+                  and username change history — for $2.00 USDC per lookup.
                 </p>
               </div>
             </div>

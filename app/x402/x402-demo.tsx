@@ -24,11 +24,15 @@ type XAccountSignalsResponse = {
     windowEnd: string | null;
     windowCapped: boolean;
     windowCapNote: string | null;
-    geo: {
-      location: string | null;
-      source: string | null;
-    };
-    usernameChanges: number | null;
+    about: {
+      accountBasedIn: string | null;
+      connectedVia: string | null;
+      isVerified: boolean | null;
+      verifiedSince: string | null;
+      affiliateUsername: string | null;
+      usernameChanges: number | null;
+      usernameLastChangedAt: string | null;
+    } | null;
   };
 };
 
@@ -287,25 +291,40 @@ export function X402Demo() {
             <ActivityGrid activityByMonth={data.signals.activityByMonth} />
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-            <div className="rounded-xl border border-border/60 bg-background/60 p-4">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground">Geo</p>
-              {data.signals.geo.location ? (
-                <div className="mt-2">
-                  <p className="font-medium">{data.signals.geo.location}</p>
-                  {data.signals.geo.source ? (
-                    <p className="mt-1 text-xs text-muted-foreground">Source: {data.signals.geo.source}</p>
-                  ) : null}
-                </div>
-              ) : (
-                <p className="mt-2 text-sm text-muted-foreground">No location returned.</p>
-              )}
-            </div>
-
-            <Stat
-              label="Username changes"
-              value={data.signals.usernameChanges != null ? String(data.signals.usernameChanges) : "—"}
-            />
+          <div className="rounded-xl border border-border/60 bg-background/60 p-4">
+            <h3 className="mb-3 font-medium">About</h3>
+            {data.signals.about ? (
+              <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                <AboutRow label="Based in" value={data.signals.about.accountBasedIn} />
+                <AboutRow label="Connected via" value={data.signals.about.connectedVia} />
+                <AboutRow
+                  label="Verified"
+                  value={
+                    data.signals.about.isVerified && data.signals.about.verifiedSince
+                      ? `Since ${formatDate(data.signals.about.verifiedSince)}`
+                      : data.signals.about.isVerified
+                        ? "Yes"
+                        : data.signals.about.isVerified === false
+                          ? "No"
+                          : null
+                  }
+                />
+                <AboutRow
+                  label="Affiliate"
+                  value={data.signals.about.affiliateUsername ? `@${data.signals.about.affiliateUsername}` : null}
+                />
+                <AboutRow
+                  label="Username changes"
+                  value={data.signals.about.usernameChanges != null ? String(data.signals.about.usernameChanges) : null}
+                />
+                <AboutRow
+                  label="Last username change"
+                  value={formatDate(data.signals.about.usernameLastChangedAt)}
+                />
+              </dl>
+            ) : (
+              <p className="text-sm text-muted-foreground">Scraper data unavailable.</p>
+            )}
           </div>
 
           <details className="rounded-xl border border-border/60 bg-background/60 p-4">
@@ -325,6 +344,15 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl border border-border/60 bg-background/60 p-4">
       <p className="text-xs uppercase tracking-widest text-muted-foreground">{label}</p>
       <p className="mt-2 text-lg font-semibold leading-snug">{value}</p>
+    </div>
+  );
+}
+
+function AboutRow({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <div className="rounded-lg bg-muted/40 p-3">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="mt-1 font-medium">{value ?? "—"}</dd>
     </div>
   );
 }
