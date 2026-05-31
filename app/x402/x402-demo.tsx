@@ -164,7 +164,7 @@ export function X402Demo() {
   const [error, setError] = useState<string | null>(null);
 
   const normalizedHandle = normalizeHandle(handle);
-  const price = maxTweets / 100;
+  const price = ((maxTweets / 100) * 1.5).toFixed(2);
   const canSubmit = Boolean(account?.address && normalizedHandle && !isPending);
   const requestUrl = useMemo(() => {
     if (!normalizedHandle) return ENDPOINT;
@@ -242,7 +242,7 @@ export function X402Demo() {
           >
             {TWEET_TIERS.map((n) => (
               <option key={n} value={n}>
-                {n} tweets · ${n / 100}.00
+                {n} tweets · ${((n / 100) * 1.5).toFixed(2)}
               </option>
             ))}
           </select>

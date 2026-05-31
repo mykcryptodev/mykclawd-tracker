@@ -66,7 +66,7 @@ export default function X402Page() {
                   A pay-per-use API powered by x402. Enter any X/Twitter
                   handle to get account signals — tweet activity patterns,
                   account location, verification status, affiliate, client,
-                  and username change history — for $2.00 USDC per lookup.
+                  and username change history — starting at $3.00 USDC per lookup.
                 </p>
               </div>
             </div>
@@ -141,7 +141,7 @@ export default function X402Page() {
                     <div className="rounded-lg bg-muted/40 p-3">
                       <dt className="text-muted-foreground">Cost</dt>
                       <dd className="mt-1 font-medium">
-                        $1.00 USDC per 100 tweets · default $2.00 (200 tweets) · max $10.00 (1000 tweets)
+                        $1.50 USDC per 100 tweets · default $3.00 (200 tweets) · max $15.00 (1000 tweets)
                       </dd>
                     </div>
                     <div className="rounded-lg bg-muted/40 p-3">
