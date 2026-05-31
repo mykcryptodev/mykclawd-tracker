@@ -14,4 +14,8 @@ onlyBuiltDependencies:
   - msw
   - utf-8-validate
 
-allowedDeprecatedVersions: {}
+# Optional postinstalls (core-js funding notice, protobufjs codegen) that are
+# safe to skip — pulled transitively via thirdweb/@x402 and not needed at runtime.
+ignoredBuiltDependencies:
+  - core-js
+  - protobufjs

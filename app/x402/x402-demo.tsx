@@ -2,11 +2,8 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { base } from "thirdweb/chains";
-import {
-  ConnectButton,
-  useActiveAccount,
-  useFetchWithPayment,
-} from "thirdweb/react";
+import { ConnectButton, useActiveAccount } from "thirdweb/react";
+import type { Account } from "thirdweb/wallets";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { thirdwebClient } from "@/lib/thirdweb-client";
@@ -59,6 +56,70 @@ function getErrorMessage(error: unknown) {
   return "Something went wrong while paying and fetching account signals.";
 }
 
+function b64DecodeUtf8(b64: string) {
+  const binary = atob(b64);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function b64EncodeUtf8(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary);
+}
+
+// x402 v2 handshake against the @x402/* server this endpoint runs on. thirdweb's
+// built-in useFetchWithPayment still validates the legacy v1 requirements schema
+// (maxAmountRequired / string resource), which this v2 server doesn't emit — so we
+// drive the flow with @x402/evm directly and use the connected thirdweb wallet
+// purely as the EIP-712 signer.
+async function fetchWithX402Payment(url: string, account: Account): Promise<Response> {
+  const initial = await fetch(url);
+  if (initial.status !== 402) return initial;
+
+  const requirementsHeader = initial.headers.get("payment-required");
+  if (!requirementsHeader) {
+    throw new Error("Server returned 402 without x402 payment requirements.");
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const paymentRequired: any = JSON.parse(b64DecodeUtf8(requirementsHeader));
+  const requirement = paymentRequired.accepts?.find(
+    (entry: { network?: string }) => entry.network === "eip155:8453",
+  );
+  if (!requirement) {
+    throw new Error("Server did not offer a Base mainnet payment option.");
+  }
+
+  // Loaded on demand to keep the crypto bundle off the initial page render.
+  const { ExactEvmScheme } = await import("@x402/evm/exact/client");
+  const scheme = new ExactEvmScheme({
+    address: account.address as `0x${string}`,
+    signTypedData: (message) =>
+      account.signTypedData(
+        message as unknown as Parameters<Account["signTypedData"]>[0],
+      ),
+  });
+
+  const { payload } = await scheme.createPaymentPayload(
+    paymentRequired.x402Version,
+    requirement,
+  );
+
+  const paymentHeader = b64EncodeUtf8(
+    JSON.stringify({
+      x402Version: paymentRequired.x402Version,
+      accepted: requirement,
+      payload,
+    }),
+  );
+
+  return fetch(url, { headers: { "PAYMENT-SIGNATURE": paymentHeader } });
+}
+
 function ActivityGrid({ activityByMonth }: { activityByMonth: Record<string, number> }) {
   const months = Object.entries(activityByMonth).sort(([a], [b]) => a.localeCompare(b));
   const max = Math.max(...months.map(([, count]) => count), 1);
@@ -91,7 +152,7 @@ function ActivityGrid({ activityByMonth }: { activityByMonth: Record<string, num
 
 export function X402Demo() {
   const account = useActiveAccount();
-  const { fetchWithPayment, isPending } = useFetchWithPayment(thirdwebClient);
+  const [isPending, setIsPending] = useState(false);
   const [handle, setHandle] = useState("vitalikbuterin");
   const [data, setData] = useState<XAccountSignalsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -110,12 +171,23 @@ export function X402Demo() {
 
     setError(null);
     setData(null);
+    setIsPending(true);
 
     try {
-      const result = await fetchWithPayment(requestUrl);
-      setData(result as XAccountSignalsResponse);
+      if (!account) throw new Error("Connect a wallet first.");
+      const response = await fetchWithX402Payment(requestUrl, account);
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(
+          `Request failed (${response.status}). ${body.slice(0, 200)}`,
+        );
+      }
+      const result = (await response.json()) as XAccountSignalsResponse;
+      setData(result);
     } catch (caughtError) {
       setError(getErrorMessage(caughtError));
+    } finally {
+      setIsPending(false);
     }
   }
 
