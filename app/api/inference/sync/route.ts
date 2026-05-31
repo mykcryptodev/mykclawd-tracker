@@ -28,7 +28,7 @@ async function executeDuneQuery(queryId: number, apiKey: string): Promise<QueryE
         "X-Dune-API-Key": apiKey,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ performance: "small" }),
+      body: JSON.stringify({ performance: "medium" }),
     });
 
     const data = (await res.json().catch(() => ({}))) as DuneExecuteResponse;
