@@ -27,9 +27,7 @@ type XAccountSignalsResponse = {
       location: string | null;
       source: string | null;
     };
-    usernameHistory: {
-      previousUsernames: string[] | null;
-    };
+    usernameChanges: number | null;
   };
 };
 
@@ -159,7 +157,6 @@ export function X402Demo() {
 
   const normalizedHandle = normalizeHandle(handle);
   const canSubmit = Boolean(account?.address && normalizedHandle && !isPending);
-  const previousUsernames = data?.signals.usernameHistory.previousUsernames?.filter(Boolean) ?? [];
   const requestUrl = useMemo(() => {
     if (!normalizedHandle) return ENDPOINT;
     return `${ENDPOINT}?handle=${encodeURIComponent(normalizedHandle)}`;
@@ -304,23 +301,10 @@ export function X402Demo() {
               )}
             </div>
 
-            <div className="rounded-xl border border-border/60 bg-background/60 p-4">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground">Previous usernames</p>
-              {previousUsernames.length > 0 ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {previousUsernames.map((username) => (
-                    <span
-                      key={username}
-                      className="rounded-full border border-border/60 bg-muted/40 px-2.5 py-1 text-xs font-medium"
-                    >
-                      @{username}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-2 text-sm text-muted-foreground">No previous usernames returned.</p>
-              )}
-            </div>
+            <Stat
+              label="Username changes"
+              value={data.signals.usernameChanges != null ? String(data.signals.usernameChanges) : "—"}
+            />
           </div>
 
           <details className="rounded-xl border border-border/60 bg-background/60 p-4">
