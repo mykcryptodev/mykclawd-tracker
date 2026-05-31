@@ -131,6 +131,16 @@
   }
 }
 
+/* Split-flap (departure board) flip animations */
+@keyframes sf-fold-out {
+  from { transform: perspective(200px) rotateX(0deg); }
+  to   { transform: perspective(200px) rotateX(-90deg); }
+}
+@keyframes sf-fold-in {
+  from { transform: perspective(200px) rotateX(90deg); }
+  to   { transform: perspective(200px) rotateX(0deg); }
+}
+
 /* Strip white background/border from Twitter widget iframe wrapper */
 twitterwidget,
 .twitter-tweet,
