@@ -56,7 +56,7 @@ export default function X402Page() {
             <div className="flex max-w-4xl flex-col gap-4">
               <div className="flex w-fit items-center gap-2 rounded-full border border-border/60 bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground">
                 <span className="size-2 rounded-full bg-chart-2" />
-                x402 · Base mainnet · $2.00 USDC
+                x402 · Base mainnet
               </div>
               <div className="space-y-3">
                 <h1 className="text-3xl font-bold tracking-tight md:text-5xl">

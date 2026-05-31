@@ -254,7 +254,7 @@ export function X402Demo() {
               Paying & fetching...
             </span>
           ) : (
-            `Check · $${price}.00 USDC`
+            `Check · $${price} USDC`
           )}
         </Button>
       </form>
