@@ -133,7 +133,7 @@ export default function X402Page() {
                       GET
                     </div>
                     <code className="block overflow-x-auto p-4 text-sm">
-                      https://xsignal.mykclawd.xyz/x-account-signals?handle={"{twitter_handle}"}
+                      https://xsignal.mykclawd.xyz/x-account-signals?handle={"{twitter_handle}"}&amp;maxTweets={"{100|200|...|1000}"}
                     </code>
                   </div>
 
@@ -141,7 +141,7 @@ export default function X402Page() {
                     <div className="rounded-lg bg-muted/40 p-3">
                       <dt className="text-muted-foreground">Cost</dt>
                       <dd className="mt-1 font-medium">
-                        $2.00 USDC on Base mainnet (eip155:8453)
+                        $1.00 USDC per 100 tweets · default $2.00 (200 tweets) · max $10.00 (1000 tweets)
                       </dd>
                     </div>
                     <div className="rounded-lg bg-muted/40 p-3">
@@ -153,7 +153,11 @@ export default function X402Page() {
                   </dl>
 
                   <p className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm leading-6 text-muted-foreground">
-                    Fetches up to 200 tweets from the last 12 months. If
+                    Pass
+                    <code className="mx-1 rounded bg-background px-1 py-0.5 text-foreground">
+                      maxTweets
+                    </code>
+                    in multiples of 100 (100–1000) to control how many tweets are fetched and how much you pay. Omit it to use the default of 200. If
                     <code className="mx-1 rounded bg-background px-1 py-0.5 text-foreground">
                       windowCapped: true
                     </code>

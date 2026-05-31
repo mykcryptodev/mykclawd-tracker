@@ -153,19 +153,23 @@ function ActivityGrid({ activityByMonth }: { activityByMonth: Record<string, num
   );
 }
 
+const TWEET_TIERS = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000] as const;
+
 export function X402Demo() {
   const account = useActiveAccount();
   const [isPending, setIsPending] = useState(false);
   const [handle, setHandle] = useState("vitalikbuterin");
+  const [maxTweets, setMaxTweets] = useState<number>(200);
   const [data, setData] = useState<XAccountSignalsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const normalizedHandle = normalizeHandle(handle);
+  const price = maxTweets / 100;
   const canSubmit = Boolean(account?.address && normalizedHandle && !isPending);
   const requestUrl = useMemo(() => {
     if (!normalizedHandle) return ENDPOINT;
-    return `${ENDPOINT}?handle=${encodeURIComponent(normalizedHandle)}`;
-  }, [normalizedHandle]);
+    return `${ENDPOINT}?handle=${encodeURIComponent(normalizedHandle)}&maxTweets=${maxTweets}`;
+  }, [normalizedHandle, maxTweets]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -201,7 +205,7 @@ export function X402Demo() {
         </p>
         <h2 className="text-xl font-semibold tracking-tight">Run a paid lookup</h2>
         <p className="text-sm leading-6 text-muted-foreground">
-          Connect a wallet on Base with at least $2.00 USDC, enter a handle, then sign the gasless payment authorization.
+          Connect a wallet on Base, enter a handle, choose how many tweets to fetch, then sign the gasless payment authorization.
         </p>
       </div>
 
@@ -216,28 +220,41 @@ export function X402Demo() {
         />
       </div>
 
-      <form onSubmit={onSubmit} className="flex flex-col gap-3 sm:flex-row xl:flex-col">
-        <div className="relative flex-1">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-            @
-          </span>
-          <Input
-            value={handle}
-            onChange={(event) => setHandle(event.target.value)}
-            placeholder="vitalikbuterin"
-            className="h-10 pl-7"
-            autoCapitalize="none"
-            autoCorrect="off"
-          />
+      <form onSubmit={onSubmit} className="flex flex-col gap-3">
+        <div className="flex gap-3 sm:flex-row xl:flex-col 2xl:flex-row">
+          <div className="relative flex-1">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+              @
+            </span>
+            <Input
+              value={handle}
+              onChange={(event) => setHandle(event.target.value)}
+              placeholder="vitalikbuterin"
+              className="h-10 pl-7"
+              autoCapitalize="none"
+              autoCorrect="off"
+            />
+          </div>
+          <select
+            value={maxTweets}
+            onChange={(e) => setMaxTweets(Number(e.target.value))}
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            {TWEET_TIERS.map((n) => (
+              <option key={n} value={n}>
+                {n} tweets · ${n / 100}.00
+              </option>
+            ))}
+          </select>
         </div>
-        <Button type="submit" disabled={!canSubmit} className="h-10 sm:min-w-28 xl:w-full">
+        <Button type="submit" disabled={!canSubmit} className="h-10 w-full">
           {isPending ? (
             <span className="inline-flex items-center gap-2">
               <span className="size-3 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" />
               Paying & fetching...
             </span>
           ) : (
-            "Check"
+            `Check · $${price}.00 USDC`
           )}
         </Button>
       </form>
