@@ -124,7 +124,7 @@ export default function X402Page() {
                       GET
                     </div>
                     <code className="block overflow-x-auto p-4 text-sm">
-                      https://mikesserver.tailfc13f8.ts.net:8443/x-account-signals?handle={"{twitter_handle}"}
+                      https://xsignal.mykclawd.xyz/x-account-signals?handle={"{twitter_handle}"}
                     </code>
                   </div>
 

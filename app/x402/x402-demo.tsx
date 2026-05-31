@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { thirdwebClient } from "@/lib/thirdweb-client";
 import { cn } from "@/lib/utils";
 
-const ENDPOINT = "https://mikesserver.tailfc13f8.ts.net:8443/x-account-signals";
+const ENDPOINT = "https://xsignal.mykclawd.xyz/x-account-signals";
 const BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
 type XAccountSignalsResponse = {
