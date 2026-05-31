@@ -18,6 +18,7 @@ const responseShape = `{
   "handle": "string",
   "userId": "string",
   "createdAt": "ISO date",
+  "errors": ["string"],
   "signals": {
     "activityByMonth": { "YYYY-MM": number },
     "tweetCount": number,
@@ -148,7 +149,13 @@ export default function X402Page() {
                     <code className="mx-1 rounded bg-background px-1 py-0.5 text-foreground">
                       windowCapped: true
                     </code>
-                    the account has more activity beyond what was fetched.
+                    the account has more activity beyond what was fetched. Non-fatal
+                    errors (e.g. scraper unavailable) are returned in the
+                    <code className="mx-1 rounded bg-background px-1 py-0.5 text-foreground">
+                      errors
+                    </code>
+                    array alongside a 200 response. If the X API itself fails, the
+                    server returns a 5xx and no payment is settled.
                   </p>
 
                   <div className="overflow-hidden rounded-xl border border-border/60 bg-background/60">

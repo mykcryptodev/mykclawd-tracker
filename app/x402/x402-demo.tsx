@@ -16,6 +16,7 @@ type XAccountSignalsResponse = {
   handle: string;
   userId: string;
   createdAt: string;
+  errors: string[];
   signals: {
     activityByMonth: Record<string, number>;
     tweetCount: number;
