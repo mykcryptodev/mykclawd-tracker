@@ -47,7 +47,7 @@ async function main() {
       .values(row)
       .onConflictDoUpdate({
         target: yankeesBets.date,
-        set: { result: row.result, profit: row.profit, payout: row.payout, tweetId: row.tweetId },
+        set: { opponent: row.opponent, result: row.result, profit: row.profit, payout: row.payout, odds: row.odds, note: row.note, tweetId: row.tweetId },
       });
     console.log(`  ✓ ${row.date} ${row.side} $${row.amount} vs ${row.opponent} → ${row.result ?? "pending"}`);
   }
