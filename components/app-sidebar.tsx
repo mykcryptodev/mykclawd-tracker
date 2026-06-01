@@ -62,8 +62,8 @@ const navMain = [
   { title: "Bounties", url: "/bounties", icon: <TrophyIcon /> },
   { title: "Hat Tap", url: "/hat", icon: <BaseballCapIcon /> },
   { title: "Yankees", url: "/yankees", icon: <CalendarIcon /> },
-  { title: "Server Health", url: "/health", icon: <ServerIcon /> },
   { title: "Skills", url: "/skills", icon: <BlocksIcon /> },
+  { title: "Server Health", url: "/health", icon: <ServerIcon /> },
 ]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
