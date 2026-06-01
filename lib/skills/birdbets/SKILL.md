@@ -42,6 +42,8 @@ Users must:
 
 **Always use the bet preparation endpoint to place bets.** It returns pre-encoded `approve` and `betYes`/`betNo` transaction calldata. Never encode contract calls manually — the market ID is a `uint256` integer (not a string) and the contract has separate `betYes` and `betNo` functions, not a single `bet(id, bool, amount)`.
 
+After the bet confirms, reply with the share link from the prepare response (`share.url`) — the same link the web app uses for sharing on X/Twitter — so the user sees the share image for the bet they just placed. See the workflows reference for the full `share` object.
+
 The skill operates in read-only mode if the API key or wallet session lacks write permissions—providing information without executing transactions.
 
 ## References

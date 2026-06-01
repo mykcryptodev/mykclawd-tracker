@@ -59,10 +59,22 @@ GET https://birdbets.mykclawd.xyz/api/base-mcp/prepare/bet?from=<wallet>&side=<Y
 3. If the response has `ok: false`, surface `error` to the user and stop.
 4. If `wallet.balance` is below `bet.stake`, acquire MYKCLAWD on Base using Bankr swap tooling before proceeding. Swap only enough for the requested amount plus a small slippage cushion, then call the prepare endpoint again.
 5. Submit each transaction in the `transactions` array **in order**, using the exact `to`, `data`, `value`, and `chainId` from each entry. Do not re-encode or modify the calldata.
-6. Return the transaction hashes and summarize `bet.side`, `bet.stakeFormatted`, `market.marketDate`, and `market.threshold` from the response.
+6. After the bet transaction confirms, reply to the user with `share.url` from the prepare response so the BirdBets share image renders inline. See "Share The Bet" below.
+7. Return the transaction hashes and summarize `bet.side`, `bet.stakeFormatted`, `market.marketDate`, and `market.threshold` from the response.
 
 Do not build or encode contract calldata manually — the prepare endpoint handles approve and betYes/betNo encoding.
 Do not place a bet if the user has not explicitly chosen side and amount.
+
+## Share The Bet
+
+The bet preparation response includes a `share` object — the same share link the BirdBets web app uses for posting to X/Twitter:
+
+- `share.url` — the BirdBets share page. Posting it unfurls into the bet's share image card (side, amount, market date, threshold). Prefer this so the card renders with title and description.
+- `share.image` — the direct share image (`/og/bet.png`) if you need the raw PNG.
+- `share.text` — suggested share copy.
+- `share.twitterUrl` — a ready-to-use X/Twitter intent link.
+
+After a bet succeeds, reply to the user with `share.url` so they immediately see the share image for the bet they just placed.
 
 ## Acquire MYKCLAWD
 
