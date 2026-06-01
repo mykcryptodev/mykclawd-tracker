@@ -25,6 +25,7 @@ import {
   TrophyIcon,
   CalendarIcon,
   AtSignIcon,
+  BlocksIcon,
 } from "lucide-react"
 
 function BaseballCapIcon() {
@@ -62,6 +63,7 @@ const navMain = [
   { title: "Hat Tap", url: "/hat", icon: <BaseballCapIcon /> },
   { title: "Yankees", url: "/yankees", icon: <CalendarIcon /> },
   { title: "Server Health", url: "/health", icon: <ServerIcon /> },
+  { title: "Skills", url: "/skills", icon: <BlocksIcon /> },
 ]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {

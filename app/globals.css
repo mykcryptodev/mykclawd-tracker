@@ -141,6 +141,93 @@
   to   { transform: perspective(200px) rotateX(0deg); }
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
+/* Prose styles for rendered skill markdown */
+.prose-skill {
+  color: var(--foreground);
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+.prose-skill h1,
+.prose-skill h2,
+.prose-skill h3,
+.prose-skill h4 {
+  font-weight: 600;
+  margin-top: 1.25em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+.prose-skill h1 { font-size: 1.25rem; }
+.prose-skill h2 { font-size: 1.1rem; }
+.prose-skill h3 { font-size: 1rem; }
+.prose-skill h1:first-child,
+.prose-skill h2:first-child,
+.prose-skill h3:first-child { margin-top: 0; }
+.prose-skill p { margin-top: 0.75em; margin-bottom: 0.75em; }
+.prose-skill p:first-child { margin-top: 0; }
+.prose-skill ul,
+.prose-skill ol {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  padding-left: 1.5em;
+}
+.prose-skill ul { list-style-type: disc; }
+.prose-skill ol { list-style-type: decimal; }
+.prose-skill li { margin-top: 0.25em; margin-bottom: 0.25em; }
+.prose-skill code {
+  font-family: var(--font-mono);
+  font-size: 0.8125em;
+  background: var(--muted);
+  border-radius: 0.25rem;
+  padding: 0.1em 0.35em;
+}
+.prose-skill pre {
+  background: var(--muted);
+  border-radius: 0.5rem;
+  padding: 0.875rem 1rem;
+  overflow-x: auto;
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+}
+.prose-skill pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 0.8125em;
+}
+.prose-skill blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 1em;
+  color: var(--muted-foreground);
+  margin: 0.75em 0;
+}
+.prose-skill hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.25em 0;
+}
+.prose-skill a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-skill strong { font-weight: 600; }
+.prose-skill table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125em;
+  margin: 0.75em 0;
+}
+.prose-skill th,
+.prose-skill td {
+  border: 1px solid var(--border);
+  padding: 0.4em 0.75em;
+  text-align: left;
+}
+.prose-skill th { background: var(--muted); font-weight: 600; }
+
 /* Strip white background/border from Twitter widget iframe wrapper */
 twitterwidget,
 .twitter-tweet,
