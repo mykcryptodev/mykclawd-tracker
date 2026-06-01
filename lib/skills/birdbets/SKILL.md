@@ -1,3 +1,15 @@
+---
+name: birdbets-market
+description: Interact with BirdBets — a Base prediction market where users bet MYKCLAWD on whether more than N birds will visit a BirdBuddy feeder on a given day
+tags: [trading, defi, prediction-market, base]
+version: 1
+visibility: public
+metadata:
+  clawdbot:
+    emoji: "🐦"
+    homepage: "https://birdbets.mykclawd.xyz/bankr-skill"
+---
+
 # BirdBets Market Skill Overview
 
 **BirdBets** is a Base-based prediction market platform focused on bird visit forecasting. The skill enables users to bet on whether bird visits will exceed set thresholds, access real-time odds, preview payouts, and manage MYKCLAWD tokens.
