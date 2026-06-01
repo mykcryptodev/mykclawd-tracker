@@ -49,19 +49,19 @@ Inputs required from the user:
 
 Workflow:
 
-1. Fetch context.
-2. Fetch Tomorrow snapshot with `side` and `stake`.
-3. Confirm `market.exists`, `!market.resolved`, and `market.isOpen`.
-4. Convert amount to wei using `bettingToken.decimals`.
-5. Check Bankr wallet MYKCLAWD balance with ERC-20 `balanceOf(wallet)`.
-6. If balance is below the amount, acquire MYKCLAWD on Base using Bankr swap tooling. Swap only enough for the requested bet plus a small cushion for rounding/slippage.
-7. Check allowance with ERC-20 `allowance(wallet, predictionMarket)`.
-8. If allowance is below the amount, submit `approve(predictionMarket, amountWei)`.
-9. Submit the market transaction:
-   - YES: `betYes(marketId, amountWei)`
-   - NO: `betNo(marketId, amountWei)`
-10. Return the transaction hash and summarize the resulting side, amount, market date, and threshold.
+1. Identify the Bankr wallet address (`from`).
+2. Call the bet preparation endpoint:
 
+```text
+GET https://birdbets.mykclawd.xyz/api/base-mcp/prepare/bet?from=<wallet>&side=<YES|NO>&stake=<amount>
+```
+
+3. If the response has `ok: false`, surface `error` to the user and stop.
+4. If `wallet.balance` is below `bet.stake`, acquire MYKCLAWD on Base using Bankr swap tooling before proceeding. Swap only enough for the requested amount plus a small slippage cushion, then call the prepare endpoint again.
+5. Submit each transaction in the `transactions` array **in order**, using the exact `to`, `data`, `value`, and `chainId` from each entry. Do not re-encode or modify the calldata.
+6. Return the transaction hashes and summarize `bet.side`, `bet.stakeFormatted`, `market.marketDate`, and `market.threshold` from the response.
+
+Do not build or encode contract calldata manually — the prepare endpoint handles approve and betYes/betNo encoding.
 Do not place a bet if the user has not explicitly chosen side and amount.
 
 ## Acquire MYKCLAWD

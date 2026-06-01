@@ -38,6 +38,9 @@ Users must:
 - Context API: `https://birdbets.mykclawd.xyz/api/bankr/context`
 - Tomorrow's market: `https://birdbets.mykclawd.xyz/api/markets/snapshot?market=Tomorrow`
 - Today's stats: Market snapshot and 7-day visit history endpoints
+- Bet preparation: `https://birdbets.mykclawd.xyz/api/base-mcp/prepare/bet?from=<wallet>&side=<YES|NO>&stake=<amount>`
+
+**Always use the bet preparation endpoint to place bets.** It returns pre-encoded `approve` and `betYes`/`betNo` transaction calldata. Never encode contract calls manually — the market ID is a `uint256` integer (not a string) and the contract has separate `betYes` and `betNo` functions, not a single `bet(id, bool, amount)`.
 
 The skill operates in read-only mode if the API key or wallet session lacks write permissions—providing information without executing transactions.
 
