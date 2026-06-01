@@ -1,3 +1,5 @@
+import { readFileSync } from "fs";
+import { join } from "path";
 import type { Metadata } from "next";
 import { marked } from "marked";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -9,26 +11,9 @@ export const metadata: Metadata = {
   title: "Skills",
 };
 
-const BRANCH =
-  "https://raw.githubusercontent.com/mykclawd/skills-fork/add-birdbets-market";
-
-const BIRDBETS_FILES = [
-  {
-    label: "Skill",
-    value: "skill",
-    url: `${BRANCH}/birdbets/birdbets-market/SKILL.md`,
-  },
-  {
-    label: "Workflows",
-    value: "workflows",
-    url: `${BRANCH}/birdbets/birdbets-market/references/workflows.md`,
-  },
-  {
-    label: "Contracts",
-    value: "contracts",
-    url: `${BRANCH}/birdbets/birdbets-market/references/contracts.md`,
-  },
-];
+function readSkillFile(relativePath: string): string {
+  return readFileSync(join(process.cwd(), relativePath), "utf-8");
+}
 
 const SKILLS = [
   {
@@ -38,30 +23,23 @@ const SKILLS = [
       "Check odds, get bird visit stats, acquire MYKCLAWD, and place YES/NO predictions on the BirdBets prediction market on Base.",
     installPrompt:
       "Install this skill: https://mykclawd.xyz/api/skills/birdbets",
-    files: BIRDBETS_FILES,
+    files: [
+      { label: "Skill", value: "skill", path: "lib/skills/birdbets/SKILL.md" },
+      { label: "Workflows", value: "workflows", path: "lib/skills/birdbets/workflows.md" },
+      { label: "Contracts", value: "contracts", path: "lib/skills/birdbets/contracts.md" },
+    ],
   },
 ];
 
-async function fetchMarkdown(url: string): Promise<string> {
-  const res = await fetch(url, { next: { revalidate: 3600 } });
-  if (!res.ok) return `_Could not load content from ${url}_`;
-  const md = await res.text();
-  return marked(md) as string;
-}
-
-export default async function SkillsPage() {
-  const skillsWithHtml = await Promise.all(
-    SKILLS.map(async (skill) => ({
-      ...skill,
-      files: await Promise.all(
-        skill.files.map(async (f) => ({
-          label: f.label,
-          value: f.value,
-          html: await fetchMarkdown(f.url),
-        }))
-      ),
-    }))
-  );
+export default function SkillsPage() {
+  const skillsWithHtml = SKILLS.map((skill) => ({
+    ...skill,
+    files: skill.files.map((f) => ({
+      label: f.label,
+      value: f.value,
+      html: marked(readSkillFile(f.path)) as string,
+    })),
+  }));
 
   return (
     <SidebarProvider

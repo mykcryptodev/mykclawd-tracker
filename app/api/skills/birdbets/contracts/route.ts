@@ -5,7 +5,7 @@ export const dynamic = "force-static";
 
 export function GET() {
   const text = readFileSync(
-    join(process.cwd(), "lib/skills/birdbets/SKILL.md"),
+    join(process.cwd(), "lib/skills/birdbets/contracts.md"),
     "utf-8"
   );
   return new Response(text, {
