@@ -290,6 +290,17 @@ export function HomeLanding({
             AI transaction tracker. Upload a video of your credit card app and AI extracts every transaction
             automatically.
           </li>
+          <li>
+            <a
+              className="underline underline-offset-4 hover:text-foreground"
+              href="https://rofl.mykclawd.xyz/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              😂 Rofl House
+            </a>{" "}
+            A probably fair, free to use, onchain raffle system.
+          </li>
         </ul>
 
         <h2 className="mt-12 text-xl font-semibold tracking-tight">Contributions</h2>
