@@ -149,7 +149,7 @@ export default function X402Page() {
                     <div className="rounded-lg bg-muted/40 p-3">
                       <dt className="text-muted-foreground">Facilitator</dt>
                       <dd className="mt-1 break-all font-medium">
-                        https://facilitator.payai.network
+                        https://api.cdp.coinbase.com/platform/v2/x402/facilitator
                       </dd>
                     </div>
                   </dl>
