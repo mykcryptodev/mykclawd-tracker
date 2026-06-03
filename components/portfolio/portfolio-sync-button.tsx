@@ -7,6 +7,19 @@ import { RefreshCwIcon } from "lucide-react";
 
 type Phase = "idle" | "dispatching" | "running" | "done" | "error";
 
+type JsonObject = Record<string, unknown>;
+
+async function readJsonObject(res: Response): Promise<JsonObject> {
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `Expected JSON from sync endpoint, got ${res.status} ${text.slice(0, 80)}`
+    );
+  }
+  return (await res.json()) as JsonObject;
+}
+
 export function PortfolioSyncButton() {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("idle");
@@ -20,11 +33,11 @@ export function PortfolioSyncButton() {
       // Dispatch GH Actions workflow — returns immediately with a runId.
       // The sync runs fully server-side; closing the browser is fine.
       const res = await fetch("/api/portfolio/dispatch", { method: "POST" });
-      const data = await res.json();
+      const data = await readJsonObject(res);
 
       if (res.status === 429 && data.tooSoon) {
         setPhase("error");
-        setMessage(data.message ?? "Synced recently — try again later");
+        setMessage(typeof data.message === "string" ? data.message : "Synced recently — try again later");
         return;
       }
       if (!res.ok || data.error) {
@@ -37,7 +50,17 @@ export function PortfolioSyncButton() {
       // Dispatched — poll run status in background, refresh page when done
       setPhase("running");
       setMessage("Running in background…");
-      pollRunStatus(data.runId);
+      if (typeof data.runId === "number") {
+        pollRunStatus(data.runId);
+      } else {
+        // Dispatch succeeded but GitHub's run ID was not available yet.
+        // The workflow is still running; refresh shortly instead of polling a bad URL.
+        setTimeout(() => {
+          router.refresh();
+          setPhase("idle");
+          setMessage("");
+        }, 10_000);
+      }
     } catch (e) {
       setPhase("error");
       setMessage((e as Error).message);
@@ -50,10 +73,10 @@ export function PortfolioSyncButton() {
     setMessage("Running in background…");
     try {
       const res = await fetch("/api/portfolio/sync", { method: "POST" });
-      const data = await res.json();
+      const data = await readJsonObject(res);
       if (!res.ok || data.error) {
         setPhase("error");
-        setMessage(data.error ?? "Sync failed");
+        setMessage(typeof data.error === "string" ? data.error : "Sync failed");
         return;
       }
       // Sync is running server-side; show started state and refresh after a moment.
