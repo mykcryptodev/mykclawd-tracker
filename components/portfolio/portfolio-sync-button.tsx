@@ -28,13 +28,9 @@ export function PortfolioSyncButton() {
         return;
       }
       if (!res.ok || data.error) {
-        // Fallback: if dispatch isn't available, try the direct sync
-        if (data.fallback) {
-          await runDirectSync();
-          return;
-        }
-        setPhase("error");
-        setMessage(data.error ?? "Dispatch failed");
+        // Dispatch failed for any reason — fall back to local background sync.
+        // The direct sync route uses after(), so it's equally fire-and-forget.
+        await runDirectSync();
         return;
       }
 
