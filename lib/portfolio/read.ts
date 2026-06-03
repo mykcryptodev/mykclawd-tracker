@@ -182,7 +182,7 @@ async function getOrdersMap(): Promise<Map<string, PortfolioOrder[]>> {
   const map = new Map<string, PortfolioOrder[]>();
 
   const addToMap = (key: string | null | undefined, order: PortfolioOrder) => {
-    if (!key) return;
+    if (!key || typeof key !== "string") return;
     const k = key.toLowerCase();
     if (!map.has(k)) map.set(k, []);
     map.get(k)!.push(order);

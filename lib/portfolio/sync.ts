@@ -62,7 +62,10 @@ export async function syncPortfolioNav(
       // Zerion ETH on Base: fungible_id is "base-asset" — use a different query
       const url =
         `/wallets/${address}/pnl?currency=usd&filter[chain_ids]=base&filter[fungible_ids]=base-asset`;
-      const res = await fetch(`https://api.zerion.io/v1${url}`, {
+      // Add trailing slash to avoid 301 redirect stripping the auth header
+      const [p, q] = url.split("?");
+      const slashedUrl = `https://api.zerion.io/v1${p.endsWith("/") ? p : p + "/"}${q ? "?" + q : ""}`;
+      const res = await fetch(slashedUrl, {
         headers: {
           Authorization: "Basic " + Buffer.from(`${process.env.ZERION_API_KEY ?? ""}:`).toString("base64"),
           Accept: "application/json",

@@ -15,7 +15,12 @@ function authHeader(): string {
 }
 
 async function zerionFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
+  // Zerion requires a trailing slash — without it they return 301 which strips the
+  // Authorization header on redirect (standard browser/fetch security behavior).
+  const [pathname, qs] = path.split("?");
+  const slashedPath = pathname.endsWith("/") ? pathname : `${pathname}/`;
+  const url = `${BASE_URL}${slashedPath}${qs ? "?" + qs : ""}`;
+  const res = await fetch(url, {
     headers: { Authorization: authHeader(), Accept: "application/json" },
   });
   if (!res.ok) {
@@ -133,7 +138,7 @@ export async function fetchZerionPositions(address: string): Promise<ZerionHoldi
     // Find Base implementation address
     const impl = info.implementations.find((i) => i.chain_id === CHAIN);
     const isNative = !impl; // ETH has no Base implementation entry
-    const tokenAddress = isNative ? "native" : impl!.address.toLowerCase();
+    const tokenAddress = isNative ? "native" : (impl?.address ?? "").toLowerCase();
 
     const token: ZerionToken = {
       tokenAddress,
