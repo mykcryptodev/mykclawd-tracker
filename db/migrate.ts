@@ -304,6 +304,52 @@ export async function runMigrations() {
   // Reset any rows that were checked with the broken pipeline (no image found but pipeline was wrong)
   await client.execute(`UPDATE tokens SET image_checked = 0 WHERE image_url IS NULL AND image_checked = 1`);
 
+  // ── Zerion PnL columns on portfolio_positions ─────────────────────────────
+  try { await client.execute(`ALTER TABLE portfolio_positions ADD COLUMN realized_gain REAL`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE portfolio_positions ADD COLUMN unrealized_gain REAL`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE portfolio_positions ADD COLUMN total_gain REAL`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE portfolio_positions ADD COLUMN total_gain_pct REAL`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE portfolio_positions ADD COLUMN realized_gain_pct REAL`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE portfolio_positions ADD COLUMN unrealized_gain_pct REAL`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE portfolio_positions ADD COLUMN total_invested REAL`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE portfolio_positions ADD COLUMN change_1d_usd REAL`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE portfolio_positions ADD COLUMN change_1d_pct REAL`); } catch { /* exists */ }
+
+  // ── portfolio_orders table ─────────────────────────────────────────────────
+  try {
+    await client.executeMultiple(`
+      CREATE TABLE IF NOT EXISTS portfolio_orders (
+        order_id TEXT NOT NULL,
+        source TEXT NOT NULL CHECK(source IN ('cowswap', 'bankr', 'definitive')),
+        status TEXT NOT NULL DEFAULT 'unknown',
+        type TEXT NOT NULL DEFAULT 'market',
+        side TEXT CHECK(side IN ('buy', 'sell')),
+        sell_token TEXT,
+        buy_token TEXT,
+        token_address TEXT,
+        token_symbol TEXT,
+        sell_amount TEXT,
+        buy_amount TEXT,
+        executed_sell_amount TEXT,
+        executed_buy_amount TEXT,
+        fee TEXT,
+        quantity TEXT,
+        filled_quantity TEXT,
+        price_usd REAL,
+        expires_at INTEGER,
+        description TEXT,
+        created_at TEXT,
+        updated_at TEXT,
+        synced_at INTEGER NOT NULL,
+        PRIMARY KEY (source, order_id)
+      );
+      CREATE INDEX IF NOT EXISTS portfolio_orders_token_idx ON portfolio_orders(token_address);
+      CREATE INDEX IF NOT EXISTS portfolio_orders_sell_token_idx ON portfolio_orders(sell_token);
+      CREATE INDEX IF NOT EXISTS portfolio_orders_buy_token_idx ON portfolio_orders(buy_token);
+      CREATE INDEX IF NOT EXISTS portfolio_orders_status_idx ON portfolio_orders(status);
+    `);
+  } catch { /* exists */ }
+
   // Fix block_timestamp = 0 in transactions (was a bug — now computed from block_number)
   await client.execute(`
     UPDATE transactions

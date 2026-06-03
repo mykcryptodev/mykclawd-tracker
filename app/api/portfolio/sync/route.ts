@@ -9,7 +9,7 @@ import { portfolioSync } from "../../../../db/schema";
 import { eq } from "drizzle-orm";
 import { syncPortfolioNav } from "../../../../lib/portfolio/sync";
 
-export const maxDuration = 60;
+export const maxDuration = 120; // orders fetch (Bankr agent API) can take ~30s
 export const dynamic = "force-dynamic";
 
 const MIN_SYNC_GAP_S = 30 * 60; // 30 minutes

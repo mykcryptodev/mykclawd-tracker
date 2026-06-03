@@ -9,28 +9,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { Blobbie } from "thirdweb/react";
-
-interface Position {
-  tokenAddress: string;
-  symbol: string;
-  name: string;
-  network: string;
-  imgUrl: string | null;
-  price: number | null;
-  balance: number;
-  balanceUsd: number;
-  pctOfNav: number;
-}
+import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import type { PortfolioPosition, PortfolioOrder, TokenPnl } from "@/lib/portfolio/read";
 
 interface Props {
-  positions: Position[];
+  positions: PortfolioPosition[];
   trackedAddress: string;
 }
 
-type SortKey = "balanceUsd" | "balance" | "pctOfNav";
+type SortKey = "balanceUsd" | "balance" | "pctOfNav" | "totalGain" | "unrealizedGain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const WETH_BASE = "0x4200000000000000000000000000000000000006";
 
 const fullUsd = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -38,9 +30,7 @@ const fullUsd = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
 });
 
-const qtyFormatter = new Intl.NumberFormat("en-US", {
-  maximumFractionDigits: 4,
-});
+const qtyFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 });
 
 function fmtPrice(p: number | null): string {
   if (p === null || p === 0) return "—";
@@ -50,11 +40,210 @@ function fmtPrice(p: number | null): string {
   return `$${p.toExponential(2)}`;
 }
 
+function fmtGain(v: number | null, pct: number | null): React.ReactNode {
+  if (v === null) return <span className="text-muted-foreground">—</span>;
+  const sign = v >= 0 ? "+" : "";
+  const pctStr = pct !== null ? ` (${sign}${pct.toFixed(1)}%)` : "";
+  return (
+    <span className={v >= 0 ? "text-green-500" : "text-red-500"}>
+      {sign}{fullUsd.format(v)}{pctStr}
+    </span>
+  );
+}
+
+function fmtChange(usd: number | null, pct: number | null): React.ReactNode {
+  if (usd === null && pct === null) return <span className="text-muted-foreground">—</span>;
+  const val = usd ?? 0;
+  const sign = val >= 0 ? "+" : "";
+  const pctStr = pct !== null ? ` (${sign}${pct.toFixed(2)}%)` : "";
+  return (
+    <span className={val >= 0 ? "text-green-500" : "text-red-500"}>
+      {sign}{fullUsd.format(val)}{pctStr}
+    </span>
+  );
+}
+
 function basescanUrl(tokenAddress: string, owner: string): string {
   return tokenAddress === ZERO_ADDRESS
     ? `https://basescan.org/address/${owner}`
     : `https://basescan.org/token/${tokenAddress}?a=${owner}`;
 }
+
+function cowscanUrl(uid: string): string {
+  return `https://explorer.cow.fi/orders/${uid}`;
+}
+
+// ── Source badge ──────────────────────────────────────────────────────────────
+
+const SOURCE_COLORS: Record<string, string> = {
+  cowswap: "bg-blue-500/15 text-blue-400 border-blue-500/30",
+  bankr: "bg-purple-500/15 text-purple-400 border-purple-500/30",
+  definitive: "bg-orange-500/15 text-orange-400 border-orange-500/30",
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  cowswap: "CoW",
+  bankr: "Bankr",
+  definitive: "Definitive",
+};
+
+// ── Status badge ─────────────────────────────────────────────────────────────
+
+function statusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
+  switch (status.toLowerCase()) {
+    case "open":
+    case "active":
+    case "pending":
+      return "default";
+    case "filled":
+    case "fulfilled":
+    case "completed":
+    case "triggered":
+      return "secondary";
+    case "cancelled":
+    case "expired":
+    case "invalidated":
+      return "destructive";
+    default:
+      return "outline";
+  }
+}
+
+// ── Tiny amount formatter (handles raw token amounts with 18 decimals) ────────
+
+function fmtRawAmount(raw: string | null, decimals = 18): string {
+  if (!raw) return "—";
+  try {
+    const n = BigInt(raw);
+    const divisor = BigInt(10 ** decimals);
+    const whole = n / divisor;
+    const frac = n % divisor;
+    const fracStr = frac.toString().padStart(decimals, "0").slice(0, 4);
+    return `${whole.toLocaleString("en-US")}.${fracStr}`;
+  } catch {
+    return raw;
+  }
+}
+
+// ── Orders sub-panel ──────────────────────────────────────────────────────────
+
+function OrderRow({ order }: { order: PortfolioOrder }) {
+  const srcColor = SOURCE_COLORS[order.source] ?? "bg-muted text-muted-foreground border-border";
+  const srcLabel = SOURCE_LABELS[order.source] ?? order.source;
+
+  const isCow = order.source === "cowswap";
+  const isBankr = order.source === "bankr";
+
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-start gap-2 py-2 px-3 rounded-md bg-muted/40 text-xs">
+      {/* Source + status */}
+      <div className="flex items-center gap-1.5 shrink-0 min-w-[120px]">
+        <span className={`px-1.5 py-0.5 rounded border text-[10px] font-medium ${srcColor}`}>
+          {srcLabel}
+        </span>
+        <Badge variant={statusVariant(order.status)} className="text-[10px] h-4 px-1.5">
+          {order.status}
+        </Badge>
+      </div>
+
+      {/* Details */}
+      <div className="flex flex-wrap gap-x-4 gap-y-0.5 flex-1 text-muted-foreground">
+        {/* Side + type */}
+        {order.side && (
+          <span>
+            <span className={order.side === "buy" ? "text-green-400" : "text-red-400"}>
+              {order.side.toUpperCase()}
+            </span>{" "}
+            <span className="text-foreground/70">{order.type}</span>
+          </span>
+        )}
+        {!order.side && order.type && (
+          <span className="text-foreground/70">{order.type}</span>
+        )}
+
+        {/* Bankr: show description */}
+        {isBankr && order.description && (
+          <span className="text-foreground/80 max-w-xs truncate">{order.description}</span>
+        )}
+
+        {/* Target price */}
+        {order.priceUsd !== null && (
+          <span>@ {fmtPrice(order.priceUsd)}</span>
+        )}
+
+        {/* CoW: amounts */}
+        {isCow && order.executedSellAmount && order.executedSellAmount !== "0" && (
+          <span>
+            Sold {fmtRawAmount(order.executedSellAmount)} → recv {fmtRawAmount(order.executedBuyAmount)}
+          </span>
+        )}
+        {isCow && (!order.executedSellAmount || order.executedSellAmount === "0") && order.sellAmount && (
+          <span>
+            Sell {fmtRawAmount(order.sellAmount)} → buy {fmtRawAmount(order.buyAmount)}
+          </span>
+        )}
+
+        {/* Quantity */}
+        {!isCow && order.quantity && (
+          <span>
+            Qty {order.quantity}
+            {order.filledQuantity && order.filledQuantity !== "0" && ` / filled ${order.filledQuantity}`}
+          </span>
+        )}
+
+        {/* Created at */}
+        {order.createdAt && (
+          <span>{new Date(order.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" })}</span>
+        )}
+
+        {/* Expires */}
+        {order.expiresAt && (
+          <span>exp {new Date(order.expiresAt * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+        )}
+      </div>
+
+      {/* External link (CoW only for now) */}
+      {isCow && (
+        <a
+          href={cowscanUrl(order.orderId)}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          <ExternalLink className="size-3" />
+        </a>
+      )}
+    </div>
+  );
+}
+
+function PnlCell({ pnl }: { pnl: TokenPnl | null }) {
+  if (!pnl || (pnl.totalGain === null && pnl.unrealizedGain === null)) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+  // Show unrealized (open position) + realized if available
+  const unreal = pnl.unrealizedGain;
+  const real = pnl.realizedGain;
+  return (
+    <div className="flex flex-col items-end gap-0.5 leading-tight">
+      {unreal !== null && (
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-muted-foreground">U</span>
+          {fmtGain(unreal, pnl.unrealizedGainPct)}
+        </div>
+      )}
+      {real !== null && real !== 0 && (
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-muted-foreground">R</span>
+          {fmtGain(real, pnl.realizedGainPct)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Column header helper ──────────────────────────────────────────────────────
 
 function ColHead({
   label,
@@ -73,7 +262,7 @@ function ColHead({
 }) {
   return (
     <TableHead
-      className={`${k ? "cursor-pointer select-none" : ""} ${align === "right" ? "text-right" : ""}`}
+      className={`${k ? "cursor-pointer select-none" : ""} ${align === "right" ? "text-right" : ""} whitespace-nowrap`}
       onClick={k ? () => onSort(k) : undefined}
     >
       {label}
@@ -82,9 +271,12 @@ function ColHead({
   );
 }
 
+// ── Main component ────────────────────────────────────────────────────────────
+
 export function HoldingsTable({ positions, trackedAddress }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("balanceUsd");
   const [asc, setAsc] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const toggleSort = useCallback(
     (key: SortKey) => {
@@ -97,76 +289,218 @@ export function HoldingsTable({ positions, trackedAddress }: Props) {
     [sortKey]
   );
 
-  // Native ETH is pinned to the top row; the rest sort normally.
+  const toggleExpand = useCallback((addr: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(addr)) next.delete(addr);
+      else next.add(addr);
+      return next;
+    });
+  }, []);
+
   const rows = useMemo(() => {
     const eth = positions.filter((p) => p.tokenAddress === ZERO_ADDRESS);
-    const rest = positions
-      .filter((p) => p.tokenAddress !== ZERO_ADDRESS)
-      .sort((a, b) => (asc ? a[sortKey] - b[sortKey] : b[sortKey] - a[sortKey]));
+    const rest = positions.filter((p) => p.tokenAddress !== ZERO_ADDRESS).sort((a, b) => {
+      const aVal =
+        sortKey === "totalGain"
+          ? (a.pnl?.totalGain ?? -Infinity)
+          : sortKey === "unrealizedGain"
+          ? (a.pnl?.unrealizedGain ?? -Infinity)
+          : a[sortKey as keyof typeof a] as number;
+      const bVal =
+        sortKey === "totalGain"
+          ? (b.pnl?.totalGain ?? -Infinity)
+          : sortKey === "unrealizedGain"
+          ? (b.pnl?.unrealizedGain ?? -Infinity)
+          : b[sortKey as keyof typeof b] as number;
+      return asc ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
+    });
     return [...eth, ...rest];
   }, [positions, sortKey, asc]);
+
+  if (rows.length === 0) {
+    return (
+      <Table>
+        <TableBody>
+          <TableRow>
+            <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+              No holdings yet — run Sync to load data.
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    );
+  }
 
   return (
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead className="w-8" /> {/* expand chevron */}
           <ColHead label="Token" sortKey={sortKey} asc={asc} onSort={toggleSort} />
           <ColHead label="Price" align="right" sortKey={sortKey} asc={asc} onSort={toggleSort} />
+          <ColHead label="24h" align="right" sortKey={sortKey} asc={asc} onSort={toggleSort} />
           <ColHead label="Balance" k="balance" align="right" sortKey={sortKey} asc={asc} onSort={toggleSort} />
           <ColHead label="Value" k="balanceUsd" align="right" sortKey={sortKey} asc={asc} onSort={toggleSort} />
           <ColHead label="% NAV" k="pctOfNav" align="right" sortKey={sortKey} asc={asc} onSort={toggleSort} />
+          <ColHead label="Unreal. PnL" k="unrealizedGain" align="right" sortKey={sortKey} asc={asc} onSort={toggleSort} />
+          <ColHead label="Total PnL" k="totalGain" align="right" sortKey={sortKey} asc={asc} onSort={toggleSort} />
+          <ColHead label="Orders" align="right" sortKey={sortKey} asc={asc} onSort={toggleSort} />
         </TableRow>
       </TableHeader>
       <TableBody>
-        {rows.length === 0 && (
-          <TableRow>
-            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-              No holdings yet — run Sync to load data.
-            </TableCell>
-          </TableRow>
-        )}
+        {rows.map((p) => {
+          const isOpen = expanded.has(p.tokenAddress);
+          const hasOrders = p.orders.length > 0;
+          return (
+            <>
+              {/* ── Main row ── */}
+              <TableRow
+                key={p.tokenAddress}
+                className={`group cursor-pointer hover:bg-muted/50 ${isOpen ? "bg-muted/30" : ""}`}
+                onClick={() => {
+                  if (hasOrders) {
+                    toggleExpand(p.tokenAddress);
+                  } else {
+                    window.open(
+                      basescanUrl(p.tokenAddress, trackedAddress),
+                      "_blank",
+                      "noopener,noreferrer"
+                    );
+                  }
+                }}
+              >
+                {/* Chevron */}
+                <TableCell className="w-8 pr-0">
+                  {hasOrders ? (
+                    <span className="text-muted-foreground">
+                      {isOpen ? (
+                        <ChevronDown className="size-4" />
+                      ) : (
+                        <ChevronRight className="size-4" />
+                      )}
+                    </span>
+                  ) : (
+                    <span className="size-4 inline-block" />
+                  )}
+                </TableCell>
 
-        {rows.map((p) => (
-          <TableRow
-            key={p.tokenAddress}
-            className="cursor-pointer hover:bg-muted/50"
-            onClick={() =>
-              window.open(
-                basescanUrl(p.tokenAddress, trackedAddress),
-                "_blank",
-                "noopener,noreferrer"
-              )
-            }
-          >
-            <TableCell className="font-medium">
-              <div className="flex items-center gap-2">
-                {p.imgUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={p.imgUrl}
-                    alt=""
-                    className="size-5 rounded-full shrink-0 object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                    }}
+                {/* Token */}
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2">
+                    {p.imgUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={p.imgUrl}
+                        alt=""
+                        className="size-5 rounded-full shrink-0 object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <Blobbie
+                        address={p.tokenAddress}
+                        size={20}
+                        className="rounded-full shrink-0"
+                      />
+                    )}
+                    <span>{p.symbol || p.tokenAddress.slice(0, 8)}</span>
+                    {p.name && p.name !== p.symbol && (
+                      <span className="hidden sm:inline text-xs text-muted-foreground truncate max-w-[120px]">
+                        {p.name}
+                      </span>
+                    )}
+                    {/* Basescan link (always visible on hover) */}
+                    <a
+                      href={basescanUrl(p.tokenAddress, trackedAddress)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity"
+                    >
+                      <ExternalLink className="size-3" />
+                    </a>
+                  </div>
+                </TableCell>
+
+                {/* Price */}
+                <TableCell className="text-right tabular-nums">
+                  {fmtPrice(p.price)}
+                </TableCell>
+
+                {/* 24h */}
+                <TableCell className="text-right tabular-nums text-xs">
+                  {fmtChange(p.change1dUsd, p.change1dPct)}
+                </TableCell>
+
+                {/* Balance */}
+                <TableCell className="text-right tabular-nums">
+                  {qtyFormatter.format(p.balance)}
+                </TableCell>
+
+                {/* Value */}
+                <TableCell className="text-right tabular-nums font-medium">
+                  {fullUsd.format(p.balanceUsd)}
+                </TableCell>
+
+                {/* % NAV */}
+                <TableCell className="text-right tabular-nums">
+                  {p.pctOfNav.toFixed(1)}%
+                </TableCell>
+
+                {/* Unrealized PnL */}
+                <TableCell className="text-right tabular-nums text-xs">
+                  <PnlCell
+                    pnl={
+                      p.pnl
+                        ? {
+                            ...p.pnl,
+                            realizedGain: null,
+                            realizedGainPct: null,
+                            totalGain: null,
+                            totalGainPct: null,
+                          }
+                        : null
+                    }
                   />
-                ) : (
-                  <Blobbie address={p.tokenAddress} size={20} className="rounded-full shrink-0" />
-                )}
-                <span>{p.symbol || p.tokenAddress.slice(0, 8)}</span>
-                {p.name && p.name !== p.symbol && (
-                  <span className="hidden sm:inline text-xs text-muted-foreground truncate max-w-[160px]">
-                    {p.name}
-                  </span>
-                )}
-              </div>
-            </TableCell>
-            <TableCell className="text-right tabular-nums">{fmtPrice(p.price)}</TableCell>
-            <TableCell className="text-right tabular-nums">{qtyFormatter.format(p.balance)}</TableCell>
-            <TableCell className="text-right tabular-nums">{fullUsd.format(p.balanceUsd)}</TableCell>
-            <TableCell className="text-right tabular-nums">{p.pctOfNav.toFixed(1)}%</TableCell>
-          </TableRow>
-        ))}
+                </TableCell>
+
+                {/* Total PnL */}
+                <TableCell className="text-right tabular-nums text-xs">
+                  {fmtGain(p.pnl?.totalGain ?? null, p.pnl?.totalGainPct ?? null)}
+                </TableCell>
+
+                {/* Orders count */}
+                <TableCell className="text-right">
+                  {hasOrders ? (
+                    <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                      {p.orders.length}
+                    </Badge>
+                  ) : (
+                    <span className="text-muted-foreground text-xs">—</span>
+                  )}
+                </TableCell>
+              </TableRow>
+
+              {/* ── Expanded orders panel ── */}
+              {isOpen && hasOrders && (
+                <TableRow key={`${p.tokenAddress}-orders`} className="bg-muted/10 hover:bg-muted/20">
+                  <TableCell colSpan={10} className="px-4 pb-3 pt-1">
+                    <div className="flex flex-col gap-1.5">
+                      <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
+                        Orders ({p.orders.length})
+                      </div>
+                      {p.orders.map((order) => (
+                        <OrderRow key={`${order.source}-${order.orderId}`} order={order} />
+                      ))}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+            </>
+          );
+        })}
       </TableBody>
     </Table>
   );

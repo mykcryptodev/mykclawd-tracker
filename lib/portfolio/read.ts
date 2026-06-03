@@ -1,12 +1,17 @@
 // Read layer for the portfolio page. Pure DB reads + period-change math derived
-// from the cached Zapper data. Never calls Zapper (that only happens on sync).
+// from the cached Zerion data. Never calls external APIs (that only happens on sync).
 
 import { db } from "../../db/client";
-import { portfolioNav, portfolioPositions, portfolioSync } from "../../db/schema";
-import { asc, desc, eq } from "drizzle-orm";
+import {
+  portfolioNav,
+  portfolioPositions,
+  portfolioSync,
+  portfolioOrders,
+} from "../../db/schema";
+import { asc, desc, eq, or } from "drizzle-orm";
 import { NATIVE_ETH_ADDRESS } from "./zapper";
 
-/** Zapper's CDN icon for native ETH on Base (same source as our other token logos). */
+/** Zerion icon for native ETH on Base */
 const ETH_IMG_URL =
   "https://storage.googleapis.com/zapper-fi-assets/tokens/base/0x0000000000000000000000000000000000000000.png";
 
@@ -20,6 +25,40 @@ export interface Delta {
   pct: number;
 }
 
+export interface TokenPnl {
+  realizedGain: number | null;
+  unrealizedGain: number | null;
+  totalGain: number | null;
+  totalGainPct: number | null;
+  realizedGainPct: number | null;
+  unrealizedGainPct: number | null;
+  totalInvested: number | null;
+}
+
+export interface PortfolioOrder {
+  orderId: string;
+  source: "cowswap" | "bankr" | "definitive";
+  status: string;
+  type: string;
+  side: "buy" | "sell" | null;
+  sellToken: string | null;
+  buyToken: string | null;
+  tokenAddress: string | null;
+  tokenSymbol: string | null;
+  sellAmount: string | null;
+  buyAmount: string | null;
+  executedSellAmount: string | null;
+  executedBuyAmount: string | null;
+  fee: string | null;
+  quantity: string | null;
+  filledQuantity: string | null;
+  priceUsd: number | null;
+  expiresAt: number | null;
+  description: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
 export interface PortfolioPosition {
   tokenAddress: string;
   symbol: string;
@@ -29,13 +68,16 @@ export interface PortfolioPosition {
   price: number | null;
   balance: number;
   balanceUsd: number;
-  /** Share of total NAV, 0–100. */
   pctOfNav: number;
+  change1dUsd: number | null;
+  change1dPct: number | null;
+  pnl: TokenPnl | null;
+  orders: PortfolioOrder[];
 }
 
 export interface PortfolioMeta {
-  syncedAt: number; // unix seconds
-  totalUsd: number; // NAV, excludes native ETH
+  syncedAt: number;
+  totalUsd: number;
   tokenCount: number;
   nativeEthBalance: number;
   nativeEthUsd: number;
@@ -43,12 +85,9 @@ export interface PortfolioMeta {
 
 export interface PortfolioOverview {
   meta: PortfolioMeta | null;
-  /** Headline NAV — INCLUDES native ETH (= navExEthUsd + native ETH). */
   totalValueUsd: number;
-  /** Ex-native-ETH total — the basis the chart series and deltas are computed on. */
   navExEthUsd: number;
   series: NavPoint[];
-  /** All token holdings INCLUDING native ETH (pinned first by the table). */
   positions: PortfolioPosition[];
   deltas: {
     d1: Delta | null;
@@ -57,19 +96,14 @@ export interface PortfolioOverview {
   };
 }
 
-// ── pure helpers (unit-tested) ───────────────────────────────────────────────
+// ── pure helpers ─────────────────────────────────────────────────────────────
 
-/** YYYY-MM-DD for (UTC `from` - `n` days). `from` defaults to now. */
 export function daysAgoUtc(n: number, from: Date = new Date()): string {
   const d = new Date(from);
   d.setUTCDate(d.getUTCDate() - n);
   return d.toISOString().slice(0, 10);
 }
 
-/**
- * Most recent point on or before `targetDate` in an ascending-by-date series, or
- * null if every point is newer than the target.
- */
 export function navAtOrBefore(series: NavPoint[], targetDate: string): NavPoint | null {
   let match: NavPoint | null = null;
   for (const p of series) {
@@ -79,7 +113,6 @@ export function navAtOrBefore(series: NavPoint[], targetDate: string): NavPoint 
   return match;
 }
 
-/** Change from the value ~`n` days ago to `currentTotal`. null if no usable baseline. */
 export function deltaOverDays(
   series: NavPoint[],
   currentTotal: number,
@@ -111,7 +144,7 @@ export interface NavSeriesRow extends NavPoint {
 }
 
 export async function getNavSeries(): Promise<NavSeriesRow[]> {
-  const rows = await db
+  return db
     .select({
       date: portfolioNav.date,
       valueUsd: portfolioNav.valueUsd,
@@ -120,7 +153,6 @@ export async function getNavSeries(): Promise<NavSeriesRow[]> {
     .from(portfolioNav)
     .orderBy(asc(portfolioNav.date))
     .all();
-  return rows;
 }
 
 export async function getPortfolioMeta(): Promise<PortfolioMeta | null> {
@@ -139,31 +171,119 @@ export async function getPortfolioMeta(): Promise<PortfolioMeta | null> {
   };
 }
 
-export async function getPositions(totalUsd: number): Promise<PortfolioPosition[]> {
+/** Fetch all orders from DB as a map: tokenAddress (lowercase) → orders[] */
+async function getOrdersMap(): Promise<Map<string, PortfolioOrder[]>> {
+  const rows = await db
+    .select()
+    .from(portfolioOrders)
+    .orderBy(desc(portfolioOrders.createdAt))
+    .all();
+
+  const map = new Map<string, PortfolioOrder[]>();
+
+  const addToMap = (key: string | null | undefined, order: PortfolioOrder) => {
+    if (!key) return;
+    const k = key.toLowerCase();
+    if (!map.has(k)) map.set(k, []);
+    map.get(k)!.push(order);
+  };
+
+  for (const r of rows) {
+    const order: PortfolioOrder = {
+      orderId: r.orderId,
+      source: r.source as "cowswap" | "bankr" | "definitive",
+      status: r.status,
+      type: r.type,
+      side: r.side as "buy" | "sell" | null,
+      sellToken: r.sellToken ?? null,
+      buyToken: r.buyToken ?? null,
+      tokenAddress: r.tokenAddress ?? null,
+      tokenSymbol: r.tokenSymbol ?? null,
+      sellAmount: r.sellAmount ?? null,
+      buyAmount: r.buyAmount ?? null,
+      executedSellAmount: r.executedSellAmount ?? null,
+      executedBuyAmount: r.executedBuyAmount ?? null,
+      fee: r.fee ?? null,
+      quantity: r.quantity ?? null,
+      filledQuantity: r.filledQuantity ?? null,
+      priceUsd: r.priceUsd ?? null,
+      expiresAt: r.expiresAt ?? null,
+      description: r.description ?? null,
+      createdAt: r.createdAt ?? null,
+      updatedAt: r.updatedAt ?? null,
+    };
+    // Index by all relevant token addresses
+    addToMap(r.tokenAddress, order);
+    addToMap(r.sellToken, order);
+    addToMap(r.buyToken, order);
+  }
+
+  return map;
+}
+
+export async function getPositions(
+  totalUsd: number,
+  ordersMap: Map<string, PortfolioOrder[]>
+): Promise<PortfolioPosition[]> {
   const rows = await db
     .select()
     .from(portfolioPositions)
     .orderBy(desc(portfolioPositions.balanceUsd))
     .all();
-  return rows.map((r) => ({
-    tokenAddress: r.tokenAddress,
-    symbol: r.symbol,
-    name: r.name,
-    network: r.network,
-    imgUrl: r.imgUrl ?? null,
-    price: r.price ?? null,
-    balance: r.balance,
-    balanceUsd: r.balanceUsd,
-    pctOfNav: totalUsd > 0 ? (r.balanceUsd / totalUsd) * 100 : 0,
-  }));
+
+  return rows.map((r) => {
+    const hasPnl =
+      r.realizedGain !== null ||
+      r.unrealizedGain !== null ||
+      r.totalGain !== null;
+
+    const pnl: TokenPnl | null = hasPnl
+      ? {
+          realizedGain: r.realizedGain ?? null,
+          unrealizedGain: r.unrealizedGain ?? null,
+          totalGain: r.totalGain ?? null,
+          totalGainPct: r.totalGainPct ?? null,
+          realizedGainPct: r.realizedGainPct ?? null,
+          unrealizedGainPct: r.unrealizedGainPct ?? null,
+          totalInvested: r.totalInvested ?? null,
+        }
+      : null;
+
+    // Deduplicate orders for this token by orderId
+    const seen = new Set<string>();
+    const orders: PortfolioOrder[] = [];
+    for (const o of ordersMap.get(r.tokenAddress.toLowerCase()) ?? []) {
+      if (!seen.has(o.orderId)) {
+        seen.add(o.orderId);
+        orders.push(o);
+      }
+    }
+
+    return {
+      tokenAddress: r.tokenAddress,
+      symbol: r.symbol,
+      name: r.name,
+      network: r.network,
+      imgUrl: r.imgUrl ?? null,
+      price: r.price ?? null,
+      balance: r.balance,
+      balanceUsd: r.balanceUsd,
+      pctOfNav: totalUsd > 0 ? (r.balanceUsd / totalUsd) * 100 : 0,
+      change1dUsd: r.change1dUsd ?? null,
+      change1dPct: r.change1dPct ?? null,
+      pnl,
+      orders,
+    };
+  });
 }
 
-/** Synthetic holdings row for native ETH (it's not stored in portfolio_positions). */
 function nativeEthPosition(
   balance: number,
   usd: number,
-  totalValueUsd: number
+  totalValueUsd: number,
+  ordersMap: Map<string, PortfolioOrder[]>
 ): PortfolioPosition {
+  const orders = ordersMap.get("native") ?? ordersMap.get(NATIVE_ETH_ADDRESS.toLowerCase()) ?? [];
   return {
     tokenAddress: NATIVE_ETH_ADDRESS,
     symbol: "ETH",
@@ -174,27 +294,36 @@ function nativeEthPosition(
     balance,
     balanceUsd: usd,
     pctOfNav: totalValueUsd > 0 ? (usd / totalValueUsd) * 100 : 0,
+    change1dUsd: null,
+    change1dPct: null,
+    pnl: null,
+    orders,
   };
 }
 
 export async function getPortfolioOverview(): Promise<PortfolioOverview> {
-  const [meta, rows] = await Promise.all([getPortfolioMeta(), getNavSeries()]);
+  const [meta, navRows, ordersMap] = await Promise.all([
+    getPortfolioMeta(),
+    getNavSeries(),
+    getOrdersMap(),
+  ]);
 
-  // The chart/deltas run on the ex-native-ETH basis (matches Zapper history). The
-  // headline NAV and holdings ADD native ETH back in (the chart intentionally won't
-  // line up with the headline — native ETH has no historical series).
-  const navExEthUsd = meta?.totalUsd ?? rows.at(-1)?.valueUsd ?? 0;
+  const navExEthUsd = meta?.totalUsd ?? navRows.at(-1)?.valueUsd ?? 0;
   const nativeEthUsd = meta?.nativeEthUsd ?? 0;
   const nativeEthBalance = meta?.nativeEthBalance ?? 0;
   const totalValueUsd = navExEthUsd + nativeEthUsd;
 
-  const tokenPositions = await getPositions(totalValueUsd);
+  const tokenPositions = await getPositions(totalValueUsd, ordersMap);
+
   const positions =
     nativeEthBalance > 0 || nativeEthUsd > 0
-      ? [nativeEthPosition(nativeEthBalance, nativeEthUsd, totalValueUsd), ...tokenPositions]
+      ? [
+          nativeEthPosition(nativeEthBalance, nativeEthUsd, totalValueUsd, ordersMap),
+          ...tokenPositions,
+        ]
       : tokenPositions;
 
-  const series: NavPoint[] = rows.map((r) => ({ date: r.date, valueUsd: r.valueUsd }));
+  const series: NavPoint[] = navRows.map((r) => ({ date: r.date, valueUsd: r.valueUsd }));
 
   return {
     meta,

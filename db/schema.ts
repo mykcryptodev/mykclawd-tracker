@@ -111,6 +111,17 @@ export const portfolioPositions = sqliteTable("portfolio_positions", {
   balance: real("balance").notNull().default(0),
   balanceRaw: text("balance_raw").notNull().default("0"),
   balanceUsd: real("balance_usd").notNull().default(0),
+  // Zerion PnL — populated during sync
+  realizedGain: real("realized_gain"),
+  unrealizedGain: real("unrealized_gain"),
+  totalGain: real("total_gain"),
+  totalGainPct: real("total_gain_pct"),
+  realizedGainPct: real("realized_gain_pct"),
+  unrealizedGainPct: real("unrealized_gain_pct"),
+  totalInvested: real("total_invested"),
+  // 24h price change
+  change1dUsd: real("change_1d_usd"),
+  change1dPct: real("change_1d_pct"),
   updatedAt: integer("updated_at").notNull(), // unix seconds
 });
 
@@ -282,3 +293,51 @@ export const bountyJobs = sqliteTable("bounty_jobs", {
   updatedAt: text("updated_at").notNull(),
   otherInfo: text("other_info"),
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Trading orders — synced from CoW Swap, Bankr, and Definitive
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const portfolioOrders = sqliteTable(
+  "portfolio_orders",
+  {
+    // composite PK: source + orderId
+    orderId: text("order_id").notNull(),
+    source: text("source", { enum: ["cowswap", "bankr", "definitive"] }).notNull(),
+
+    status: text("status").notNull().default("unknown"),
+    type: text("type").notNull().default("market"),   // limit, market, dca, twap, stop
+    side: text("side", { enum: ["buy", "sell"] }),
+
+    // Token addresses (lowercase) — used to join against portfolio_positions
+    sellToken: text("sell_token"),   // CoW/Definitive
+    buyToken: text("buy_token"),     // CoW/Definitive
+    tokenAddress: text("token_address"), // Bankr (single token ref)
+    tokenSymbol: text("token_symbol"),
+
+    // Amounts (raw strings to avoid precision loss)
+    sellAmount: text("sell_amount"),
+    buyAmount: text("buy_amount"),
+    executedSellAmount: text("executed_sell_amount"),
+    executedBuyAmount: text("executed_buy_amount"),
+    fee: text("fee"),
+    quantity: text("quantity"),
+    filledQuantity: text("filled_quantity"),
+
+    // Order metadata
+    priceUsd: real("price_usd"),
+    expiresAt: integer("expires_at"),    // unix seconds
+    description: text("description"),   // Bankr human-readable description
+
+    createdAt: text("created_at"),
+    updatedAt: text("updated_at"),
+    syncedAt: integer("synced_at").notNull(), // when we fetched this
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.source, t.orderId] }),
+    tokenIdx: index("portfolio_orders_token_idx").on(t.tokenAddress),
+    sellTokenIdx: index("portfolio_orders_sell_token_idx").on(t.sellToken),
+    buyTokenIdx: index("portfolio_orders_buy_token_idx").on(t.buyToken),
+    statusIdx: index("portfolio_orders_status_idx").on(t.status),
+  })
+);
