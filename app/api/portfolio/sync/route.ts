@@ -1,7 +1,9 @@
-// On-demand portfolio NAV refresh. Fast enough (1–2 Zapper calls) to run inline in
-// a serverless function. Rate-limited so the page's Sync button can't hammer the
-// expensive Zapper API; the 6h GitHub Actions cron is the primary refresh path.
+// On-demand portfolio NAV refresh. Uses Next.js `after()` to run the sync
+// *after* the response is returned — so the user can close the tab immediately
+// after tapping Sync and the work continues server-side.
+// Rate-limited to avoid hammering Zerion; the 6h GH Actions cron is the primary path.
 
+import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { runMigrations } from "../../../../db/migrate";
 import { db } from "../../../../db/client";
@@ -38,8 +40,16 @@ export async function POST() {
       }
     }
 
-    const result = await syncPortfolioNav();
-    return NextResponse.json({ ok: true, result });
+    // Fire the sync after the response is sent — safe to close the browser.
+    after(async () => {
+      try {
+        await syncPortfolioNav();
+      } catch (e) {
+        console.error("[portfolio/sync] background sync error:", e);
+      }
+    });
+
+    return NextResponse.json({ ok: true, background: true });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
