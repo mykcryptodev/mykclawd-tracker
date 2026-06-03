@@ -55,9 +55,10 @@ jobs:
     steps:
       - name: Trigger portfolio sync via API
         run: |
+          APP_URL='${{ secrets.APP_URL || 'https://mykclawd.xyz' }}'
           RESPONSE=$(curl -s -w '\n%{http_code}' -X POST \
             -H 'Content-Type: application/json' \
-            '${{ secrets.APP_URL }}/api/portfolio/sync')
+            "$APP_URL/api/portfolio/sync")
           STATUS=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | head -1)
           echo "Status: $STATUS"
