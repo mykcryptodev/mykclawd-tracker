@@ -212,10 +212,29 @@ async function getOrdersMap(): Promise<Map<string, PortfolioOrder[]>> {
       createdAt: r.createdAt ?? null,
       updatedAt: r.updatedAt ?? null,
     };
-    // Index by all relevant token addresses
-    addToMap(r.tokenAddress, order);
-    addToMap(r.sellToken, order);
-    addToMap(r.buyToken, order);
+    // Index by the "primary" (non-quote) asset so orders appear under the
+    // token being traded, not the output stablecoin.
+    // - sell order (e.g. sell ETH → USDC): primary = sellToken
+    // - buy order  (e.g. buy  ETH with USDC): primary = buyToken
+    // - bankr / unknown side: fall back to tokenAddress
+    if (r.sellToken && r.buyToken) {
+      if (r.side === "sell") {
+        addToMap(r.sellToken, order);
+      } else if (r.side === "buy") {
+        addToMap(r.buyToken, order);
+      } else {
+        // No side info — index both but prefer tokenAddress if present
+        if (r.tokenAddress) {
+          addToMap(r.tokenAddress, order);
+        } else {
+          addToMap(r.sellToken, order);
+          addToMap(r.buyToken, order);
+        }
+      }
+    } else {
+      // Bankr-style: only tokenAddress
+      addToMap(r.tokenAddress, order);
+    }
   }
 
   return map;
