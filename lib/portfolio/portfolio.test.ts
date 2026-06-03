@@ -10,6 +10,7 @@ import {
   navAtOrBefore,
   deltaOverDays,
   computeDeltas,
+  tokenKeysForOrder,
   type NavPoint,
 } from "./read";
 
@@ -98,6 +99,31 @@ describe("navAtOrBefore", () => {
 
   it("returns null when every point is newer than the target", () => {
     expect(navAtOrBefore(series, "2026-01-01")).toBeNull();
+  });
+});
+
+
+describe("tokenKeysForOrder", () => {
+  const USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
+  const WETH = "0x4200000000000000000000000000000000000006";
+  const MEME = "0xbf8e8f0e8866a7052f948c16508644347c57aba3";
+  const OTHER = "0x8ebf0ee27898454216f564a2e67f6907fe3b7ba3";
+
+  it("groups WETH/USDC-funded buys under the non-quote token", () => {
+    expect(tokenKeysForOrder({ sellToken: WETH, buyToken: MEME, tokenAddress: null })).toEqual([MEME]);
+    expect(tokenKeysForOrder({ sellToken: USDC, buyToken: MEME, tokenAddress: null })).toEqual([MEME]);
+  });
+
+  it("groups token-to-USDC sells under the sold token", () => {
+    expect(tokenKeysForOrder({ sellToken: MEME, buyToken: USDC, tokenAddress: null })).toEqual([MEME]);
+  });
+
+  it("uses explicit provider tokenAddress when available", () => {
+    expect(tokenKeysForOrder({ sellToken: USDC, buyToken: WETH, tokenAddress: MEME })).toEqual([MEME]);
+  });
+
+  it("keeps both non-quote legs for token-to-token orders", () => {
+    expect(tokenKeysForOrder({ sellToken: MEME, buyToken: OTHER, tokenAddress: null })).toEqual([MEME, OTHER]);
   });
 });
 

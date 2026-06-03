@@ -8,7 +8,7 @@ import {
   portfolioSync,
   portfolioOrders,
 } from "../../db/schema";
-import { asc, desc, eq, or } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { NATIVE_ETH_ADDRESS } from "./zapper";
 
 /** Zerion icon for native ETH on Base */
@@ -94,6 +94,41 @@ export interface PortfolioOverview {
     d7: Delta | null;
     d30: Delta | null;
   };
+}
+
+/** Base asset addresses that are normally the settlement side, not the holding an order is for. */
+const QUOTE_TOKEN_ADDRESSES = new Set([
+  "0x0000000000000000000000000000000000000000", // native ETH
+  "0x4200000000000000000000000000000000000006", // WETH
+  "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", // USDC
+  "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca", // USDbC
+  "0x50c5725949a6f0c72e6c4a641f24049a917db0cb", // DAI
+]);
+
+function normalizeTokenAddress(value: string | null | undefined): string | null {
+  if (!value || typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  return normalized.length > 0 ? normalized : null;
+}
+
+export function tokenKeysForOrder(order: Pick<PortfolioOrder, "sellToken" | "buyToken" | "tokenAddress">): string[] {
+  const explicitToken = normalizeTokenAddress(order.tokenAddress);
+  if (explicitToken) return [explicitToken];
+
+  const sellToken = normalizeTokenAddress(order.sellToken);
+  const buyToken = normalizeTokenAddress(order.buyToken);
+
+  if (sellToken && buyToken) {
+    const sellIsQuote = QUOTE_TOKEN_ADDRESSES.has(sellToken);
+    const buyIsQuote = QUOTE_TOKEN_ADDRESSES.has(buyToken);
+
+    if (sellIsQuote && !buyIsQuote) return [buyToken];
+    if (buyIsQuote && !sellIsQuote) return [sellToken];
+
+    return sellToken === buyToken ? [sellToken] : [sellToken, buyToken];
+  }
+
+  return sellToken ? [sellToken] : buyToken ? [buyToken] : [];
 }
 
 // ── pure helpers ─────────────────────────────────────────────────────────────
@@ -182,8 +217,8 @@ async function getOrdersMap(): Promise<Map<string, PortfolioOrder[]>> {
   const map = new Map<string, PortfolioOrder[]>();
 
   const addToMap = (key: string | null | undefined, order: PortfolioOrder) => {
-    if (!key || typeof key !== "string") return;
-    const k = key.toLowerCase();
+    const k = normalizeTokenAddress(key);
+    if (!k) return;
     if (!map.has(k)) map.set(k, []);
     map.get(k)!.push(order);
   };
@@ -212,28 +247,13 @@ async function getOrdersMap(): Promise<Map<string, PortfolioOrder[]>> {
       createdAt: r.createdAt ?? null,
       updatedAt: r.updatedAt ?? null,
     };
-    // Index by the "primary" (non-quote) asset so orders appear under the
-    // token being traded, not the output stablecoin.
-    // - sell order (e.g. sell ETH → USDC): primary = sellToken
-    // - buy order  (e.g. buy  ETH with USDC): primary = buyToken
-    // - bankr / unknown side: fall back to tokenAddress
-    if (r.sellToken && r.buyToken) {
-      if (r.side === "sell") {
-        addToMap(r.sellToken, order);
-      } else if (r.side === "buy") {
-        addToMap(r.buyToken, order);
-      } else {
-        // No side info — index both but prefer tokenAddress if present
-        if (r.tokenAddress) {
-          addToMap(r.tokenAddress, order);
-        } else {
-          addToMap(r.sellToken, order);
-          addToMap(r.buyToken, order);
-        }
-      }
-    } else {
-      // Bankr-style: only tokenAddress
-      addToMap(r.tokenAddress, order);
+    // Group each order under the holding it is really about. CoW orders often
+    // have `side = sell` even when the user is buying a memecoin with WETH/USDC,
+    // so side-based grouping puts those buys under WETH/USDC. Instead, use an
+    // explicit single-token reference when providers give one, otherwise strip
+    // the common quote/settlement assets and attach to the non-quote leg.
+    for (const key of tokenKeysForOrder(order)) {
+      addToMap(key, order);
     }
   }
 
