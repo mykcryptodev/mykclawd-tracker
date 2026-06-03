@@ -4,7 +4,12 @@ on:
   schedule:
     # Every 6 hours
     - cron: '0 */6 * * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      jobs:
+        description: 'Comma-separated list of jobs to run (portfolio, yankees, aero, all). Defaults to all.'
+        required: false
+        default: 'all'
 
 # Shared env injected into every job
 env:
@@ -41,42 +46,31 @@ jobs:
           path: node_modules
           key: node-modules-${{ github.sha }}
 
-  # ── Portfolio NAV sync (Zapper) ──────────────────────────────────────────────
-  # Replaces the old transfer-replay PnL sync. lib/pnl + lib/ingest + scripts/sync.ts
-  # remain on disk but are no longer invoked by the cron.
+  # ── Portfolio NAV sync (Zerion) ─────────────────────────────────────────────
   sync-portfolio:
     name: Portfolio NAV sync
-    needs: install
+    if: ${{ github.event_name == 'schedule' || inputs.jobs == 'all' || contains(inputs.jobs, 'portfolio') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.25.0
-          run_install: false
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'pnpm'
-
-      - name: Restore node_modules
-        uses: actions/cache/restore@v4
-        with:
-          path: node_modules
-          key: node-modules-${{ github.sha }}
-
-      - name: Run portfolio NAV sync
-        env:
-          TRACKED_ADDRESS: ${{ secrets.TRACKED_ADDRESS }}
-          ZAPPER_API_KEY: ${{ secrets.ZAPPER_API_KEY }}
-        run: pnpm tsx scripts/sync-portfolio.ts
+      - name: Trigger portfolio sync via API
+        run: |
+          RESPONSE=$(curl -s -w '\n%{http_code}' -X POST \
+            -H 'Content-Type: application/json' \
+            '${{ secrets.APP_URL }}/api/portfolio/sync')
+          STATUS=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+          echo "Status: $STATUS"
+          echo "Body: $BODY"
+          if [ "$STATUS" != "200" ] && [ "$STATUS" != "429" ]; then
+            echo "Sync failed with status $STATUS"
+            exit 1
+          fi
 
   # ── Yankees bets seed/sync ──────────────────────────────────────────────────
   sync-yankees:
     name: Yankees bets seed
+    if: ${{ github.event_name == 'schedule' || inputs.jobs == 'all' || contains(inputs.jobs, 'yankees') }}
     needs: install
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -105,6 +99,7 @@ jobs:
   # ── Aerodrome LP sync ────────────────────────────────────────────────────────
   sync-aero:
     name: Aerodrome LP sync
+    if: ${{ github.event_name == 'schedule' || inputs.jobs == 'all' || contains(inputs.jobs, 'aero') }}
     needs: install
     runs-on: ubuntu-latest
     timeout-minutes: 30
