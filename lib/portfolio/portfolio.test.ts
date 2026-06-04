@@ -13,6 +13,13 @@ import {
   tokenKeysForOrder,
   type NavPoint,
 } from "./read";
+import {
+  fmtRawTokenAmount,
+  getTokenDecimals,
+  isActivePortfolioOrder,
+  filterPortfolioOrders,
+} from "./orders";
+import type { PortfolioOrder } from "./read";
 
 describe("ticksToDailyNav", () => {
   it("collapses to one ascending value per UTC day (last tick of day wins)", () => {
@@ -124,6 +131,31 @@ describe("tokenKeysForOrder", () => {
 
   it("keeps both non-quote legs for token-to-token orders", () => {
     expect(tokenKeysForOrder({ sellToken: MEME, buyToken: OTHER, tokenAddress: null })).toEqual([MEME, OTHER]);
+  });
+});
+
+describe("portfolio order helpers", () => {
+  const USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
+
+  it("treats only CoW open orders as active", () => {
+    expect(isActivePortfolioOrder({ source: "cowswap", status: "open" })).toBe(true);
+    expect(isActivePortfolioOrder({ source: "cowswap", status: "presign" })).toBe(false);
+    expect(isActivePortfolioOrder({ source: "cowswap", status: "pending" })).toBe(false);
+    expect(isActivePortfolioOrder({ source: "cowswap", status: "filled" })).toBe(false);
+  });
+
+  it("filters orders unless showAll", () => {
+    const orders = [
+      { source: "cowswap", status: "open" },
+      { source: "cowswap", status: "filled" },
+    ] as PortfolioOrder[];
+    expect(filterPortfolioOrders(orders, false)).toHaveLength(1);
+    expect(filterPortfolioOrders(orders, true)).toHaveLength(2);
+  });
+
+  it("formats USDC amounts with 6 decimals", () => {
+    expect(getTokenDecimals(USDC)).toBe(6);
+    expect(fmtRawTokenAmount("29551511", 6)).toBe("29.5515");
   });
 });
 

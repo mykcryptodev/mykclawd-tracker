@@ -222,7 +222,7 @@ export async function syncPortfolioNav(
     const [cowOrders, bankrOrders, definitiveOrders] = await Promise.allSettled([
       fetchCowswapOrders(address),
       fetchBankrOrders(),
-      fetchDefinitiveOrders(),
+      fetchDefinitiveOrders(address),
     ]);
 
     const allOrders = [
@@ -301,6 +301,7 @@ export async function syncPortfolioNav(
             side: order.side,
             sellToken: order.side === "sell" ? order.targetAsset : order.contraAsset,
             buyToken: order.side === "buy" ? order.targetAsset : order.contraAsset,
+            tokenAddress: order.targetAsset || undefined,
             tokenSymbol: order.targetSymbol ?? undefined,
             quantity: order.quantity,
             filledQuantity: order.filledQuantity ?? undefined,

@@ -10,9 +10,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Toggle } from "@/components/ui/toggle";
 import { Blobbie } from "thirdweb/react";
 import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 import type { PortfolioPosition, PortfolioOrder, TokenPnl } from "@/lib/portfolio/read";
+import {
+  filterPortfolioOrders,
+  fmtRawTokenAmount,
+  getTokenDecimals,
+  isActivePortfolioOrder,
+} from "@/lib/portfolio/orders";
 
 interface Props {
   positions: PortfolioPosition[];
@@ -103,31 +110,18 @@ function statusVariant(status: string): "default" | "secondary" | "destructive" 
     case "cancelled":
     case "expired":
     case "invalidated":
+    case "presign":
       return "destructive";
     default:
       return "outline";
   }
 }
 
-// ── Tiny amount formatter (handles raw token amounts with 18 decimals) ────────
-
-function fmtRawAmount(raw: string | null, decimals = 18): string {
-  if (!raw) return "—";
-  try {
-    const n = BigInt(raw);
-    const divisor = BigInt(10 ** decimals);
-    const whole = n / divisor;
-    const frac = n % divisor;
-    const fracStr = frac.toString().padStart(decimals, "0").slice(0, 4);
-    return `${whole.toLocaleString("en-US")}.${fracStr}`;
-  } catch {
-    return raw;
-  }
-}
-
 // ── Orders sub-panel ──────────────────────────────────────────────────────────
 
 function OrderRow({ order }: { order: PortfolioOrder }) {
+  const sellDecimals = getTokenDecimals(order.sellToken);
+  const buyDecimals = getTokenDecimals(order.buyToken);
   const srcColor = SOURCE_COLORS[order.source] ?? "bg-muted text-muted-foreground border-border";
   const srcLabel = SOURCE_LABELS[order.source] ?? order.source;
 
@@ -174,12 +168,14 @@ function OrderRow({ order }: { order: PortfolioOrder }) {
         {/* CoW: amounts */}
         {isCow && order.executedSellAmount && order.executedSellAmount !== "0" && (
           <span>
-            Sold {fmtRawAmount(order.executedSellAmount)} → recv {fmtRawAmount(order.executedBuyAmount)}
+            Sold {fmtRawTokenAmount(order.executedSellAmount, sellDecimals)} → recv{" "}
+            {fmtRawTokenAmount(order.executedBuyAmount, buyDecimals)}
           </span>
         )}
         {isCow && (!order.executedSellAmount || order.executedSellAmount === "0") && order.sellAmount && (
           <span>
-            Sell {fmtRawAmount(order.sellAmount)} → buy {fmtRawAmount(order.buyAmount)}
+            Sell {fmtRawTokenAmount(order.sellAmount, sellDecimals)} → buy{" "}
+            {fmtRawTokenAmount(order.buyAmount, buyDecimals)}
           </span>
         )}
 
@@ -277,6 +273,12 @@ export function HoldingsTable({ positions, trackedAddress }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("balanceUsd");
   const [asc, setAsc] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [showAllOrders, setShowAllOrders] = useState(false);
+
+  const hasAnyOrders = useMemo(
+    () => positions.some((p) => p.orders.length > 0),
+    [positions]
+  );
 
   const toggleSort = useCallback(
     (key: SortKey) => {
@@ -333,6 +335,23 @@ export function HoldingsTable({ positions, trackedAddress }: Props) {
   }
 
   return (
+    <div className="flex flex-col">
+      {hasAnyOrders && (
+        <div className="flex items-center justify-end gap-2 border-b border-border/40 px-4 py-2">
+          <span className="text-[10px] text-muted-foreground">
+            {showAllOrders ? "Showing all synced orders" : "Active orders only"}
+          </span>
+          <Toggle
+            variant="outline"
+            size="sm"
+            pressed={showAllOrders}
+            onPressedChange={setShowAllOrders}
+            aria-label="Show completed and presign orders"
+          >
+            All orders
+          </Toggle>
+        </div>
+      )}
     <Table>
       <TableHeader>
         <TableRow>
@@ -351,7 +370,10 @@ export function HoldingsTable({ positions, trackedAddress }: Props) {
       <TableBody>
         {rows.map((p) => {
           const isOpen = expanded.has(p.tokenAddress);
-          const hasOrders = p.orders.length > 0;
+          const visibleOrders = filterPortfolioOrders(p.orders, showAllOrders);
+          const activeCount = p.orders.filter(isActivePortfolioOrder).length;
+          const hasOrders = visibleOrders.length > 0;
+          const canExpand = p.orders.length > 0;
           return (
             <>
               {/* ── Main row ── */}
@@ -359,7 +381,7 @@ export function HoldingsTable({ positions, trackedAddress }: Props) {
                 key={p.tokenAddress}
                 className={`group cursor-pointer hover:bg-muted/50 ${isOpen ? "bg-muted/30" : ""}`}
                 onClick={() => {
-                  if (hasOrders) {
+                  if (canExpand) {
                     toggleExpand(p.tokenAddress);
                   } else {
                     window.open(
@@ -372,7 +394,7 @@ export function HoldingsTable({ positions, trackedAddress }: Props) {
               >
                 {/* Chevron */}
                 <TableCell className="w-8 pr-0">
-                  {hasOrders ? (
+                  {canExpand ? (
                     <span className="text-muted-foreground">
                       {isOpen ? (
                         <ChevronDown className="size-4" />
@@ -474,9 +496,20 @@ export function HoldingsTable({ positions, trackedAddress }: Props) {
                 {/* Orders count */}
                 <TableCell className="text-right">
                   {hasOrders ? (
-                    <Badge variant="outline" className="text-[10px] h-4 px-1.5">
-                      {p.orders.length}
+                    <Badge variant="outline" className="text-[10px] h-4 px-1.5 tabular-nums">
+                      {showAllOrders
+                        ? String(visibleOrders.length)
+                        : activeCount < p.orders.length
+                          ? `${activeCount}/${p.orders.length}`
+                          : String(activeCount)}
                     </Badge>
+                  ) : canExpand ? (
+                    <span
+                      className="text-muted-foreground text-xs tabular-nums"
+                      title="Enable All orders to view"
+                    >
+                      0/{p.orders.length}
+                    </span>
                   ) : (
                     <span className="text-muted-foreground text-xs">—</span>
                   )}
@@ -484,16 +517,26 @@ export function HoldingsTable({ positions, trackedAddress }: Props) {
               </TableRow>
 
               {/* ── Expanded orders panel ── */}
-              {isOpen && hasOrders && (
+              {isOpen && canExpand && (
                 <TableRow key={`${p.tokenAddress}-orders`} className="bg-muted/10 hover:bg-muted/20">
                   <TableCell colSpan={10} className="px-4 pb-3 pt-1">
                     <div className="flex flex-col gap-1.5">
                       <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
-                        Orders ({p.orders.length})
+                        Orders ({visibleOrders.length}
+                        {!showAllOrders && p.orders.length > visibleOrders.length
+                          ? ` of ${p.orders.length}`
+                          : ""}
+                        )
                       </div>
-                      {p.orders.map((order) => (
-                        <OrderRow key={`${order.source}-${order.orderId}`} order={order} />
-                      ))}
+                      {visibleOrders.length === 0 ? (
+                        <p className="text-xs text-muted-foreground px-3 py-2">
+                          No active orders. Turn on &quot;All orders&quot; above to see completed and presign entries.
+                        </p>
+                      ) : (
+                        visibleOrders.map((order) => (
+                          <OrderRow key={`${order.source}-${order.orderId}`} order={order} />
+                        ))
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -503,5 +546,6 @@ export function HoldingsTable({ positions, trackedAddress }: Props) {
         })}
       </TableBody>
     </Table>
+    </div>
   );
 }
