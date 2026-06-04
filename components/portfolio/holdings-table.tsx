@@ -117,9 +117,17 @@ function statusVariant(status: string): "default" | "secondary" | "destructive" 
   }
 }
 
+// ── x from entry formatter ───────────────────────────────────────────────────
+
+function fmtMultiple(priceUsd: number | null, avgCostUsd: number | null): string | null {
+  if (priceUsd === null || avgCostUsd === null || avgCostUsd <= 0) return null;
+  const x = priceUsd / avgCostUsd;
+  return `${x.toFixed(2)}x`;
+}
+
 // ── Orders sub-panel ──────────────────────────────────────────────────────────
 
-function OrderRow({ order }: { order: PortfolioOrder }) {
+function OrderRow({ order, avgCostUsd }: { order: PortfolioOrder; avgCostUsd: number | null }) {
   const sellDecimals = getTokenDecimals(order.sellToken);
   const buyDecimals = getTokenDecimals(order.buyToken);
   const srcColor = SOURCE_COLORS[order.source] ?? "bg-muted text-muted-foreground border-border";
@@ -127,6 +135,7 @@ function OrderRow({ order }: { order: PortfolioOrder }) {
 
   const isCow = order.source === "cowswap";
   const isBankr = order.source === "bankr";
+  const multiple = fmtMultiple(order.priceUsd, avgCostUsd);
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-start gap-2 py-2 px-3 rounded-md bg-muted/40 text-xs">
@@ -160,9 +169,14 @@ function OrderRow({ order }: { order: PortfolioOrder }) {
           <span className="text-foreground/80 max-w-xs truncate">{order.description}</span>
         )}
 
-        {/* Target price */}
+        {/* Target price + multiplier from entry */}
         {order.priceUsd !== null && (
-          <span>@ {fmtPrice(order.priceUsd)}</span>
+          <span>
+            @ {fmtPrice(order.priceUsd)}
+            {multiple && (
+              <span className="ml-1 font-semibold text-amber-400">{multiple} from entry</span>
+            )}
+          </span>
         )}
 
         {/* CoW: amounts */}
@@ -534,7 +548,7 @@ export function HoldingsTable({ positions, trackedAddress }: Props) {
                         </p>
                       ) : (
                         visibleOrders.map((order) => (
-                          <OrderRow key={`${order.source}-${order.orderId}`} order={order} />
+                          <OrderRow key={`${order.source}-${order.orderId}`} order={order} avgCostUsd={p.avgCostUsd} />
                         ))
                       )}
                     </div>

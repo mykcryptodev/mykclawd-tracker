@@ -7,6 +7,7 @@ import {
   portfolioPositions,
   portfolioSync,
   portfolioOrders,
+  lots,
 } from "../../db/schema";
 import { asc, desc, eq } from "drizzle-orm";
 import { NATIVE_ETH_ADDRESS } from "./zapper";
@@ -61,6 +62,7 @@ export interface PortfolioOrder {
 
 export interface PortfolioPosition {
   tokenAddress: string;
+  avgCostUsd: number | null;
   symbol: string;
   name: string;
   network: string;
@@ -264,11 +266,11 @@ export async function getPositions(
   totalUsd: number,
   ordersMap: Map<string, PortfolioOrder[]>
 ): Promise<PortfolioPosition[]> {
-  const rows = await db
-    .select()
-    .from(portfolioPositions)
-    .orderBy(desc(portfolioPositions.balanceUsd))
-    .all();
+  const [rows, lotRows] = await Promise.all([
+    db.select().from(portfolioPositions).orderBy(desc(portfolioPositions.balanceUsd)).all(),
+    db.select().from(lots).all(),
+  ]);
+  const lotsMap = new Map(lotRows.map((l) => [l.tokenAddress.toLowerCase(), l.avgCostUsd]));
 
   return rows.map((r) => {
     const hasPnl =
@@ -298,6 +300,7 @@ export async function getPositions(
       }
     }
 
+    const avgCostUsd = lotsMap.get(r.tokenAddress.toLowerCase()) ?? null;
     return {
       tokenAddress: r.tokenAddress,
       symbol: r.symbol,
@@ -311,6 +314,7 @@ export async function getPositions(
       change1dUsd: r.change1dUsd ?? null,
       change1dPct: r.change1dPct ?? null,
       pnl,
+      avgCostUsd: avgCostUsd && avgCostUsd > 0 ? avgCostUsd : null,
       orders,
     };
   });
@@ -336,6 +340,7 @@ function nativeEthPosition(
     change1dUsd: null,
     change1dPct: null,
     pnl: null,
+    avgCostUsd: null,
     orders,
   };
 }
