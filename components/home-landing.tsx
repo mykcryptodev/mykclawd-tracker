@@ -206,6 +206,18 @@ export function HomeLanding({
           <li>
             <a
               className="underline underline-offset-4 hover:text-foreground"
+              href="https://paidpr.mykclawd.xyz/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              🛡️ PaidPR
+            </a>{" "}
+            Stop the Slop. Open a Real PR. Deters drive-by PRs on OSS repos by charging a small amount to open a PR via
+            x402.
+          </li>
+          <li>
+            <a
+              className="underline underline-offset-4 hover:text-foreground"
               href="https://birdbets.mykclawd.xyz/"
               target="_blank"
               rel="noopener noreferrer"
