@@ -301,6 +301,36 @@ export async function runMigrations() {
     `);
   } catch { /* exists */ }
 
+  // Widen yankees_bets.result CHECK to allow 'VOID' (postponed/rained-out games →
+  // Polymarket market voided & stake refunded). Rebuild only if the old constraint is present.
+  try {
+    const tbl = await client.execute(
+      `SELECT sql FROM sqlite_master WHERE type='table' AND name='yankees_bets'`
+    );
+    const ddl = String(tbl.rows[0]?.sql ?? "");
+    if (ddl && !ddl.includes("VOID")) {
+      await client.executeMultiple(`
+        CREATE TABLE yankees_bets_new (
+          date TEXT PRIMARY KEY,
+          opponent TEXT NOT NULL,
+          side TEXT NOT NULL CHECK(side IN ('YES', 'NO')),
+          amount REAL NOT NULL,
+          odds REAL NOT NULL,
+          payout REAL,
+          result TEXT CHECK(result IN ('WIN', 'LOSS', 'VOID')),
+          profit REAL,
+          note TEXT,
+          bet_placed INTEGER NOT NULL DEFAULT 1,
+          tweet_id TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        INSERT INTO yankees_bets_new SELECT date, opponent, side, amount, odds, payout, result, profit, note, bet_placed, tweet_id, created_at FROM yankees_bets;
+        DROP TABLE yankees_bets;
+        ALTER TABLE yankees_bets_new RENAME TO yankees_bets;
+      `);
+    }
+  } catch { /* already migrated or table doesn't exist yet */ }
+
   // Reset any rows that were checked with the broken pipeline (no image found but pipeline was wrong)
   await client.execute(`UPDATE tokens SET image_checked = 0 WHERE image_url IS NULL AND image_checked = 1`);
 

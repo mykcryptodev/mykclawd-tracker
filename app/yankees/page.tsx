@@ -66,8 +66,14 @@ function getOpponent(game: MlbGame): MlbTeamEntry {
   return isYankeesHome(game) ? game.teams.away : game.teams.home;
 }
 
+function isPostponed(game: MlbGame): boolean {
+  // MLB marks rainouts/suspensions in detailedState ("Postponed", "Suspended", "Cancelled")
+  return /postponed|suspended|cancelled|canceled/i.test(game.status.detailedState);
+}
+
 function gameResult(game: MlbGame): "W" | "L" | "T" | null {
   const state = game.status.abstractGameState;
+  if (isPostponed(game)) return null;
   if (state !== "Final") return null;
   const yank = getYankees(game);
   if (yank.score === undefined) return null;
@@ -166,7 +172,7 @@ interface PolyBet {
   amount: number;
   odds: number;
   payout: number | null;
-  result: "WIN" | "LOSS" | null;
+  result: "WIN" | "LOSS" | "VOID" | null;
   profit: number | null;
   note: string | null;
   betPlaced: boolean;
@@ -393,17 +399,21 @@ export default function YankeesPage() {
                               const ys = getYankees(g);
                               const state = g.status.abstractGameState;
 
+                              const postponed = isPostponed(g);
+
                               let chipColor = "bg-muted/60 text-muted-foreground";
                               if (colorMode === "yankee") {
                                 if (result === "W") chipColor = "bg-green-500/20 text-green-400";
                                 if (result === "L") chipColor = "bg-red-500/20 text-red-400";
                                 if (state === "Live") chipColor = "bg-yellow-500/20 text-yellow-400 animate-pulse";
+                                if (postponed) chipColor = "bg-sky-500/15 text-sky-400";
                               } else {
                                 // Bet W/L mode
                                 const bet = betsByDate[key];
                                 if (bet) {
                                   if (bet.result === "WIN") chipColor = "bg-green-500/20 text-green-400";
                                   else if (bet.result === "LOSS") chipColor = "bg-red-500/20 text-red-400";
+                                  else if (bet.result === "VOID") chipColor = "bg-sky-500/15 text-sky-400"; // postponed → refunded
                                   else if (state === "Live") chipColor = "bg-yellow-500/20 text-yellow-400 animate-pulse";
                                   else chipColor = "bg-yellow-500/10 text-yellow-500"; // pending / not yet resolved
                                 }
@@ -419,18 +429,19 @@ export default function YankeesPage() {
                                     {/* Home/away dot indicator instead of vs/@ text */}
                                     <span className={`w-1 h-1 rounded-full shrink-0 ${isHome ? "bg-current opacity-70" : "opacity-0"}`} />
                                     <span className="truncate">{abbrev(opp.team.name)}</span>
-                                    {result && (
+                                    {postponed && <span className="ml-auto font-bold shrink-0">PPD</span>}
+                                    {!postponed && result && (
                                       <span className="ml-auto font-bold shrink-0">
                                         {ys.score}–{opp.score}
                                       </span>
                                     )}
-                                    {state === "Live" && <span className="ml-auto font-bold shrink-0">LIVE</span>}
-                                    {state === "Preview" && !g.status.startTimeTBD && (
+                                    {!postponed && state === "Live" && <span className="ml-auto font-bold shrink-0">LIVE</span>}
+                                    {!postponed && state === "Preview" && !g.status.startTimeTBD && (
                                       <span className="ml-auto opacity-70 shrink-0 tabular-nums">
                                         {formatTime(g.gameDate).replace(/:00 (EDT|EST|ET)/, "p").replace(/ (EDT|EST|ET)/, "")}
                                       </span>
                                     )}
-                                    {state === "Preview" && g.status.startTimeTBD && (
+                                    {!postponed && state === "Preview" && g.status.startTimeTBD && (
                                       <span className="ml-auto opacity-70 shrink-0">TBD</span>
                                     )}
                                   </div>
@@ -470,7 +481,12 @@ export default function YankeesPage() {
                               {isHome ? "NYY vs " : "NYY @ "}
                               {opp.team.name}
                             </span>
-                            {result && (
+                            {isPostponed(g) && (
+                              <Badge variant="outline" className="border-sky-500 text-sky-400">
+                                Postponed
+                              </Badge>
+                            )}
+                            {!isPostponed(g) && result && (
                               <Badge
                                 variant="outline"
                                 className={result === "W"
@@ -480,12 +496,12 @@ export default function YankeesPage() {
                                 {result} {ys.score}–{opp.score}
                               </Badge>
                             )}
-                            {state === "Live" && (
+                            {!isPostponed(g) && state === "Live" && (
                               <Badge variant="outline" className="border-yellow-500 text-yellow-400 animate-pulse">
                                 LIVE
                               </Badge>
                             )}
-                            {state === "Preview" && (
+                            {!isPostponed(g) && state === "Preview" && (
                               <Badge variant="outline" className="text-muted-foreground">
                                 {g.status.startTimeTBD ? "TBD" : formatTime(g.gameDate)}
                               </Badge>
@@ -581,16 +597,18 @@ export default function YankeesPage() {
 
                   {/* P&L summary */}
                   {(() => {
-                    const resolved = bets.filter(b => b.result !== null);
-                    const totalProfit = resolved.reduce((s, b) => s + (b.profit ?? 0), 0);
-                    const wins = resolved.filter(b => b.result === "WIN").length;
-                    const totalRisked = resolved.reduce((s, b) => s + b.amount, 0);
+                    // Voided (rained-out) bets are refunded — they don't count as W/L
+                    // and nothing was at risk, so exclude them from record & ROI.
+                    const graded = bets.filter(b => b.result === "WIN" || b.result === "LOSS");
+                    const totalProfit = graded.reduce((s, b) => s + (b.profit ?? 0), 0);
+                    const wins = graded.filter(b => b.result === "WIN").length;
+                    const totalRisked = graded.reduce((s, b) => s + b.amount, 0);
                     const roi = totalRisked > 0 ? (totalProfit / totalRisked) * 100 : 0;
                     return (
                       <div className="grid grid-cols-4 gap-2">
                         {[
                           { label: "Net P&L", value: `${totalProfit >= 0 ? "+" : ""}$${totalProfit.toFixed(2)}`, positive: totalProfit >= 0 },
-                          { label: "Record", value: `${wins}-${resolved.length - wins}`, positive: wins >= resolved.length - wins },
+                          { label: "Record", value: `${wins}-${graded.length - wins}`, positive: wins >= graded.length - wins },
                           { label: "ROI", value: `${roi >= 0 ? "+" : ""}${roi.toFixed(0)}%`, positive: roi >= 0 },
                           { label: "Bets", value: String(bets.length), positive: true },
                         ].map(({ label, value, positive }) => (
@@ -628,12 +646,16 @@ export default function YankeesPage() {
                                 <span className="text-muted-foreground">—</span>
                               ) : b.result === "WIN" ? (
                                 <span className="text-green-400 font-medium">WIN</span>
+                              ) : b.result === "VOID" ? (
+                                <span className="text-sky-400 font-medium" title="Game postponed — market voided & stake refunded">VOID</span>
                               ) : (
                                 <span className="text-red-400 font-medium">LOSS</span>
                               )}
                             </td>
                             <td className="px-2 py-2 font-mono">
-                              {b.profit === null ? (
+                              {b.result === "VOID" ? (
+                                <span className="text-sky-400" title="Stake refunded">Refund</span>
+                              ) : b.profit === null ? (
                                 <span className="text-muted-foreground">—</span>
                               ) : (
                                 <span className={b.profit >= 0 ? "text-green-400" : "text-red-400"}>
@@ -659,6 +681,10 @@ export default function YankeesPage() {
                 <span className="flex items-center gap-1">
                   <span className="w-3 h-3 rounded-sm bg-red-500/20" />
                   {colorMode === "yankee" ? "Loss" : "Bet lost"}
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-3 h-3 rounded-sm bg-sky-500/15" />
+                  {colorMode === "yankee" ? "Postponed" : "Voided / refunded"}
                 </span>
                 {colorMode === "yankee" ? (
                   <span className="flex items-center gap-1">

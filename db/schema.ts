@@ -266,7 +266,8 @@ export const yankeesBets = sqliteTable("yankees_bets", {
   amount: real("amount").notNull(),           // USD bet size
   odds: real("odds").notNull(),              // share price 0–1
   payout: real("payout"),                    // gross payout if win
-  result: text("result", { enum: ["WIN", "LOSS"] }),
+  // VOID = game postponed/rained-out → Polymarket market voided & stake refunded (no W/L, $0 P&L)
+  result: text("result", { enum: ["WIN", "LOSS", "VOID"] }),
   profit: real("profit"),                    // net profit/loss (negative for loss)
   note: text("note"),
   betPlaced: integer("bet_placed", { mode: "boolean" }).notNull().default(true),
