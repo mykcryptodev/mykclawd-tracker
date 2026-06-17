@@ -52,6 +52,22 @@ export async function clearLastSyncedBlock(address: string) {
 
 // ThirdWeb Insight 500s on large time windows; chunk into 30-day slices.
 const TW_CHUNK_DAYS = 30;
+const TW_MAX_RETRIES = 3;
+
+async function insightWithRetry(
+  tw: ReturnType<typeof createThirdwebClient>,
+  params: Parameters<typeof Insight.getContractEvents>[0],
+): Promise<InsightLog[]> {
+  for (let attempt = 1; attempt <= TW_MAX_RETRIES; attempt++) {
+    try {
+      return (await Insight.getContractEvents(params)) as unknown as InsightLog[];
+    } catch (e) {
+      if (attempt === TW_MAX_RETRIES) throw e;
+      await new Promise((r) => setTimeout(r, 1000 * attempt));
+    }
+  }
+  return [];
+}
 
 async function scanOne(
   tw: ReturnType<typeof createThirdwebClient>,
@@ -70,7 +86,7 @@ async function scanOne(
     const chunkEnd = Math.min(chunkStart + chunkSecs - 1, nowTs);
     let page = 0;
     while (true) {
-      const events = (await Insight.getContractEvents({
+      const events = await insightWithRetry(tw, {
         client: tw, chains: [twBase],
         contractAddress: contractAddress as `0x${string}`,
         event: ERC20_TRANSFER, decodeLogs: false,
@@ -82,7 +98,7 @@ async function scanOne(
           sort_by: "block_number", sort_order: "asc",
           limit: 500, page,
         },
-      } as Parameters<typeof Insight.getContractEvents>[0])) as unknown as InsightLog[];
+      } as Parameters<typeof Insight.getContractEvents>[0]);
       if (!events.length) break;
       out.push(...events);
       if (events.length < 500) break;
@@ -218,35 +234,39 @@ export async function ingestAeroTransfers(
     }
   } else {
     // fallback to ThirdWeb Insight
-    tw ??= getClient();
-    for (const { addr, meta } of tokensToScan) {
-      for (const dir of ["in", "out"] as const) {
-        const filterKey: "filter_topic_1" | "filter_topic_2" =
-          dir === "in" ? "filter_topic_2" : "filter_topic_1";
-        const events = await scanOne(tw, addr, filterKey, ADDR_PADDED, fromBlock, sinceTs);
-        for (const e of events) {
-          const from = "0x" + e.topics[1].slice(26);
-          const to = "0x" + e.topics[2].slice(26);
-          const rawAmount = BigInt(e.data).toString();
-          const blockTimestamp = e.block_timestamp;
-          const counterparty = dir === "in" ? from : to;
-          const result = await db.insert(aeroTransfers).values({
-            txHash: e.transaction_hash as string,
-            logIndex: Number(e.log_index),
-            blockNumber: Number(e.block_number),
-            blockTimestamp,
-            tokenAddress: addr.toLowerCase(),
-            symbol: meta.sym,
-            decimals: meta.dec,
-            direction: dir,
-            counterparty,
-            rawAmount,
-            walletAddress: pos.address.toLowerCase(),
-          }).onConflictDoNothing().run();
-          if (changedRows(result) > 0) newRows++;
-          if (Number(e.block_number) > maxBlockSeen) maxBlockSeen = Number(e.block_number);
+    try {
+      tw ??= getClient();
+      for (const { addr, meta } of tokensToScan) {
+        for (const dir of ["in", "out"] as const) {
+          const filterKey: "filter_topic_1" | "filter_topic_2" =
+            dir === "in" ? "filter_topic_2" : "filter_topic_1";
+          const events = await scanOne(tw, addr, filterKey, ADDR_PADDED, fromBlock, sinceTs);
+          for (const e of events) {
+            const from = "0x" + e.topics[1].slice(26);
+            const to = "0x" + e.topics[2].slice(26);
+            const rawAmount = BigInt(e.data).toString();
+            const blockTimestamp = e.block_timestamp;
+            const counterparty = dir === "in" ? from : to;
+            const result = await db.insert(aeroTransfers).values({
+              txHash: e.transaction_hash as string,
+              logIndex: Number(e.log_index),
+              blockNumber: Number(e.block_number),
+              blockTimestamp,
+              tokenAddress: addr.toLowerCase(),
+              symbol: meta.sym,
+              decimals: meta.dec,
+              direction: dir,
+              counterparty,
+              rawAmount,
+              walletAddress: pos.address.toLowerCase(),
+            }).onConflictDoNothing().run();
+            if (changedRows(result) > 0) newRows++;
+            if (Number(e.block_number) > maxBlockSeen) maxBlockSeen = Number(e.block_number);
+          }
         }
       }
+    } catch (e) {
+      console.warn(`[aero] ThirdWeb Insight fallback failed: ${(e as Error).message} — skipping transfer fetch this run`);
     }
   }
 

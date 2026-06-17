@@ -157,29 +157,37 @@ export async function discoverAeroPosition(address: string, daysBack = 14): Prom
   const sinceTs = Math.floor(Date.now() / 1000) - daysBack * 86400;
 
   // AERO senders (i.e. gauges that paid this address)
-  const senders = await fetchAeroRewardSendersSql(address, sinceTs) ?? await (async () => {
-    const tw = clientId ? createThirdwebClient({ clientId }) : createThirdwebClient({ secretKey: secretKey! });
+  const sqlSenders = await fetchAeroRewardSendersSql(address, sinceTs);
+  let senders: Set<string>;
+  if (sqlSenders !== null) {
+    senders = sqlSenders;
+  } else {
     const fallbackSenders = new Set<string>();
-    let page = 0;
-    while (true) {
-      const events = (await Insight.getContractEvents({
-        client: tw, chains: [twBase],
-        contractAddress: AERO_AERO as `0x${string}`,
-        event: ERC20_TRANSFER, decodeLogs: false,
-        queryOptions: {
-          filter_block_timestamp_gte: sinceTs,
-          filter_topic_2: ADDR_PADDED,
-          sort_by: "block_number", sort_order: "desc",
-          limit: 500, page,
-        },
-      } as Parameters<typeof Insight.getContractEvents>[0])) as unknown as InsightLog[];
-      if (!events.length) break;
-      for (const e of events) fallbackSenders.add(("0x" + e.topics[1].slice(26)).toLowerCase());
-      if (events.length < 500) break;
-      page++;
+    try {
+      const tw = clientId ? createThirdwebClient({ clientId }) : createThirdwebClient({ secretKey: secretKey! });
+      let page = 0;
+      while (true) {
+        const events = (await Insight.getContractEvents({
+          client: tw, chains: [twBase],
+          contractAddress: AERO_AERO as `0x${string}`,
+          event: ERC20_TRANSFER, decodeLogs: false,
+          queryOptions: {
+            filter_block_timestamp_gte: sinceTs,
+            filter_topic_2: ADDR_PADDED,
+            sort_by: "block_number", sort_order: "desc",
+            limit: 500, page,
+          },
+        } as Parameters<typeof Insight.getContractEvents>[0])) as unknown as InsightLog[];
+        if (!events.length) break;
+        for (const e of events) fallbackSenders.add(("0x" + e.topics[1].slice(26)).toLowerCase());
+        if (events.length < 500) break;
+        page++;
+      }
+    } catch (e) {
+      console.warn(`[aero] ThirdWeb Insight fallback failed in discoverAeroPosition: ${(e as Error).message}`);
     }
-    return fallbackSenders;
-  })();
+    senders = fallbackSenders;
+  }
 
   // Probe each AERO sender — pick the first one whose rewardToken==AERO and stakedValues(address) is non-empty.
   for (const g of senders) {
