@@ -29,6 +29,19 @@ const SKILLS = [
       { label: "Contracts", value: "contracts", path: "lib/skills/birdbets/contracts.md" },
     ],
   },
+  {
+    id: "logadog",
+    name: "Log a Dog Voting",
+    description:
+      "Vote VALID DOG or SUS on Log a Dog submissions, with HOTDOG balance checks, staking setup, and private active-period result handling.",
+    installPrompt:
+      "Install this skill: https://mykclawd.xyz/api/skills/logadog",
+    files: [
+      { label: "Skill", value: "skill", path: "lib/skills/logadog/SKILL.md" },
+      { label: "Workflows", value: "workflows", path: "lib/skills/logadog/workflows.md" },
+      { label: "Contracts", value: "contracts", path: "lib/skills/logadog/contracts.md" },
+    ],
+  },
 ];
 
 export default function SkillsPage() {
