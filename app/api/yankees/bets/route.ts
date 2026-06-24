@@ -57,7 +57,7 @@ const SEED_BETS = [
   { date: "2026-06-17", opponent: "CWS", side: "YES" as const, amount: 15.0, odds: 0.625, payout: 23.809521, result: "WIN" as const, profit: 8.81, note: "3-game win streak + Game 2 of CHW series + Yankees lead 1-0. Rule 1: YES $15 high confidence.", betPlaced: true, tweetId: "2067096208565207392", createdAt: new Date().toISOString() },
   { date: "2026-06-18", opponent: "CHW", side: "YES" as const, amount: 15.0, odds: 0.585, payout: 25.423727, result: "LOSS" as const, profit: -15, note: "4-game win streak + Game 3 of CHW series, Yankees lead 2-0. Rule 1: YES $15 high confidence.", betPlaced: true, tweetId: null, createdAt: new Date().toISOString() },
   { date: "2026-06-19", opponent: "CIN", side: "YES" as const, amount: 10, odds: 0.4152, payout: 14.084506, result: "WIN" as const, profit: 4.08, note: "Bounce-back rule: lost exactly 1 (June 18 vs CHW) after 4-game win streak (June 13-17). Retry after order manager rejection.", betPlaced: true, tweetId: null, createdAt: new Date().toISOString() },
-  { date: "2026-06-23", opponent: "DET", side: "NO" as const, amount: 10.0, odds: 0.3243, payout: 20.833332, result: null, profit: null, note: "3-game losing streak (L vs CIN x2, L vs DET G1). Rule 4: NO $10 loss streak.", betPlaced: true, tweetId: "2069271772843712921", createdAt: new Date().toISOString() },
+  { date: "2026-06-23", opponent: "DET", side: "NO" as const, amount: 10.0, odds: 0.3243, payout: 20.833332, result: "LOSS" as const, profit: -10.0, note: "3-game losing streak (L vs CIN x2, L vs DET G1). Rule 4: NO $10 loss streak.", betPlaced: true, tweetId: "2069271772843712921", createdAt: new Date().toISOString() },
 ] satisfies (typeof yankeesBets.$inferInsert)[];
 
 export async function GET() {
