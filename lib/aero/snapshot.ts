@@ -1,6 +1,6 @@
 // Compute a full snapshot of strategy state from cached transfers + live on-chain reads.
 
-import { createPublicClient, http, parseAbi } from "viem";
+import { createPublicClient, http, parseAbi, ContractFunctionExecutionError, ContractFunctionRevertedError } from "viem";
 import { base } from "viem/chains";
 import { db } from "../../db/client";
 import { aeroTransfers, aeroSnapshots } from "../../db/schema";
@@ -25,6 +25,30 @@ const gaugeAbi = parseAbi([
 const poolAbi = parseAbi([
   "function slot0() view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, bool unlocked)",
 ]);
+
+// Thrown when a supposedly-staked tokenId reverts on the NPM/gauge read.
+// This can only happen when the gauge's stakedValues() and the NPM's positions()
+// are read at different block heights (public-RPC node/block skew) — the NFT lives
+// in the gauge while staked and can't be burned, so the two views are momentarily
+// inconsistent. The read is therefore unreliable: skip this address for this cycle
+// rather than computing/saving/alerting on garbage. Genuine closure surfaces instead
+// as an empty stakedValues() → re-discovery → position: null (handled separately).
+export class AeroInconsistentReadError extends Error {
+  constructor(public readonly tokenId: string, options?: { cause?: unknown }) {
+    super(
+      `Aero position read for staked tokenId ${tokenId} reverted — gauge↔NPM block skew; skipping this address this cycle`,
+      options,
+    );
+    this.name = "AeroInconsistentReadError";
+  }
+}
+
+function isContractRevert(e: unknown): boolean {
+  return (
+    e instanceof ContractFunctionExecutionError &&
+    e.walk((err) => err instanceof ContractFunctionRevertedError) instanceof ContractFunctionRevertedError
+  );
+}
 
 // ───── price helpers ─────
 type PriceSeries = Array<[number, number]>;
@@ -208,13 +232,23 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
   let posT0 = 0n, posT1 = 0n, pendingAero = 0n;
   const positions: AeroSnapshot["positions"] = [];
   for (const tid of pos.stakedTokenIds) {
-    const p = await rpc.readContract({
-      address: AERO_NPM as `0x${string}`, abi: npmAbi, functionName: "positions", args: [tid],
-    }) as readonly [bigint, string, string, string, number, number, number, bigint, bigint, bigint, bigint, bigint];
-    const earned = (await rpc.readContract({
-      address: pos.gauge as `0x${string}`, abi: gaugeAbi, functionName: "earned",
-      args: [pos.address as `0x${string}`, tid],
-    })) as bigint;
+    let p: readonly [bigint, string, string, string, number, number, number, bigint, bigint, bigint, bigint, bigint];
+    let earned: bigint;
+    try {
+      p = await rpc.readContract({
+        address: AERO_NPM as `0x${string}`, abi: npmAbi, functionName: "positions", args: [tid],
+      }) as readonly [bigint, string, string, string, number, number, number, bigint, bigint, bigint, bigint, bigint];
+      earned = (await rpc.readContract({
+        address: pos.gauge as `0x${string}`, abi: gaugeAbi, functionName: "earned",
+        args: [pos.address as `0x${string}`, tid],
+      })) as bigint;
+    } catch (e) {
+      // A staked tokenId that reverts is an inconsistent read (gauge↔NPM block skew).
+      // Abort the snapshot for this address so we never persist/alert on garbage.
+      // Anything that isn't a contract revert (RPC/network) is a real failure — rethrow.
+      if (isContractRevert(e)) throw new AeroInconsistentReadError(tid.toString(), { cause: e });
+      throw e;
+    }
     pendingAero += earned;
     const tickLower = Number(p[5]);
     const tickUpper = Number(p[6]);

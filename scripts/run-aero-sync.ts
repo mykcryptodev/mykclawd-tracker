@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { runMigrations } from "../db/migrate";
 import { ingestAeroMonitor, setMonitoredAddress } from "../lib/aero";
+import { AeroInconsistentReadError } from "../lib/aero/snapshot";
 
 const ADDRESSES = [
   { address: "0xf142022273602c6a6c0ea7a044d21082273bd686", label: "mykclawd" },
@@ -10,10 +11,25 @@ const ADDRESSES = [
 
 async function main() {
   await runMigrations();
+  let hadError = false;
   for (const { address, label } of ADDRESSES) {
     console.log(`\n=== Running aero monitor for ${label} (${address}) ===`);
     await setMonitoredAddress(address);
-    const r = await ingestAeroMonitor(14);
+    let r: Awaited<ReturnType<typeof ingestAeroMonitor>>;
+    try {
+      r = await ingestAeroMonitor(14);
+    } catch (e) {
+      // Known transient (inconsistent gauge↔NPM read): skip this address this cycle,
+      // don't fail the whole job — the other addresses still need to sync, and the
+      // next run gets a consistent read. Any other error is real: rethrow → fail red.
+      if (e instanceof AeroInconsistentReadError) {
+        console.warn(`[aero] ${label}: ${e.message}`);
+        continue;
+      }
+      console.error(`[aero] ${label} failed:`, e);
+      hadError = true;
+      continue;
+    }
     console.log("Position:", r.position ? `${r.position.tokenMeta0.sym}/${r.position.tokenMeta1.sym}` : "none");
     console.log("New transfers:", r.newTransfers);
     if (r.snapshot) {
@@ -28,5 +44,6 @@ async function main() {
       console.log(`Monitor: ${r.monitor.level}${r.monitor.reasons.length ? " — " + r.monitor.reasons[0] : ""}${r.monitor.sent ? " [alert sent]" : ""}`);
     }
   }
+  if (hadError) process.exit(1);
 }
 main().catch(e => { console.error(e); process.exit(1); });
