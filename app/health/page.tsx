@@ -30,6 +30,12 @@ interface HealthSnapshot {
     freeBytes: number;
     usedPercent: number;
   } | null;
+  swap: {
+    totalBytes: number;
+    usedBytes: number;
+    freeBytes: number;
+    usedPercent: number;
+  } | null;
   cpu: {
     model: string;
     cores: number;
@@ -173,6 +179,46 @@ export default async function HealthPage() {
                       </div>
                     </CardContent>
                   </Card>
+
+                  {/* Swap */}
+                  {data.swap && (
+                    <Card className="border-border/60">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
+                          Swap
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="flex flex-col gap-3">
+                        {data.swap.totalBytes === 0 ? (
+                          <div className="text-sm text-muted-foreground">No swap configured</div>
+                        ) : (
+                          <>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="font-mono">
+                                {formatBytes(data.swap.usedBytes)} / {formatBytes(data.swap.totalBytes)}
+                              </span>
+                              <span
+                                className={`font-mono font-semibold ${
+                                  data.swap.usedPercent > 90
+                                    ? "text-red-500"
+                                    : data.swap.usedPercent > 70
+                                    ? "text-yellow-500"
+                                    : "text-green-500"
+                                }`}
+                              >
+                                {data.swap.usedPercent.toFixed(1)}%
+                              </span>
+                            </div>
+                            <ProgressBar value={data.swap.usedPercent} />
+                            <div className="grid grid-cols-2 gap-2 mt-1">
+                              <StatRow label="Free" value={formatBytes(data.swap.freeBytes)} />
+                              <StatRow label="Total" value={formatBytes(data.swap.totalBytes)} />
+                            </div>
+                          </>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
 
                   {/* Disk */}
                   {data.disk && (
