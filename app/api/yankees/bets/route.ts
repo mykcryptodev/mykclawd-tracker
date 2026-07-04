@@ -65,7 +65,7 @@ const SEED_BETS = [
   { date: "2026-06-29", opponent: "DET", side: "NO" as const, amount: 10.0, odds: 0.3056, payout: 22.727271, result: "WIN" as const, profit: 12.73, note: "Rule 4: 4-game loss streak (L June 25, 26, 27, 28). NO bet on Yankees, betting DET to win.", betPlaced: true, tweetId: "2071600055446835424", createdAt: new Date().toISOString() },
   { date: "2026-06-30", opponent: "DET", side: "NO" as const, amount: 10, odds: 0.3075, payout: 22.522521, result: "WIN" as const, profit: 12.52, note: "Rule 4: 9-game loss streak. Betting DET wins.", betPlaced: true, tweetId: null, createdAt: new Date().toISOString() },
   { date: "2026-07-01", opponent: "DET", side: "NO" as const, amount: 10.0, odds: 0.3056, payout: 22.727271, result: "WIN" as const, profit: 12.73, note: "Rule 4: 6-game loss streak (L June 25-30). Also Rule 5: DET leads series 2-0, Game 3. Tigers 6, Yankees 2 (11 inn.) — DET swept series. NO bet hit.", betPlaced: true, tweetId: "2072170081396699420", createdAt: new Date().toISOString() },
-  { date: "2026-07-03", opponent: "MIN", side: "NO" as const, amount: 10.0, odds: 0.2806, payout: 25.641024, result: null, profit: null, note: "Rule 4: 7-game loss streak (L June 25 - July 1). Yankees 48-38, betting MIN to win.", betPlaced: true, tweetId: "2072619502873829596", createdAt: new Date().toISOString() },
+  { date: "2026-07-03", opponent: "MIN", side: "NO" as const, amount: 10.0, odds: 0.2806, payout: 25.641024, result: "LOSS" as const, profit: -10.0, note: "Rule 4: 7-game loss streak (L June 25 - July 1). Yankees 48-38, betting MIN to win.", betPlaced: true, tweetId: "2073256709397647515", createdAt: new Date().toISOString() },
 ] satisfies (typeof yankeesBets.$inferInsert)[];
 
 export async function GET() {
