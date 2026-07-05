@@ -17,7 +17,7 @@ metadata:
 ## Key Capabilities
 
 - **Dog ID Parsing**: Extract the dog ID from `https://www.logadog.xyz/dog/<id>` URLs or use a provided numeric dog ID.
-- **Vote Setup**: Check HOTDOG balance, current Season 4 staking status, and available unlocked stake before voting.
+- **Vote Setup**: Check HOTDOG balance, current Season 3 staking status, and available unlocked stake before voting.
 - **Token Acquisition**: If the user lacks enough HOTDOG, route them through Bankr's Base swap/buy tooling after explicit approval.
 - **Staking**: If the user is not staked, route them through HOTDOG approval and staking after explicit approval.
 - **Voting**: Vote `VALID DOG` or `SUS` from the user's Bankr wallet with `AttestationManager.attestToLog`.
@@ -38,7 +38,7 @@ The happy path is:
 
 1. Parse the dog ID and verdict.
 2. Confirm the dog is still in an active attestation period.
-3. Confirm the Bankr wallet has enough available Season 4 HOTDOG stake.
+3. Confirm the Bankr wallet has enough available Season 3 HOTDOG stake.
 4. If not, acquire HOTDOG with Bankr, approve the staking contract, and stake.
 5. Submit `attestToLog(logId, isValid, stakeAmount)` from the user's wallet.
 

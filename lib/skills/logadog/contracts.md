@@ -10,7 +10,7 @@ These values are for Base mainnet. If the live Log a Dog app publishes newer add
 ## Contracts
 
 - HOTDOG token: `0x61f47EC6D1d0ef9b095574D7b76cF0467d13fB07`
-- Season 4 voting/staking contract: `0x42B32e8de4eC9cc53825bcd61D4d29A724BC9f54`
+- Season 3 voting/staking contract: `0x42B32e8de4eC9cc53825bcd61D4d29A724BC9f54`
 - Attestation manager: `0xf890Ba81bA07aEf61320e1500AbB141BC3316fdC`
 - Log a Dog contract: `0x6CfB88C8d0d7FFC563155e13C62b4Fa17bc25974`
 
@@ -135,7 +135,8 @@ These values are for Base mainnet. If the live Log a Dog app publishes newer add
 
 ## Season Timing
 
-- Season: `4`
+- Season: `3`
+- Contract season index: `4`
 - Staking season start: `1783173600` (`2026-07-04T14:00:00Z`)
 - Staking reward end: `1788839940` (`2026-09-08T03:59:00Z`)
 

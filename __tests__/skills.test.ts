@@ -31,13 +31,13 @@ describe("Bankr skill docs", () => {
     const contracts = read("lib/skills/logadog/contracts.md");
 
     expect(skill).toContain("Vote `VALID DOG` or `SUS`");
-    expect(skill).toContain("Season 4");
+    expect(skill).toContain("Season 3");
     expect(skill).toContain("Do not use thirdweb Engine");
     expect(workflows).toContain("AttestationManager.attestToLog");
     expect(workflows).toContain("Bankr's swap capability on Base");
     expect(workflows).toContain("Staking.canParticipateInAttestation");
-    expect(contracts).toContain("Season 4 voting/staking contract");
+    expect(contracts).toContain("Season 3 voting/staking contract");
     expect(contracts).toContain("0x42B32e8de4eC9cc53825bcd61D4d29A724BC9f54");
-    expect(`${skill}\n${workflows}\n${contracts}`).not.toContain("Season 3");
+    expect(`${skill}\n${workflows}\n${contracts}`).not.toContain("Season 4");
   });
 });
