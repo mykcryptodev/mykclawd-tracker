@@ -12,15 +12,15 @@ metadata:
 
 # Log a Dog Voting Skill Overview
 
-**Log a Dog** is a Base app where users log dog photos and judges vote whether each dog is valid or sus. This skill helps agents prepare a Bankr wallet, stake HOTDOG when needed, and cast a verdict during the dog attestation window.
+**Log a Dog** is a Base app where users log dog photos and judges vote whether each dog is valid or sus. This skill helps agents prepare a Bankr wallet, acquire and stake HOTDOG when needed, and cast the same on-chain verdict the app casts during the dog attestation window.
 
 ## Key Capabilities
 
 - **Dog ID Parsing**: Extract the dog ID from `https://www.logadog.xyz/dog/<id>` URLs or use a provided numeric dog ID.
-- **Vote Setup**: Check HOTDOG balance, current Season 3 staking status, and available unlocked stake before voting.
-- **Token Acquisition**: If the user lacks enough HOTDOG, ask permission before swapping into HOTDOG on Base.
-- **Staking**: Ask how much HOTDOG to stake when setup is required; default to the user's entire HOTDOG wallet balance.
-- **Voting**: Vote `VALID DOG` or `SUS` according to the user's requested verdict.
+- **Vote Setup**: Check HOTDOG balance, current Season 4 staking status, and available unlocked stake before voting.
+- **Token Acquisition**: If the user lacks enough HOTDOG, route them through Bankr's Base swap/buy tooling after explicit approval.
+- **Staking**: If the user is not staked, route them through HOTDOG approval and staking after explicit approval.
+- **Voting**: Vote `VALID DOG` or `SUS` from the user's Bankr wallet with `AttestationManager.attestToLog`.
 - **Result Privacy**: Do not share current vote outcomes while the voting period is still active.
 
 ## Before Voting
@@ -34,6 +34,14 @@ Users must:
 
 If the wallet is not set up to vote, guide the user through HOTDOG acquisition and staking before attempting the vote. Ask for explicit permission before any swap and before any staking or voting transaction.
 
+The happy path is:
+
+1. Parse the dog ID and verdict.
+2. Confirm the dog is still in an active attestation period.
+3. Confirm the Bankr wallet has enough available Season 4 HOTDOG stake.
+4. If not, acquire HOTDOG with Bankr, approve the staking contract, and stake.
+5. Submit `attestToLog(logId, isValid, stakeAmount)` from the user's wallet.
+
 ## Primary Data Sources
 
 - App URL pattern: `https://www.logadog.xyz/dog/<dogId>`
@@ -41,6 +49,8 @@ If the wallet is not set up to vote, guide the user through HOTDOG acquisition a
 - Workflows reference: `https://mykclawd.xyz/api/skills/logadog/workflows`
 
 Use Base mainnet (`chainId: 8453`) unless the user explicitly asks for a supported testnet flow.
+
+Do not use thirdweb Engine or a server/operator wallet for the vote. The Log a Dog app now sends votes directly from the user's wallet, and this skill should do the same.
 
 ## Important Privacy Rule
 

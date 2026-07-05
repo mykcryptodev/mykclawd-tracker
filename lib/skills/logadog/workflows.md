@@ -2,6 +2,8 @@
 
 These workflows assume a Bankr wallet on Base mainnet.
 
+The goal is to mirror the Log a Dog app's current user-wallet path: acquire and stake HOTDOG when needed, then call `AttestationManager.attestToLog` from the user's wallet. Do not use a server wallet, thirdweb Engine, or `attestToLogOnBehalf`.
+
 ## Parse Dog ID And Verdict
 
 Inputs required from the user:
@@ -56,6 +58,7 @@ HOTDOG.allowance(wallet, stakingContract)
 Staking.stakes(wallet)
 Staking.lockedForAttestation(wallet)
 Staking.getAvailableStake(wallet)
+Staking.canParticipateInAttestation(wallet, voteStakeAmount)
 AttestationManager.MINIMUM_ATTESTATION_STAKE()
 Staking.MINIMUM_STAKE()
 ```
@@ -65,6 +68,7 @@ Interpretation:
 - `MINIMUM_ATTESTATION_STAKE` is the minimum HOTDOG amount that can be locked behind a dog vote. It is currently `30,000 HOTDOG`.
 - `Staking.MINIMUM_STAKE` is the minimum amount accepted by the staking contract for a stake transaction. It is currently `300,000 HOTDOG`.
 - `getAvailableStake(wallet)` must be at least the vote stake amount before voting.
+- `canParticipateInAttestation(wallet, voteStakeAmount)` must return `true` before voting.
 - `lockedForAttestation(wallet)` is already committed to active votes and cannot be reused until those periods resolve.
 
 If available stake is already at least `MINIMUM_ATTESTATION_STAKE`, the wallet is set up to vote. Continue to "Vote Valid Or Sus".
@@ -73,8 +77,8 @@ If available stake is insufficient:
 
 1. Explain that the wallet is not set up to vote because it lacks enough available HOTDOG staked in the voting contract.
 2. Check the wallet's liquid HOTDOG balance.
-3. Ask how much HOTDOG the user wants to stake. Default to the entire liquid HOTDOG balance.
-4. If the amount to stake is below `Staking.MINIMUM_STAKE`, explain the minimum and ask whether they want to acquire enough HOTDOG to reach it.
+3. Ask how much HOTDOG the user wants to stake. Default to the entire liquid HOTDOG balance if it is at least `Staking.MINIMUM_STAKE`.
+4. If the wallet has no HOTDOG or the amount to stake is below `Staking.MINIMUM_STAKE`, explain the minimum and offer to acquire enough HOTDOG through Bankr on Base.
 5. If liquid HOTDOG is insufficient for the selected stake amount, ask permission to swap enough Base assets into HOTDOG. Do not swap without explicit approval.
 6. After any swap completes, re-check `HOTDOG.balanceOf(wallet)`.
 7. If `allowance(wallet, stakingContract)` is below the selected stake amount, submit `HOTDOG.approve(stakingContract, selectedStakeAmount)` and wait for confirmation.
@@ -92,7 +96,7 @@ Before swapping:
 
 - Ask for explicit permission.
 - State the token being acquired: `HOTDOG`.
-- State the approximate amount needed.
+- State the approximate amount needed. If the wallet has no HOTDOG and no stake, the normal setup amount is at least `Staking.MINIMUM_STAKE` (`300,000 HOTDOG`) plus a small cushion for slippage.
 - Prefer swapping only enough to satisfy the requested staking amount plus a small slippage cushion.
 
 After swapping:
@@ -115,8 +119,9 @@ Before submitting:
 1. Confirm the dog ID and verdict with the user.
 2. Confirm the vote stake amount if it is greater than `MINIMUM_ATTESTATION_STAKE`.
 3. Confirm `getAvailableStake(wallet) >= voteStakeAmount`.
-4. Confirm the attestation period is active.
-5. Confirm the user has not already voted on the dog.
+4. Confirm `canParticipateInAttestation(wallet, voteStakeAmount)` is `true`.
+5. Confirm the attestation period is active.
+6. Confirm the user has not already voted on the dog.
 
 Submit from the user's wallet:
 
@@ -125,6 +130,7 @@ AttestationManager.attestToLog(logId, isValid, voteStakeAmount)
 ```
 
 Do not use `attestToLogOnBehalf`; it is reserved for authorized operator wallets.
+Do not re-encode this as a generic `judge` or operator call. The active app flow calls `attestToLog` directly from the connected wallet.
 
 After confirmation:
 
