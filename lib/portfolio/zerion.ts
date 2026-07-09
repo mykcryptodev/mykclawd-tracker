@@ -1,31 +1,36 @@
 /**
- * Zerion REST API client — positions + per-token PnL on Base.
+ * Zerion REST API client — positions, wallet NAV history, and per-token PnL on Base.
  *
- * Replaces the Zapper GraphQL client for live holdings data.
  * Auth: HTTP Basic with API key as the username, empty password.
  */
 
 const BASE_URL = "https://api.zerion.io/v1";
 const CHAIN = "base";
 const MIN_VALUE_USD = 0.01;
+const MAX_POSITION_PAGES = 10;
+
+/** Native ETH on Base, normalized to Basescan's zero-address convention. */
+export const NATIVE_ETH_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 function authHeader(): string {
   const key = process.env.ZERION_API_KEY ?? "";
   return "Basic " + Buffer.from(`${key}:`).toString("base64");
 }
 
-async function zerionFetch<T>(path: string): Promise<T> {
+async function zerionFetch<T>(pathOrUrl: string): Promise<T> {
   // Zerion requires a trailing slash — without it they return 301 which strips the
   // Authorization header on redirect (standard browser/fetch security behavior).
-  const [pathname, qs] = path.split("?");
-  const slashedPath = pathname.endsWith("/") ? pathname : `${pathname}/`;
-  const url = `${BASE_URL}${slashedPath}${qs ? "?" + qs : ""}`;
-  const res = await fetch(url, {
+  const isAbsolute = pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://");
+  const rawUrl = isAbsolute ? pathOrUrl : `${BASE_URL}${pathOrUrl}`;
+  const parsed = new URL(rawUrl);
+  if (!parsed.pathname.endsWith("/")) parsed.pathname = `${parsed.pathname}/`;
+
+  const res = await fetch(parsed.toString(), {
     headers: { Authorization: authHeader(), Accept: "application/json" },
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Zerion ${path} → ${res.status}: ${text.slice(0, 200)}`);
+    throw new Error(`Zerion ${pathOrUrl} -> ${res.status}: ${text.slice(0, 200)}`);
   }
   return res.json() as Promise<T>;
 }
@@ -43,7 +48,7 @@ interface ZerionPositionAttributes {
     symbol: string;
     icon: { url: string } | null;
     flags: { verified: boolean };
-    implementations: Array<{ chain_id: string; address: string; decimals: number }>;
+    implementations: Array<{ chain_id: string; address: string | null; decimals: number }>;
   };
 }
 
@@ -78,10 +83,20 @@ interface ZerionPnlResponse {
   };
 }
 
+interface ZerionChartResponse {
+  data: {
+    type: "wallet_chart";
+    id: string;
+    attributes: {
+      points: Array<[number, number]>;
+    };
+  };
+}
+
 // ─── Exported shapes ─────────────────────────────────────────────────────────
 
 export interface ZerionToken {
-  tokenAddress: string; // lowercase contract address, or "native" for ETH
+  tokenAddress: string; // lowercase contract address, or zero address for native ETH
   symbol: string;
   name: string;
   imgUrl: string | null;
@@ -108,21 +123,33 @@ export interface ZerionTokenPnl {
 export interface ZerionHoldings {
   tokens: ZerionToken[];
   nativeEth: ZerionToken | null;
-  totalUsd: number; // excludes native ETH to match Zapper historical basis
+  totalUsd: number; // includes native ETH, matching Zerion wallet chart history
+}
+
+/** One daily point of the wallet NAV curve. */
+export interface NavTick {
+  /** YYYY-MM-DD (UTC). */
+  date: string;
+  valueUsd: number;
 }
 
 // ─── Positions ────────────────────────────────────────────────────────────────
 
 export async function fetchZerionPositions(address: string): Promise<ZerionHoldings> {
-  const url =
+  let nextUrl: string | null =
     `/wallets/${address}/positions` +
     `?filter[chain_ids]=${CHAIN}` +
     `&filter[position_types]=wallet` +
     `&currency=usd` +
     `&sort=-value`;
 
-  const data = await zerionFetch<ZerionPositionsResponse>(url);
-  const positions = data.data ?? [];
+  const positions: ZerionPosition[] = [];
+
+  for (let page = 0; nextUrl && page < MAX_POSITION_PAGES; page++) {
+    const response: ZerionPositionsResponse = await zerionFetch<ZerionPositionsResponse>(nextUrl);
+    positions.push(...(response.data ?? []));
+    nextUrl = response.links?.next ?? null;
+  }
 
   const tokens: ZerionToken[] = [];
   let nativeEth: ZerionToken | null = null;
@@ -135,10 +162,14 @@ export async function fetchZerionPositions(address: string): Promise<ZerionHoldi
 
     if (value < MIN_VALUE_USD) continue;
 
-    // Find Base implementation address
+    totalUsd += value;
+
+    // Find Base implementation address. Zerion models native gas assets as an
+    // implementation for the chain with `address: null`, not as a missing impl.
     const impl = info.implementations.find((i) => i.chain_id === CHAIN);
-    const isNative = !impl; // ETH has no Base implementation entry
-    const tokenAddress = isNative ? "native" : (impl?.address ?? "").toLowerCase();
+    const implAddress = impl?.address;
+    const isNative = !implAddress;
+    const tokenAddress = implAddress ? implAddress.toLowerCase() : NATIVE_ETH_ADDRESS;
 
     const token: ZerionToken = {
       tokenAddress,
@@ -158,13 +189,46 @@ export async function fetchZerionPositions(address: string): Promise<ZerionHoldi
       nativeEth = token;
     } else {
       tokens.push(token);
-      totalUsd += value;
     }
   }
 
   tokens.sort((a, b) => b.balanceUsd - a.balanceUsd);
 
   return { tokens, nativeEth, totalUsd };
+}
+
+// ─── Wallet NAV chart ────────────────────────────────────────────────────────
+
+/** UTC YYYY-MM-DD for a unix-second timestamp. */
+function secondsToUtcDate(seconds: number): string {
+  return new Date(seconds * 1000).toISOString().slice(0, 10);
+}
+
+/**
+ * Collapse raw Zerion chart points (unix seconds + value) to one ascending value
+ * per UTC day. If Zerion returns multiple points for a day, the last point wins.
+ */
+export function pointsToDailyNav(points: Array<[number, number]>): NavTick[] {
+  const byDate = new Map<string, number>();
+  for (const [timestamp, value] of points) {
+    byDate.set(secondsToUtcDate(timestamp), value);
+  }
+
+  return [...byDate.entries()]
+    .map(([date, valueUsd]) => ({ date, valueUsd }))
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+}
+
+/**
+ * Year of Base wallet NAV ticks from Zerion. The values include native ETH,
+ * matching `fetchZerionPositions().totalUsd`.
+ */
+export async function fetchZerionWalletNav(address: string): Promise<NavTick[]> {
+  const data = await zerionFetch<ZerionChartResponse>(
+    `/wallets/${address}/charts/year?currency=usd&filter[chain_ids]=${CHAIN}`
+  );
+
+  return pointsToDailyNav(data.data?.attributes?.points ?? []);
 }
 
 // ─── Per-token PnL ────────────────────────────────────────────────────────────

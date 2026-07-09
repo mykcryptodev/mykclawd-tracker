@@ -1,10 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  ticksToDailyNav,
-  excludeNativeEth,
-  NATIVE_ETH_ADDRESS,
-  type ZapperToken,
-} from "./zapper";
+  pointsToDailyNav,
+} from "./zerion";
 import {
   daysAgoUtc,
   navAtOrBefore,
@@ -21,16 +18,16 @@ import {
 } from "./orders";
 import type { PortfolioOrder } from "./read";
 
-describe("ticksToDailyNav", () => {
+describe("pointsToDailyNav", () => {
   it("collapses to one ascending value per UTC day (last tick of day wins)", () => {
-    const d1 = Date.UTC(2026, 0, 18, 9, 0); // 2026-01-18 09:00Z
-    const d1b = Date.UTC(2026, 0, 18, 21, 0); // 2026-01-18 21:00Z (later same day)
-    const d2 = Date.UTC(2026, 0, 19, 0, 0); // 2026-01-19
+    const d1 = Date.UTC(2026, 0, 18, 9, 0) / 1000; // 2026-01-18 09:00Z
+    const d1b = Date.UTC(2026, 0, 18, 21, 0) / 1000; // 2026-01-18 21:00Z (later same day)
+    const d2 = Date.UTC(2026, 0, 19, 0, 0) / 1000; // 2026-01-19
 
-    const out = ticksToDailyNav([
-      { timestamp: d2, value: 200 },
-      { timestamp: d1, value: 100 },
-      { timestamp: d1b, value: 150 },
+    const out = pointsToDailyNav([
+      [d2, 200],
+      [d1, 100],
+      [d1b, 150],
     ]);
 
     expect(out).toEqual([
@@ -40,44 +37,7 @@ describe("ticksToDailyNav", () => {
   });
 
   it("returns [] for no ticks", () => {
-    expect(ticksToDailyNav([])).toEqual([]);
-  });
-});
-
-describe("excludeNativeEth", () => {
-  const mk = (tokenAddress: string, balanceUsd: number, balance = 1): ZapperToken => ({
-    tokenAddress,
-    symbol: "X",
-    name: "X",
-    network: "Base",
-    imgUrl: null,
-    price: balanceUsd / balance,
-    balance,
-    balanceRaw: "0",
-    balanceUsd,
-  });
-
-  it("removes native ETH from the list and subtracts it from the total", () => {
-    const tokens = [
-      mk("0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", 3443), // USDC
-      mk(NATIVE_ETH_ADDRESS, 1547, 0.77), // native ETH
-      mk("0x4200000000000000000000000000000000000006", 1511), // WETH
-    ];
-    const out = excludeNativeEth(7684, tokens);
-
-    expect(out.totalUsd).toBe(7684 - 1547);
-    expect(out.tokens.map((t) => t.tokenAddress)).not.toContain(NATIVE_ETH_ADDRESS);
-    expect(out.tokens).toHaveLength(2);
-    expect(out.nativeEth).toEqual({ balance: 0.77, balanceUsd: 1547, price: 1547 / 0.77 });
-  });
-
-  it("leaves total/list untouched and nativeEth null when there is no native ETH", () => {
-    const tokens = [mk("0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", 3443)];
-    const out = excludeNativeEth(3443, tokens);
-
-    expect(out.totalUsd).toBe(3443);
-    expect(out.tokens).toHaveLength(1);
-    expect(out.nativeEth).toBeNull();
+    expect(pointsToDailyNav([])).toEqual([]);
   });
 });
 

@@ -87,7 +87,7 @@ export function NavChart({ series }: Props) {
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <div className="flex flex-col gap-0.5">
           <CardTitle>NAV over time</CardTitle>
-          <span className="text-[11px] text-muted-foreground">Excludes native ETH</span>
+          <span className="text-[11px] text-muted-foreground">Base wallet value incl. native ETH</span>
         </div>
         <div className="flex items-center gap-1">
           {TIMEFRAMES.map((t) => (

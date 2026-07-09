@@ -86,16 +86,16 @@ export const syncState = sqliteTable("sync_state", {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Portfolio NAV (Zapper-sourced) — replaces the transfer-replay PnL model
+// Portfolio NAV (Zerion-sourced) — replaces the transfer-replay PnL model
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Daily net-asset-value series for the history chart. `source` distinguishes our
-// own live snapshots from the one-time Zapper historicalPortfolio backfill so a
+// own live snapshots from the Zerion wallet-chart backfill so a
 // live point for a given day always wins over a backfilled one.
 export const portfolioNav = sqliteTable("portfolio_nav", {
   date: text("date").primaryKey(), // YYYY-MM-DD (UTC)
   valueUsd: real("value_usd").notNull(),
-  source: text("source", { enum: ["live", "zapper_history"] })
+  source: text("source", { enum: ["live", "zerion_history"] })
     .notNull()
     .default("live"),
 });
@@ -125,14 +125,13 @@ export const portfolioPositions = sqliteTable("portfolio_positions", {
   updatedAt: integer("updated_at").notNull(), // unix seconds
 });
 
-// Single-row (id = 1) sync metadata: when we last pulled from Zapper + headline totals.
-// totalUsd / tokenCount EXCLUDE native ETH (so they match Zapper's historical basis);
-// native ETH is tracked separately and shown on its own card, outside NAV.
+// Single-row (id = 1) sync metadata: when we last pulled from Zerion + headline totals.
+// totalUsd / tokenCount include native ETH, matching the Zerion wallet-chart basis.
 export const portfolioSync = sqliteTable("portfolio_sync", {
   id: integer("id").primaryKey(), // always 1
   syncedAt: integer("synced_at").notNull(), // unix seconds
-  totalUsd: real("total_usd").notNull(), // NAV, excludes native ETH
-  tokenCount: integer("token_count").notNull(), // excludes native ETH
+  totalUsd: real("total_usd").notNull(), // NAV, includes native ETH
+  tokenCount: integer("token_count").notNull(), // includes native ETH
   nativeEthBalance: real("native_eth_balance").notNull().default(0),
   nativeEthUsd: real("native_eth_usd").notNull().default(0),
   error: text("error"),

@@ -10,11 +10,6 @@ import {
   lots,
 } from "../../db/schema";
 import { asc, desc, eq } from "drizzle-orm";
-import { NATIVE_ETH_ADDRESS } from "./zapper";
-
-/** Zerion icon for native ETH on Base */
-const ETH_IMG_URL =
-  "https://storage.googleapis.com/zapper-fi-assets/tokens/base/0x0000000000000000000000000000000000000000.png";
 
 export interface NavPoint {
   date: string; // YYYY-MM-DD (UTC)
@@ -88,6 +83,7 @@ export interface PortfolioMeta {
 export interface PortfolioOverview {
   meta: PortfolioMeta | null;
   totalValueUsd: number;
+  /** @deprecated Kept for API compatibility; now the same total-NAV basis as totalValueUsd. */
   navExEthUsd: number;
   series: NavPoint[];
   positions: PortfolioPosition[];
@@ -177,7 +173,7 @@ export function computeDeltas(
 // ── DB reads ─────────────────────────────────────────────────────────────────
 
 export interface NavSeriesRow extends NavPoint {
-  source: "live" | "zapper_history";
+  source: "live" | "zerion_history";
 }
 
 export async function getNavSeries(): Promise<NavSeriesRow[]> {
@@ -320,31 +316,6 @@ export async function getPositions(
   });
 }
 
-function nativeEthPosition(
-  balance: number,
-  usd: number,
-  totalValueUsd: number,
-  ordersMap: Map<string, PortfolioOrder[]>
-): PortfolioPosition {
-  const orders = ordersMap.get("native") ?? ordersMap.get(NATIVE_ETH_ADDRESS.toLowerCase()) ?? [];
-  return {
-    tokenAddress: NATIVE_ETH_ADDRESS,
-    symbol: "ETH",
-    name: "Ethereum",
-    network: "Base",
-    imgUrl: ETH_IMG_URL,
-    price: balance > 0 ? usd / balance : null,
-    balance,
-    balanceUsd: usd,
-    pctOfNav: totalValueUsd > 0 ? (usd / totalValueUsd) * 100 : 0,
-    change1dUsd: null,
-    change1dPct: null,
-    pnl: null,
-    avgCostUsd: null,
-    orders,
-  };
-}
-
 export async function getPortfolioOverview(): Promise<PortfolioOverview> {
   const [meta, navRows, ordersMap] = await Promise.all([
     getPortfolioMeta(),
@@ -352,29 +323,18 @@ export async function getPortfolioOverview(): Promise<PortfolioOverview> {
     getOrdersMap(),
   ]);
 
-  const navExEthUsd = meta?.totalUsd ?? navRows.at(-1)?.valueUsd ?? 0;
-  const nativeEthUsd = meta?.nativeEthUsd ?? 0;
-  const nativeEthBalance = meta?.nativeEthBalance ?? 0;
-  const totalValueUsd = navExEthUsd + nativeEthUsd;
+  const totalValueUsd = meta?.totalUsd ?? navRows.at(-1)?.valueUsd ?? 0;
 
-  const tokenPositions = await getPositions(totalValueUsd, ordersMap);
-
-  const positions =
-    nativeEthBalance > 0 || nativeEthUsd > 0
-      ? [
-          nativeEthPosition(nativeEthBalance, nativeEthUsd, totalValueUsd, ordersMap),
-          ...tokenPositions,
-        ]
-      : tokenPositions;
+  const positions = await getPositions(totalValueUsd, ordersMap);
 
   const series: NavPoint[] = navRows.map((r) => ({ date: r.date, valueUsd: r.valueUsd }));
 
   return {
     meta,
     totalValueUsd,
-    navExEthUsd,
+    navExEthUsd: totalValueUsd,
     series,
     positions,
-    deltas: computeDeltas(series, navExEthUsd),
+    deltas: computeDeltas(series, totalValueUsd),
   };
 }

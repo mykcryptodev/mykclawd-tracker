@@ -64,11 +64,11 @@ export async function runMigrations() {
       value TEXT NOT NULL
     );
 
-    -- Portfolio NAV (Zapper-sourced) tables
+    -- Portfolio NAV (Zerion-sourced) tables
     CREATE TABLE IF NOT EXISTS portfolio_nav (
       date TEXT PRIMARY KEY,
       value_usd REAL NOT NULL,
-      source TEXT NOT NULL DEFAULT 'live' CHECK(source IN ('live', 'zapper_history'))
+      source TEXT NOT NULL DEFAULT 'live' CHECK(source IN ('live', 'zerion_history'))
     );
 
     CREATE TABLE IF NOT EXISTS portfolio_positions (
@@ -205,6 +205,30 @@ export async function runMigrations() {
   // Additive migrations for portfolio_sync native-ETH columns
   try { await client.execute(`ALTER TABLE portfolio_sync ADD COLUMN native_eth_balance REAL NOT NULL DEFAULT 0`); } catch { /* exists */ }
   try { await client.execute(`ALTER TABLE portfolio_sync ADD COLUMN native_eth_usd REAL NOT NULL DEFAULT 0`); } catch { /* exists */ }
+
+  // Rebuild portfolio_nav once the history source moved from Zapper to Zerion.
+  // Existing SQLite CHECK constraints cannot be altered in-place.
+  try {
+    await client.executeMultiple(`
+      CREATE TABLE IF NOT EXISTS portfolio_nav_next (
+        date TEXT PRIMARY KEY,
+        value_usd REAL NOT NULL,
+        source TEXT NOT NULL DEFAULT 'live' CHECK(source IN ('live', 'zerion_history'))
+      );
+      INSERT OR REPLACE INTO portfolio_nav_next (date, value_usd, source)
+      SELECT
+        date,
+        value_usd,
+        CASE
+          WHEN source = 'zapper_history' THEN 'zerion_history'
+          WHEN source = 'zerion_history' THEN 'zerion_history'
+          ELSE 'live'
+        END
+      FROM portfolio_nav;
+      DROP TABLE portfolio_nav;
+      ALTER TABLE portfolio_nav_next RENAME TO portfolio_nav;
+    `);
+  } catch { /* already migrated or empty DB */ }
 
   // Additive migrations for aero_snapshots LP health columns
   try { await client.execute(`ALTER TABLE aero_snapshots ADD COLUMN net_benefit_usd REAL NOT NULL DEFAULT 0`); } catch { /* exists */ }

@@ -14,8 +14,8 @@ import { gt, notInArray } from "drizzle-orm";
 import {
   fetchZerionPositions,
   fetchZerionPnlBatch,
+  fetchZerionWalletNav,
 } from "./zerion";
-import { fetchHistoricalNav } from "./zapper"; // keep historical NAV from Zapper
 import { fetchCowswapOrders } from "../orders/cowswap";
 import { fetchBankrOrders } from "../orders/bankr";
 import { fetchDefinitiveOrders } from "../orders/definitive";
@@ -166,7 +166,7 @@ export async function syncPortfolioNav(
       id: 1,
       syncedAt,
       totalUsd,
-      tokenCount: tokens.length,
+      tokenCount: allTokens.length,
       nativeEthBalance,
       nativeEthUsd,
       error: null,
@@ -176,7 +176,7 @@ export async function syncPortfolioNav(
       set: {
         syncedAt,
         totalUsd,
-        tokenCount: tokens.length,
+        tokenCount: allTokens.length,
         nativeEthBalance,
         nativeEthUsd,
         error: null,
@@ -194,24 +194,24 @@ export async function syncPortfolioNav(
     })
     .run();
 
-  // ── 6. Historical NAV backfill (Zapper — still the best source for history) ─
+  // ── 6. Historical NAV backfill from Zerion, on the same basis as live NAV ──
   let historyTicks = 0;
   try {
-    const ticks = await fetchHistoricalNav(address, "YEAR");
+    const ticks = await fetchZerionWalletNav(address);
     for (const tick of ticks) {
       if (tick.date >= today) continue;
       await db
         .insert(portfolioNav)
-        .values({ date: tick.date, valueUsd: tick.valueUsd, source: "zapper_history" })
+        .values({ date: tick.date, valueUsd: tick.valueUsd, source: "zerion_history" })
         .onConflictDoUpdate({
           target: portfolioNav.date,
-          set: { valueUsd: tick.valueUsd, source: "zapper_history" },
+          set: { valueUsd: tick.valueUsd, source: "zerion_history" },
         })
         .run();
       historyTicks++;
     }
   } catch (e) {
-    console.warn(`  historicalPortfolio backfill skipped: ${(e as Error).message}`);
+    console.warn(`  Zerion wallet chart backfill skipped: ${(e as Error).message}`);
   }
 
   await db.delete(portfolioNav).where(gt(portfolioNav.date, today)).run();
@@ -337,7 +337,7 @@ export async function syncPortfolioNav(
 
   return {
     totalUsd,
-    tokenCount: tokens.length,
+    tokenCount: allTokens.length,
     nativeEthUsd,
     historyTicks,
     syncedAt,
