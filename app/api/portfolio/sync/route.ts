@@ -46,6 +46,17 @@ export async function POST() {
         await syncPortfolioNav();
       } catch (e) {
         console.error("[portfolio/sync] background sync error:", e);
+        // Persist the failure — the 200 already went out, so without this the
+        // sync can break silently while every caller sees success.
+        try {
+          await db
+            .update(portfolioSync)
+            .set({ error: (e as Error).message.slice(0, 500) })
+            .where(eq(portfolioSync.id, 1))
+            .run();
+        } catch {
+          // DB write failed too — nothing more we can do here.
+        }
       }
     });
 

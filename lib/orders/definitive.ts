@@ -11,8 +11,12 @@
 
 import { createHmac } from "crypto";
 
-const FLASH_BASE = "https://ddp.definitive.fi/v2/flash";
-const PORTFOLIO_BASE = "https://ddp.definitive.fi";
+// Definitive moved the Flash host; default to the latest domain while allowing
+// overrides so we can quickly adapt if they change again.
+const FLASH_BASE =
+  process.env.DEFINITIVE_FLASH_BASE?.trim() || "https://flash.definitive.fi/v2/flash";
+const PORTFOLIO_BASE =
+  process.env.DEFINITIVE_PORTFOLIO_BASE?.trim() || "https://flash.definitive.fi";
 
 /** Flash list endpoint max `pageSize` per request (OpenAPI). */
 export const DEFINITIVE_FLASH_PAGE_SIZE = 200;

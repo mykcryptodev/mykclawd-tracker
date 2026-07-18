@@ -295,3 +295,208 @@ export async function fetchZerionPnlBatch(
 
   return result;
 }
+
+// ─── Per-token transactions (trade history for the holding detail page) ───────
+
+interface ZerionTransferAttr {
+  direction: "in" | "out" | "self";
+  quantity: { float: number };
+  price: number | null;
+  value: number | null;
+  fungible_info?: {
+    symbol: string;
+    implementations: Array<{ chain_id: string; address: string | null; decimals: number }>;
+  };
+}
+
+interface ZerionTransaction {
+  id: string;
+  attributes: {
+    operation_type: string;
+    hash: string;
+    mined_at: string; // ISO
+    status: string;
+    transfers: ZerionTransferAttr[];
+  };
+}
+
+interface ZerionTransactionsResponse {
+  data: ZerionTransaction[];
+  links: { next?: string | null };
+}
+
+export type TokenTradeAction = "buy" | "sell" | "send" | "receive" | "other";
+
+export interface TokenTrade {
+  hash: string;
+  minedAt: number; // unix seconds
+  operationType: string;
+  action: TokenTradeAction;
+  /** Quantity of the target token moved in this tx (positive). */
+  tokenQty: number;
+  /** Execution price of the target token at tx time (from Zerion). */
+  tokenPriceUsd: number | null;
+  /** USD value of the target token leg at tx time. */
+  tokenValueUsd: number | null;
+  /** The other side of a trade, e.g. "USDC" / "WETH". */
+  counterSymbol: string | null;
+  counterQty: number | null;
+  counterValueUsd: number | null;
+}
+
+export interface TokenTradeHistory {
+  trades: TokenTrade[];
+  truncated: boolean;
+  maxPages: number;
+}
+
+function transferMatchesToken(t: ZerionTransferAttr, tokenAddress: string, isNative: boolean): boolean {
+  const impl = t.fungible_info?.implementations?.find((i) => i.chain_id === CHAIN);
+  if (!impl) return false;
+  if (isNative) return !impl.address;
+  return (impl.address ?? "").toLowerCase() === tokenAddress;
+}
+
+function classifyAction(operationType: string, direction: "in" | "out" | "self"): TokenTradeAction {
+  if (operationType === "trade") return direction === "in" ? "buy" : "sell";
+  if (direction === "in") return "receive";
+  if (direction === "out") return "send";
+  return "other";
+}
+
+/**
+ * Full transaction history for one token in the tracked wallet, newest first.
+ * Uses Zerion execution-time prices/values — the same source as positions/PnL.
+ */
+export async function fetchTokenTradeHistory(
+  walletAddress: string,
+  tokenAddress: string, // lowercase; zero address = native ETH
+  maxPages = 25
+): Promise<TokenTradeHistory> {
+  const isNative = tokenAddress === NATIVE_ETH_ADDRESS;
+  const tokenFilter = isNative
+    ? `filter[fungible_ids]=eth`
+    : `filter[fungible_implementations]=${encodeURIComponent(`${CHAIN}:${tokenAddress}`)}`;
+
+  let nextUrl: string | null =
+    `/wallets/${walletAddress}/transactions` +
+    `?currency=usd&filter[chain_ids]=${CHAIN}&${tokenFilter}&page[size]=100`;
+
+  const trades: TokenTrade[] = [];
+
+  for (let page = 0; nextUrl && page < maxPages; page++) {
+    const res: ZerionTransactionsResponse = await zerionFetch<ZerionTransactionsResponse>(nextUrl);
+
+    for (const tx of res.data ?? []) {
+      const attr = tx.attributes;
+      if (attr.status !== "confirmed") continue;
+
+      const tokenLegs = (attr.transfers ?? []).filter((t) =>
+        transferMatchesToken(t, tokenAddress, isNative)
+      );
+      if (tokenLegs.length === 0) continue;
+
+      // A tx can have several token legs (e.g. multi-hop); aggregate per direction
+      // and report the dominant one so one row == one user-visible action.
+      const sum = (dir: "in" | "out") =>
+        tokenLegs
+          .filter((t) => t.direction === dir)
+          .reduce(
+            (acc, t) => ({
+              qty: acc.qty + (t.quantity?.float ?? 0),
+              value: acc.value + (t.value ?? 0),
+              price: t.price ?? acc.price,
+            }),
+            { qty: 0, value: 0, price: null as number | null }
+          );
+
+      const inn = sum("in");
+      const out = sum("out");
+      const net = inn.qty - out.qty;
+      if (inn.qty === 0 && out.qty === 0) continue;
+
+      const direction: "in" | "out" = net >= 0 ? "in" : "out";
+      const side = direction === "in" ? inn : out;
+
+      // Counter leg: the largest non-target transfer in the opposite direction.
+      const counter = (attr.transfers ?? [])
+        .filter(
+          (t) =>
+            !transferMatchesToken(t, tokenAddress, isNative) &&
+            t.direction !== direction &&
+            (t.value ?? 0) > 0
+        )
+        .sort((a, b) => (b.value ?? 0) - (a.value ?? 0))[0];
+
+      trades.push({
+        hash: attr.hash,
+        minedAt: Math.floor(new Date(attr.mined_at).getTime() / 1000),
+        operationType: attr.operation_type,
+        action: classifyAction(attr.operation_type, direction),
+        tokenQty: Math.abs(net) > 0 ? Math.abs(net) : side.qty,
+        tokenPriceUsd: side.price,
+        tokenValueUsd: side.value > 0 ? side.value : null,
+        counterSymbol: counter?.fungible_info?.symbol ?? null,
+        counterQty: counter?.quantity?.float ?? null,
+        counterValueUsd: counter?.value ?? null,
+      });
+    }
+
+    nextUrl = res.links?.next ?? null;
+  }
+
+  trades.sort((a, b) => b.minedAt - a.minedAt);
+  return {
+    trades,
+    truncated: nextUrl !== null,
+    maxPages,
+  };
+}
+
+export async function fetchTokenTrades(
+  walletAddress: string,
+  tokenAddress: string,
+  maxPages = 25
+): Promise<TokenTrade[]> {
+  return (await fetchTokenTradeHistory(walletAddress, tokenAddress, maxPages)).trades;
+}
+
+// ─── Token price chart ────────────────────────────────────────────────────────
+
+export interface PricePoint {
+  ts: number; // unix seconds
+  price: number;
+}
+
+export type ChartPeriod = "day" | "week" | "month" | "year" | "max";
+
+interface ZerionFungiblesResponse {
+  data: Array<{ id: string; attributes: { symbol: string } }>;
+}
+
+interface ZerionFungibleChartResponse {
+  data: { attributes: { points: Array<[number, number]> } };
+}
+
+/** Resolve a Base contract address to Zerion's fungible id ("eth" for native). */
+export async function fetchZerionFungibleId(tokenAddress: string): Promise<string | null> {
+  if (tokenAddress === NATIVE_ETH_ADDRESS) return "eth";
+  const res = await zerionFetch<ZerionFungiblesResponse>(
+    `/fungibles/?filter[implementation_chain_id]=${CHAIN}` +
+      `&filter[implementation_address]=${tokenAddress}`
+  );
+  return res.data?.[0]?.id ?? null;
+}
+
+export async function fetchZerionFungibleChart(
+  fungibleId: string,
+  period: ChartPeriod
+): Promise<PricePoint[]> {
+  const res = await zerionFetch<ZerionFungibleChartResponse>(
+    `/fungibles/${fungibleId}/charts/${period}?currency=usd`
+  );
+  return (res.data?.attributes?.points ?? [])
+    .map(([ts, price]) => ({ ts, price }))
+    .filter((p) => Number.isFinite(p.ts) && Number.isFinite(p.price) && p.price > 0)
+    .sort((a, b) => a.ts - b.ts);
+}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { Fragment, useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -29,7 +30,6 @@ interface Props {
 type SortKey = "balanceUsd" | "balance" | "pctOfNav" | "totalGain" | "unrealizedGain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-const WETH_BASE = "0x4200000000000000000000000000000000000006";
 
 const fullUsd = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -127,7 +127,7 @@ function fmtMultiple(priceUsd: number | null, avgCostUsd: number | null): string
 
 // ── Orders sub-panel ──────────────────────────────────────────────────────────
 
-function OrderRow({ order, avgCostUsd }: { order: PortfolioOrder; avgCostUsd: number | null }) {
+export function OrderRow({ order, avgCostUsd }: { order: PortfolioOrder; avgCostUsd: number | null }) {
   const sellDecimals = getTokenDecimals(order.sellToken);
   const buyDecimals = getTokenDecimals(order.buyToken);
   const srcColor = SOURCE_COLORS[order.source] ?? "bg-muted text-muted-foreground border-border";
@@ -284,6 +284,7 @@ function ColHead({
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function HoldingsTable({ positions, trackedAddress }: Props) {
+  const router = useRouter();
   const [sortKey, setSortKey] = useState<SortKey>("balanceUsd");
   const [asc, setAsc] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -388,34 +389,42 @@ export function HoldingsTable({ positions, trackedAddress }: Props) {
           const activeCount = p.orders.filter(isActivePortfolioOrder).length;
           const hasOrders = visibleOrders.length > 0;
           const canExpand = p.orders.length > 0;
+          const detailUrl = `/pnl/${p.tokenAddress}`;
           return (
-            <>
+            <Fragment key={p.tokenAddress}>
               {/* ── Main row ── */}
               <TableRow
-                key={p.tokenAddress}
                 className={`group cursor-pointer hover:bg-muted/50 ${isOpen ? "bg-muted/30" : ""}`}
+                role="link"
+                tabIndex={0}
                 onClick={() => {
-                  if (canExpand) {
-                    toggleExpand(p.tokenAddress);
-                  } else {
-                    window.open(
-                      basescanUrl(p.tokenAddress, trackedAddress),
-                      "_blank",
-                      "noopener,noreferrer"
-                    );
+                  router.push(detailUrl);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    router.push(detailUrl);
                   }
                 }}
               >
                 {/* Chevron */}
                 <TableCell className="w-8 pr-0">
                   {canExpand ? (
-                    <span className="text-muted-foreground">
+                    <button
+                      type="button"
+                      className="rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label={isOpen ? "Collapse token orders" : "Expand token orders"}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpand(p.tokenAddress);
+                      }}
+                    >
                       {isOpen ? (
                         <ChevronDown className="size-4" />
                       ) : (
                         <ChevronRight className="size-4" />
                       )}
-                    </span>
+                    </button>
                   ) : (
                     <span className="size-4 inline-block" />
                   )}
@@ -555,7 +564,7 @@ export function HoldingsTable({ positions, trackedAddress }: Props) {
                   </TableCell>
                 </TableRow>
               )}
-            </>
+            </Fragment>
           );
         })}
       </TableBody>

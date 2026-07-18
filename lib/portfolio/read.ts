@@ -316,6 +316,20 @@ export async function getPositions(
   });
 }
 
+/** Position + orders for one holding (the /pnl/[token] detail page). */
+export async function getPositionDetail(tokenAddress: string): Promise<{
+  meta: PortfolioMeta | null;
+  position: PortfolioPosition | null;
+}> {
+  const addr = tokenAddress.toLowerCase();
+  const [meta, ordersMap] = await Promise.all([getPortfolioMeta(), getOrdersMap()]);
+  const positions = await getPositions(meta?.totalUsd ?? 0, ordersMap);
+  return {
+    meta,
+    position: positions.find((p) => p.tokenAddress.toLowerCase() === addr) ?? null,
+  };
+}
+
 export async function getPortfolioOverview(): Promise<PortfolioOverview> {
   const [meta, navRows, ordersMap] = await Promise.all([
     getPortfolioMeta(),
