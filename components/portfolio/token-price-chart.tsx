@@ -112,7 +112,10 @@ function ChartTooltip({
           </span>
           <span>{dateTimeFormatter.format(marker.ts * 1000)}</span>
           <span>
-            {qtyFmt.format(marker.qty)} @ {marker.priceUsd !== null ? fmtPrice(marker.priceUsd) : "N/A"}
+            {qtyFmt.format(marker.qty)} @{" "}
+            {marker.priceUsd !== null
+              ? fmtPrice(marker.priceUsd)
+              : `${fmtPrice(marker.markerPrice)} chart`}
           </span>
           {marker.valueUsd !== null && <span>{usdFmt.format(marker.valueUsd)}</span>}
         </div>

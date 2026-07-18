@@ -21,6 +21,9 @@ import {
 import { filterPortfolioOrders, isActivePortfolioOrder } from "@/lib/portfolio/orders";
 
 export const dynamic = "force-dynamic";
+// Zerion calls on this page are now serialized (>=1.1s apart) to respect the
+// account's 1 req/s rate limit, so a cold render can take several seconds.
+export const maxDuration = 60;
 
 const TRACKED_ADDRESS =
   process.env.TRACKED_ADDRESS ?? "0xcef6e6639e0c60d5c0805670f4363a6698081fab";
@@ -37,7 +40,7 @@ const fullUsd = new Intl.NumberFormat("en-US", {
 const qtyFmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 });
 
 function fmtPrice(p: number | null): string {
-  if (p === null || p === 0) return "N/A";
+  if (p === null || p === 0) return "—";
   if (p >= 1) return `$${p.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
   if (p >= 0.01) return `$${p.toFixed(4)}`;
   if (p >= 0.000001) return `$${p.toFixed(6)}`;
@@ -50,7 +53,7 @@ function gainClass(v: number | null): string {
 }
 
 function fmtGain(v: number | null, pct: number | null): string {
-  if (v === null) return "N/A";
+  if (v === null) return "—";
   const sign = v >= 0 ? "+" : "";
   const pctStr = pct !== null ? ` (${sign}${pct.toFixed(1)}%)` : "";
   return `${sign}${fullUsd.format(v)}${pctStr}`;
@@ -451,7 +454,7 @@ export default async function HoldingPage({
                               <td className="px-2 py-2 hidden sm:table-cell text-muted-foreground">
                                 {t.counterSymbol
                                   ? `${t.counterQty !== null ? qtyFmt.format(t.counterQty) + " " : ""}${t.counterSymbol}`
-                                  : "N/A"}
+                                  : "—"}
                               </td>
                               <td className="px-2 py-2 text-right">
                                 <a

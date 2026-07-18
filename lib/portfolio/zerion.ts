@@ -17,6 +17,31 @@ function authHeader(): string {
   return "Basic " + Buffer.from(`${key}:`).toString("base64");
 }
 
+// Zerion's demo tier allows only 1 request/second per org. Without serializing
+// requests, any concurrent Zerion calls (per-token PnL batch during sync, or
+// the multiple calls the holding detail page fires per render) race each
+// other and mostly come back 429 — which callers here previously swallowed as
+// "no data", producing the N/A/blank-chart symptoms. This queue makes every
+// Zerion call in the process wait its turn with >=1.1s spacing, and retries
+// once on 429 instead of giving up immediately.
+const MIN_REQUEST_INTERVAL_MS = 1100;
+const MAX_429_RETRIES = 3;
+let requestChain: Promise<void> = Promise.resolve();
+let lastRequestAt = 0;
+
+async function throttle(): Promise<void> {
+  const previous = requestChain;
+  let resolveNext!: () => void;
+  requestChain = new Promise((resolve) => {
+    resolveNext = resolve;
+  });
+  await previous;
+  const wait = Math.max(0, lastRequestAt + MIN_REQUEST_INTERVAL_MS - Date.now());
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  lastRequestAt = Date.now();
+  resolveNext();
+}
+
 async function zerionFetch<T>(pathOrUrl: string): Promise<T> {
   // Zerion requires a trailing slash — without it they return 301 which strips the
   // Authorization header on redirect (standard browser/fetch security behavior).
@@ -25,14 +50,29 @@ async function zerionFetch<T>(pathOrUrl: string): Promise<T> {
   const parsed = new URL(rawUrl);
   if (!parsed.pathname.endsWith("/")) parsed.pathname = `${parsed.pathname}/`;
 
-  const res = await fetch(parsed.toString(), {
-    headers: { Authorization: authHeader(), Accept: "application/json" },
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Zerion ${pathOrUrl} -> ${res.status}: ${text.slice(0, 200)}`);
+  for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt++) {
+    await throttle();
+    const res = await fetch(parsed.toString(), {
+      headers: { Authorization: authHeader(), Accept: "application/json" },
+    });
+
+    if (res.status === 429 && attempt < MAX_429_RETRIES) {
+      const resetSeconds = Number(res.headers.get("ratelimit-reset"));
+      const waitMs = Number.isFinite(resetSeconds)
+        ? Math.min(Math.max(resetSeconds * 1000, 500), 5000)
+        : 1500 * (attempt + 1);
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
+    }
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Zerion ${pathOrUrl} -> ${res.status}: ${text.slice(0, 200)}`);
+    }
+    return res.json() as Promise<T>;
   }
-  return res.json() as Promise<T>;
+
+  throw new Error(`Zerion ${pathOrUrl} -> exhausted retries after repeated 429s`);
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -275,6 +315,9 @@ export async function fetchZerionPnlBatch(
   tokenAddresses: string[],
   concurrency = 5
 ): Promise<Map<string, ZerionTokenPnl>> {
+  // `zerionFetch`'s internal throttle already serializes every underlying HTTP
+  // call at >=1.1s apart (and retries 429s), so firing several requests here
+  // "concurrently" just queues them in order rather than racing the API.
   const result = new Map<string, ZerionTokenPnl>();
   const queue = [...tokenAddresses];
 
@@ -289,8 +332,6 @@ export async function fetchZerionPnlBatch(
         result.set(batch[i], s.value);
       }
     }
-    // Small pause between batches to be nice to the API
-    if (queue.length > 0) await new Promise((r) => setTimeout(r, 200));
   }
 
   return result;

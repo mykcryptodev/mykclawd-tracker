@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   pointsToDailyNav,
+  fetchZerionTokenPnl,
 } from "./zerion";
 import {
   daysAgoUtc,
@@ -17,6 +18,95 @@ import {
   filterPortfolioOrders,
 } from "./orders";
 import type { PortfolioOrder } from "./read";
+
+describe("zerion request throttling", () => {
+  const originalFetch = global.fetch;
+  const originalKey = process.env.ZERION_API_KEY;
+
+  beforeEach(() => {
+    process.env.ZERION_API_KEY = "test-key";
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    process.env.ZERION_API_KEY = originalKey;
+  });
+
+  it("serializes concurrent calls at least ~1.1s apart instead of racing", async () => {
+    const callTimes: number[] = [];
+    global.fetch = vi.fn(async () => {
+      callTimes.push(Date.now());
+      return new Response(
+        JSON.stringify({
+          data: {
+            type: "wallet_pnl",
+            id: "x",
+            attributes: {
+              total_gain: 1,
+              realized_gain: 0,
+              unrealized_gain: 1,
+              relative_total_gain_percentage: 1,
+              relative_realized_gain_percentage: 0,
+              relative_unrealized_gain_percentage: 1,
+              total_invested: 1,
+              net_invested: 1,
+              realized_cost_basis: 0,
+            },
+          },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      );
+    }) as unknown as typeof fetch;
+
+    await Promise.all([
+      fetchZerionTokenPnl("0xwallet", "0xtoken1"),
+      fetchZerionTokenPnl("0xwallet", "0xtoken2"),
+      fetchZerionTokenPnl("0xwallet", "0xtoken3"),
+    ]);
+
+    expect(callTimes).toHaveLength(3);
+    for (let i = 1; i < callTimes.length; i++) {
+      expect(callTimes[i] - callTimes[i - 1]).toBeGreaterThanOrEqual(1000);
+    }
+  }, 10000);
+
+  it("retries once after a 429 instead of treating it as no data", async () => {
+    let calls = 0;
+    global.fetch = vi.fn(async () => {
+      calls++;
+      if (calls === 1) {
+        return new Response(JSON.stringify({ errors: [{ title: "Too many requests" }] }), {
+          status: 429,
+          headers: { "ratelimit-reset": "1" },
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          data: {
+            type: "wallet_pnl",
+            id: "x",
+            attributes: {
+              total_gain: 5,
+              realized_gain: 0,
+              unrealized_gain: 5,
+              relative_total_gain_percentage: 5,
+              relative_realized_gain_percentage: 0,
+              relative_unrealized_gain_percentage: 5,
+              total_invested: 10,
+              net_invested: 10,
+              realized_cost_basis: 0,
+            },
+          },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      );
+    }) as unknown as typeof fetch;
+
+    const pnl = await fetchZerionTokenPnl("0xwallet", "0xtoken");
+    expect(calls).toBe(2);
+    expect(pnl?.totalGain).toBe(5);
+  }, 10000);
+});
 
 describe("pointsToDailyNav", () => {
   it("collapses to one ascending value per UTC day (last tick of day wins)", () => {
