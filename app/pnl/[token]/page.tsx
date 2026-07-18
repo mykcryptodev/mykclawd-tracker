@@ -10,6 +10,7 @@ import { OrderRow } from "@/components/portfolio/holdings-table";
 import { TokenPriceChart } from "@/components/portfolio/token-price-chart";
 import { getPositionDetail } from "@/lib/portfolio/read";
 import {
+  fetchFallbackTokenChartSeries,
   fetchTokenTradeHistory,
   fetchZerionFungibleId,
   fetchZerionFungibleChart,
@@ -106,6 +107,46 @@ async function fetchChartSeries(fungibleId: string): Promise<{
   return { week, month, max };
 }
 
+async function fetchTokenChartSeries(
+  tokenAddress: string,
+  fungibleId: string | null
+): Promise<{
+  week: PricePoint[];
+  month: PricePoint[];
+  max: PricePoint[];
+}> {
+  if (fungibleId) {
+    const zerionSeries = await fetchChartSeries(fungibleId);
+    if (
+      zerionSeries.week.length > 0 ||
+      zerionSeries.month.length > 0 ||
+      zerionSeries.max.length > 0
+    ) {
+      return zerionSeries;
+    }
+  }
+
+  return fetchFallbackTokenChartSeries(tokenAddress);
+}
+
+function unixSeconds(value: string | null): number | null {
+  if (!value) return null;
+  const ms = new Date(value).getTime();
+  return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
+}
+
+function positiveNumberString(value: string | null): number | null {
+  if (!value) return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function isFilledOrder(order: { status: string }): boolean {
+  return ["filled", "fulfilled", "completed", "triggered"].includes(
+    order.status.toLowerCase()
+  );
+}
+
 function StatCard({ label, value, sub, valueClass }: { label: string; value: string; sub?: string; valueClass?: string }) {
   return (
     <Card className="border-border/60">
@@ -139,9 +180,7 @@ export default async function HoldingPage({
   ]);
   const trades = tradeHistory.trades;
 
-  const chartSeries = fungibleId
-    ? await fetchChartSeries(fungibleId)
-    : { week: [], month: [], max: [] };
+  const chartSeries = await fetchTokenChartSeries(tokenAddress, fungibleId);
 
   // Prefer a cost basis aligned with the displayed Zerion PnL. The local lot
   // engine and trade-history average are fallbacks when Zerion lacks PnL fields.
@@ -185,6 +224,39 @@ export default async function HoldingPage({
       qty: t.tokenQty,
       valueUsd: t.tokenValueUsd,
     }));
+
+  const orderMarkers = position.orders
+    .filter((o) => o.side !== null && isFilledOrder(o))
+    .map((o) => {
+      const ts = unixSeconds(o.updatedAt) ?? unixSeconds(o.createdAt);
+      if (!ts) return null;
+      const qty = positiveNumberString(o.filledQuantity) ?? positiveNumberString(o.quantity) ?? 0;
+      const valueUsd = o.priceUsd && qty > 0 ? o.priceUsd * qty : null;
+      return {
+        ts,
+        action: o.side!,
+        priceUsd: positiveFinite(o.priceUsd),
+        qty,
+        valueUsd,
+      };
+    })
+    .filter((m): m is {
+      ts: number;
+      action: "buy" | "sell";
+      priceUsd: number | null;
+      qty: number;
+      valueUsd: number | null;
+    } => m !== null);
+
+  const markerKey = (m: { ts: number; action: string; qty: number }) =>
+    `${m.ts}:${m.action}:${m.qty.toFixed(8)}`;
+  const seenMarkers = new Set<string>();
+  const chartEvents = [...chartMarkers, ...orderMarkers].filter((m) => {
+    const key = markerKey(m);
+    if (seenMarkers.has(key)) return false;
+    seenMarkers.add(key);
+    return true;
+  });
 
   return (
     <SidebarProvider
@@ -239,7 +311,8 @@ export default async function HoldingPage({
               </div>
 
               <p className="text-xs text-muted-foreground">
-                PnL uses the latest tracker sync. Chart and transaction rows are fetched from Zerion live.
+                PnL uses the latest tracker sync. Charts use Zerion first, then GeckoTerminal price history;
+                markers include Zerion trades when available plus synced filled orders.
               </p>
 
               {/* Stat cards */}
@@ -286,7 +359,7 @@ export default async function HoldingPage({
               <TokenPriceChart
                 symbol={position.symbol}
                 series={chartSeries}
-                trades={chartMarkers}
+                trades={chartEvents}
               />
 
               {/* Orders */}

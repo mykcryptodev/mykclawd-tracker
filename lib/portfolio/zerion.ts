@@ -500,3 +500,131 @@ export async function fetchZerionFungibleChart(
     .filter((p) => Number.isFinite(p.ts) && Number.isFinite(p.price) && p.price > 0)
     .sort((a, b) => a.ts - b.ts);
 }
+
+// ─── GeckoTerminal price chart fallback ──────────────────────────────────────
+
+const GECKO_BASE_URL = "https://api.geckoterminal.com/api/v2";
+const GECKO_NETWORK = "base";
+const BASE_WETH_ADDRESS = "0x4200000000000000000000000000000000000006";
+
+interface GeckoPool {
+  id: string;
+  attributes: {
+    address: string;
+    reserve_in_usd: string | null;
+  };
+  relationships: {
+    base_token?: { data?: { id: string } | null };
+    quote_token?: { data?: { id: string } | null };
+  };
+}
+
+interface GeckoPoolsResponse {
+  data: GeckoPool[];
+}
+
+interface GeckoOhlcvResponse {
+  data: {
+    attributes: {
+      ohlcv_list: Array<[number, number, number, number, number, number]>;
+    };
+  };
+}
+
+async function geckoFetch<T>(path: string): Promise<T> {
+  const res = await fetch(`${GECKO_BASE_URL}${path}`, {
+    headers: { Accept: "application/json" },
+    next: { revalidate: 15 * 60 },
+  } as RequestInit & { next: { revalidate: number } });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`GeckoTerminal ${path} -> ${res.status}: ${text.slice(0, 200)}`);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+function asFiniteNumber(value: string | number | null | undefined): number | null {
+  const n = typeof value === "number" ? value : value ? Number(value) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+function geckoAddressFor(tokenAddress: string): string {
+  return tokenAddress === NATIVE_ETH_ADDRESS ? BASE_WETH_ADDRESS : tokenAddress.toLowerCase();
+}
+
+function geckoTokenId(tokenAddress: string): string {
+  return `${GECKO_NETWORK}_${geckoAddressFor(tokenAddress)}`;
+}
+
+function poolTokenSide(pool: GeckoPool, tokenAddress: string): "base" | "quote" | null {
+  const target = geckoTokenId(tokenAddress);
+  if (pool.relationships.base_token?.data?.id?.toLowerCase() === target) return "base";
+  if (pool.relationships.quote_token?.data?.id?.toLowerCase() === target) return "quote";
+  return null;
+}
+
+async function bestGeckoPool(tokenAddress: string): Promise<{
+  address: string;
+  side: "base" | "quote";
+} | null> {
+  const address = geckoAddressFor(tokenAddress);
+  const data = await geckoFetch<GeckoPoolsResponse>(
+    `/networks/${GECKO_NETWORK}/tokens/${address}/pools?page=1`
+  );
+
+  const pools = (data.data ?? [])
+    .map((pool) => ({
+      pool,
+      side: poolTokenSide(pool, tokenAddress),
+      reserveUsd: asFiniteNumber(pool.attributes.reserve_in_usd) ?? 0,
+    }))
+    .filter((p): p is { pool: GeckoPool; side: "base" | "quote"; reserveUsd: number } =>
+      p.side !== null
+    )
+    .sort((a, b) => b.reserveUsd - a.reserveUsd);
+
+  const best = pools[0];
+  if (!best) return null;
+  return { address: best.pool.attributes.address.toLowerCase(), side: best.side };
+}
+
+async function fetchGeckoTerminalChart(
+  pool: { address: string; side: "base" | "quote" },
+  period: "week" | "month" | "max"
+): Promise<PricePoint[]> {
+  const cfg =
+    period === "week"
+      ? { timeframe: "hour", aggregate: 1, limit: 24 * 7 }
+      : period === "month"
+        ? { timeframe: "hour", aggregate: 4, limit: 31 * 6 }
+        : { timeframe: "day", aggregate: 1, limit: 1000 };
+
+  const data = await geckoFetch<GeckoOhlcvResponse>(
+    `/networks/${GECKO_NETWORK}/pools/${pool.address}/ohlcv/${cfg.timeframe}` +
+      `?aggregate=${cfg.aggregate}&limit=${cfg.limit}&currency=usd&token=${pool.side}`
+  );
+
+  return (data.data?.attributes?.ohlcv_list ?? [])
+    .map(([ts, , , , close]) => ({ ts, price: close }))
+    .filter((p) => Number.isFinite(p.ts) && Number.isFinite(p.price) && p.price > 0)
+    .sort((a, b) => a.ts - b.ts);
+}
+
+export async function fetchFallbackTokenChartSeries(tokenAddress: string): Promise<{
+  week: PricePoint[];
+  month: PricePoint[];
+  max: PricePoint[];
+}> {
+  const pool = await bestGeckoPool(tokenAddress).catch(() => null);
+  if (!pool) return { week: [], month: [], max: [] };
+
+  const [week, month, max] = await Promise.all([
+    fetchGeckoTerminalChart(pool, "week").catch(() => []),
+    fetchGeckoTerminalChart(pool, "month").catch(() => []),
+    fetchGeckoTerminalChart(pool, "max").catch(() => []),
+  ]);
+
+  return { week, month, max };
+}
