@@ -234,7 +234,6 @@ export function TokenPriceChart({ symbol, series, trades }: Props) {
             <XAxis
               dataKey="ts"
               type="number"
-              scale="time"
               domain={["dataMin", "dataMax"]}
               tickFormatter={(v) => dateFormatter.format((v as number) * 1000)}
               tick={{ fontSize: 11 }}
