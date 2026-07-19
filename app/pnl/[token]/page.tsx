@@ -96,18 +96,20 @@ async function fetchChartSeries(fungibleId: string): Promise<{
   max: PricePoint[];
 }> {
   const empty: PricePoint[] = [];
-  const max = await fetchZerionFungibleChart(fungibleId, "max").catch(() => empty);
-  if (max.length > 0) {
-    return {
-      week: recentPoints(max, 7),
-      month: recentPoints(max, 31),
-      max,
-    };
-  }
-
-  const month = await fetchZerionFungibleChart(fungibleId, "month").catch(() => empty);
-  const week = await fetchZerionFungibleChart(fungibleId, "week").catch(() => empty);
-  return { week, month, max };
+  // Zerion's `max` chart is daily/weekly-bucketed — too coarse to slice for
+  // 1W/1M (e.g. PEPE yields only ~5 points for 1W). Use the native
+  // week/month endpoints (30-min and 2-hour buckets) when they return data,
+  // falling back to slicing `max` only if a shorter window has no points.
+  const [max, month, week] = await Promise.all([
+    fetchZerionFungibleChart(fungibleId, "max").catch(() => empty),
+    fetchZerionFungibleChart(fungibleId, "month").catch(() => empty),
+    fetchZerionFungibleChart(fungibleId, "week").catch(() => empty),
+  ]);
+  return {
+    week: week.length > 0 ? week : recentPoints(max, 7),
+    month: month.length > 0 ? month : recentPoints(max, 31),
+    max,
+  };
 }
 
 async function fetchTokenChartSeries(

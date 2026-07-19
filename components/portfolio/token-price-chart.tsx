@@ -148,6 +148,8 @@ export function TokenPriceChart({ symbol, series, trades }: Props) {
     return series[activeFrame.series];
   }, [activeFrame, series]);
 
+
+
   const markers = useMemo<MarkerDatum[]>(() => {
     if (activeSeries.length === 0) return [];
     const minTs = activeSeries[0].ts;
@@ -168,6 +170,24 @@ export function TokenPriceChart({ symbol, series, trades }: Props) {
     const minTs = activeSeries[0].ts;
     return trades.filter((t) => t.ts < minTs).length;
   }, [activeSeries, trades]);
+
+  // With `auto/auto` recharts pads the domain by ~10%, which for a
+  // slow-moving token can turn a ±10% range into a nearly flat line at the
+  // center of the chart. Use an exact [min,max] domain with a small margin
+  // instead so the price movement fills the plot.
+  const priceDomain = useMemo<[number, number] | ["auto", "auto"]>(() => {
+    const prices = activeSeries.map((p) => p.price).filter((v) => Number.isFinite(v));
+    for (const m of markers) if (Number.isFinite(m.markerPrice)) prices.push(m.markerPrice);
+    if (prices.length === 0) return ["auto", "auto"];
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    if (min === max) {
+      const pad = Math.abs(min) * 0.01 || 1;
+      return [min - pad, max + pad];
+    }
+    const pad = (max - min) * 0.06;
+    return [min - pad, max + pad];
+  }, [activeSeries, markers]);
 
   if (series.max.length === 0 && series.month.length === 0 && series.week.length === 0) {
     return (
@@ -224,7 +244,7 @@ export function TokenPriceChart({ symbol, series, trades }: Props) {
               tickFormatter={(v) => fmtPrice(v as number)}
               tick={{ fontSize: 11 }}
               width={72}
-              domain={["auto", "auto"]}
+              domain={priceDomain}
             />
             <Tooltip content={<ChartTooltip />} />
             <Area
