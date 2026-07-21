@@ -206,6 +206,18 @@ export function HomeLanding({
           <li>
             <a
               className="underline underline-offset-4 hover:text-foreground"
+              href="https://github.com/mykclawd/openclaw-smart-router"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              🔀 OpenClaw Smart Router
+            </a>{" "}
+            Picks the best LLM for every request. Scores eligible candidates by prompt intent and quality, then
+            proxies the winner through unmodified.
+          </li>
+          <li>
+            <a
+              className="underline underline-offset-4 hover:text-foreground"
               href="https://paidpr.mykclawd.xyz/"
               target="_blank"
               rel="noopener noreferrer"
