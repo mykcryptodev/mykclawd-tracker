@@ -76,6 +76,7 @@ const SEED_BETS = [
   { date: "2026-07-25", opponent: "PHI", side: "YES" as const, amount: 15.0, odds: 0.3377, payout: 29.411763, result: "WIN" as const, profit: 14.41, note: "Rule 1: W-W streak (PIT DH G2 + PHI G105 1-0 Schlittler gem) + Game 2 of series, Yankees lead 1-0 (high-confidence YES $15)", betPlaced: true, tweetId: "2081201302546108747", createdAt: new Date().toISOString() },
   { date: "2026-07-26", opponent: "PHI", side: "YES" as const, amount: 15.0, odds: 0.2857, payout: 37.5, result: "LOSS" as const, profit: -15.0, note: "Rule 1: won last 2+ (G105+G106 W), series lead 2-0 → high confidence 5", betPlaced: true, tweetId: "2081581824719954292", createdAt: new Date().toISOString() },
   { date: "2026-07-27", opponent: "CHW", side: "YES" as const, amount: 10.0, odds: 0.3631, payout: 17.543858, result: "WIN" as const, profit: 7.54, note: "Bounce-back rule: lost 1 after 3+ win streak (W,W,W then L vs PHI G107)", betPlaced: true, tweetId: "2081949508171186570", createdAt: new Date().toISOString() },
+  { date: "2026-07-29", opponent: "CHW", side: "YES" as const, amount: 15.0, odds: 0.3631, payout: 26.315788, result: null, profit: null, note: "Rule 1: won last 2 (G108 CHW + G109 CHW), series lead 2-0 → high confidence $15", betPlaced: true, tweetId: null, createdAt: new Date().toISOString() },
 ] satisfies (typeof yankeesBets.$inferInsert)[];
 
 export async function GET() {
