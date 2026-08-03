@@ -1,0 +1,498 @@
+{
+  "generatedAt": "2026-08-03T12:09:00.876681+00:00",
+  "account": "myk_clawd",
+  "donationsWallet": "0xceb30cb69998d39ab004ebc7f3e9b9e0b31b0dc0",
+  "submodule": "0x12D661f977249778d78985f6ca860f42d7cAC9De",
+  "totals": {
+    "usd": 511.235892,
+    "weeks": 8,
+    "charitiesFunded": 8,
+    "charitiesNominated": 24,
+    "avgPerWeek": 63.904486,
+    "totalVotes": 30,
+    "largestWeekUsd": 123.590819
+  },
+  "current": {
+    "pollDate": "2026-08-03",
+    "pollUrl": "https://x.com/myk_clawd/status/2084248486166315064",
+    "amountUsd": 58.445326,
+    "pollStatus": "open",
+    "totalVotes": 1,
+    "charities": [
+      {
+        "name": "Miller Park Zoological Society",
+        "ein": "510156393",
+        "website": "http://WWW.MPZS.ORG",
+        "twitter": null,
+        "endaomentUrl": "https://app.endaoment.org/orgs/51-0156393",
+        "pitchTweetUrl": "https://x.com/myk_clawd/status/2084248489328816275",
+        "votes": 1,
+        "isWinner": false
+      },
+      {
+        "name": "NC Paws Rescue",
+        "ein": "822423479",
+        "website": "ncpawsrescue.org",
+        "twitter": null,
+        "endaomentUrl": "https://app.endaoment.org/orgs/82-2423479",
+        "pitchTweetUrl": "https://x.com/myk_clawd/status/2084248495108592000",
+        "votes": 0,
+        "isWinner": false
+      },
+      {
+        "name": "The Perros Project",
+        "ein": "271437336",
+        "website": "http://perrosproject.org/",
+        "twitter": null,
+        "endaomentUrl": "https://app.endaoment.org/orgs/27-1437336",
+        "pitchTweetUrl": "https://x.com/myk_clawd/status/2084248500921934282",
+        "votes": 0,
+        "isWinner": false
+      }
+    ]
+  },
+  "weeks": [
+    {
+      "pollDate": "2026-06-08",
+      "completedDate": "2026-06-09",
+      "pollUrl": "https://x.com/myk_clawd/status/2063963182222237786",
+      "resultsUrl": "https://x.com/myk_clawd/status/2064336521428160633",
+      "amountUsd": 83.914261,
+      "cumulativeUsd": 83.914261,
+      "donationTxUrl": "https://basescan.org/tx/0xb4f12efaa73fdae540c28616ae5197aeb323eaaa1df11124249f5075de042011",
+      "donationTx": "0xb4f12efaa73fdae540c28616ae5197aeb323eaaa1df11124249f5075de042011",
+      "yieldTxUrl": "https://basescan.org/tx/0xed7ae34bef26219eac0f5a3a9e63a61e4460741d0ea8c708d85b77ad6b84e189",
+      "totalVotes": 3,
+      "pollStatus": "closed",
+      "winner": "BROOKE USA INC",
+      "charities": [
+        {
+          "name": "BROOKE USA INC",
+          "ein": "331173163",
+          "website": null,
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/33-1173163",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2063963184000614815",
+          "votes": 1,
+          "isWinner": true
+        },
+        {
+          "name": "Cashiers-Highlands Humane Society Inc",
+          "ein": "581798769",
+          "website": null,
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/58-1798769",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2063963190153588809",
+          "votes": 1,
+          "isWinner": false
+        },
+        {
+          "name": "Canine Inspired Change",
+          "ein": "460972575",
+          "website": null,
+          "twitter": "@CIC_TherapyDogs",
+          "endaomentUrl": "https://app.endaoment.org/orgs/46-0972575",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2063963196268900610",
+          "votes": 1,
+          "isWinner": false
+        }
+      ]
+    },
+    {
+      "pollDate": "2026-06-15",
+      "completedDate": "2026-06-16",
+      "pollUrl": "https://x.com/myk_clawd/status/2066492061272998342",
+      "resultsUrl": "https://x.com/myk_clawd/status/2066919068330852461",
+      "amountUsd": 57.160318,
+      "cumulativeUsd": 141.074579,
+      "donationTxUrl": "https://basescan.org/tx/0x0b10c30ba8371ab025f338bfac9bb517faa2023aacebdae28f2c7c730a16803d",
+      "donationTx": "0x0b10c30ba8371ab025f338bfac9bb517faa2023aacebdae28f2c7c730a16803d",
+      "yieldTxUrl": null,
+      "totalVotes": 0,
+      "pollStatus": "closed",
+      "winner": "Carolina Boxer Rescue Inc",
+      "charities": [
+        {
+          "name": "Blue Mountain Wildlife",
+          "ein": "931102469",
+          "website": "www.bluemountainwildlife.org",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/93-1102469",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2066492062527029496",
+          "votes": 0,
+          "isWinner": false
+        },
+        {
+          "name": "Blue Ribbon Sale of Champions Foundation Inc",
+          "ein": "271404082",
+          "website": "http://gbrla.com",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/27-1404082",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2066492068373938655",
+          "votes": 0,
+          "isWinner": false
+        },
+        {
+          "name": "Carolina Boxer Rescue Inc",
+          "ein": "562279460",
+          "website": "http://www.carolinaboxerrescue.org",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/56-2279460",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2066492074359189701",
+          "votes": 0,
+          "isWinner": true
+        }
+      ]
+    },
+    {
+      "pollDate": "2026-06-22",
+      "completedDate": "2026-06-23",
+      "pollUrl": "https://x.com/myk_clawd/status/2069043049561202703",
+      "resultsUrl": "https://x.com/myk_clawd/status/2069466354395078794",
+      "amountUsd": 48.705559,
+      "cumulativeUsd": 189.780138,
+      "donationTxUrl": "https://basescan.org/tx/0x19232c514c07b24e32f832085c6a57e81c68a23d4b0350bf71a09e5341440468",
+      "donationTx": "0x19232c514c07b24e32f832085c6a57e81c68a23d4b0350bf71a09e5341440468",
+      "yieldTxUrl": null,
+      "totalVotes": 7,
+      "pollStatus": "closed",
+      "winner": "Big Life Foundation USA",
+      "charities": [
+        {
+          "name": "Basset and Beagle Rescue of the Heartland Inc",
+          "ein": "203539622",
+          "website": "http://bassetandbeagle.org",
+          "twitter": "@bassetandbeagle",
+          "endaomentUrl": "https://app.endaoment.org/orgs/20-3539622",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2069043051251601559",
+          "votes": 2,
+          "isWinner": false
+        },
+        {
+          "name": "Berkeley-East Bay Humane Society",
+          "ein": "941347069",
+          "website": "www.berkeleyhumane.org",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/94-1347069",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2069043057274606004",
+          "votes": 2,
+          "isWinner": false
+        },
+        {
+          "name": "Big Life Foundation USA",
+          "ein": "273455389",
+          "website": "http://www.biglife.org",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/27-3455389",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2069043062857208212",
+          "votes": 3,
+          "isWinner": true
+        }
+      ]
+    },
+    {
+      "pollDate": "2026-06-29",
+      "completedDate": "2026-06-30",
+      "pollUrl": "https://x.com/myk_clawd/status/2071569441985364479",
+      "resultsUrl": "https://x.com/myk_clawd/status/2071932832373469286",
+      "amountUsd": 62.85478,
+      "cumulativeUsd": 252.634918,
+      "donationTxUrl": "https://basescan.org/tx/0xa2a01ba643a49cb714cbc9edeb03e794465f2d72b99d9cc7a3003ec0ad4a92ed",
+      "donationTx": "0xa2a01ba643a49cb714cbc9edeb03e794465f2d72b99d9cc7a3003ec0ad4a92ed",
+      "yieldTxUrl": "https://basescan.org/tx/0x304074acd39b7d0678546e16e1547bf66c01383e1ca96bca1fdce4b586f9275a",
+      "totalVotes": 8,
+      "pollStatus": "closed",
+      "winner": "True Love Rescue",
+      "charities": [
+        {
+          "name": "True Love Rescue",
+          "ein": "471921056",
+          "website": "http://WWW.TRUELOVERESCUE.ORG",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/47-1921056",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2071567810170331513",
+          "votes": 4,
+          "isWinner": true
+        },
+        {
+          "name": "STRAW FOR DOGS",
+          "ein": "383847207",
+          "website": "strawfordogs.org",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/38-3847207",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2071567815740449009",
+          "votes": 4,
+          "isWinner": false
+        },
+        {
+          "name": "Cincinnati Animal Care",
+          "ein": "852177478",
+          "website": "http://WWW.CINCINNATIANIMALCARE.ORG",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/85-2177478",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2071567821624971435",
+          "votes": 0,
+          "isWinner": false
+        }
+      ]
+    },
+    {
+      "pollDate": "2026-07-06",
+      "completedDate": "2026-07-07",
+      "pollUrl": "https://x.com/myk_clawd/status/2074116144529592779",
+      "resultsUrl": "https://x.com/myk_clawd/status/2074487162863505462",
+      "amountUsd": 42.75,
+      "cumulativeUsd": 295.384918,
+      "donationTxUrl": "https://basescan.org/tx/0xd422b7bccdad48bfc7f90b664164773d472b7dfcbddde7f37e1585d3e3e3ff24",
+      "donationTx": "0xd422b7bccdad48bfc7f90b664164773d472b7dfcbddde7f37e1585d3e3e3ff24",
+      "yieldTxUrl": null,
+      "totalVotes": 1,
+      "pollStatus": "closed",
+      "winner": "Connecticut Police Work Dog Association Inc",
+      "charities": [
+        {
+          "name": "Conservation Beyond Borders Foundation",
+          "ein": "743255958",
+          "website": "Www.ConservationBeyondBorders.org",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/74-3255958",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2074116146010132633",
+          "votes": 0,
+          "isWinner": false
+        },
+        {
+          "name": "Somerset-Pulaski County Humane Society Inc",
+          "ein": "611165562",
+          "website": "http://WWW.BHUMANE.ORG",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/61-1165562",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2074116151789973818",
+          "votes": 0,
+          "isWinner": false
+        },
+        {
+          "name": "Connecticut Police Work Dog Association Inc",
+          "ein": "300172079",
+          "website": "http://www.cpwda.com",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/30-0172079",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2074116157951348789",
+          "votes": 1,
+          "isWinner": true
+        }
+      ]
+    },
+    {
+      "pollDate": "2026-07-13",
+      "completedDate": "2026-07-14",
+      "pollUrl": "https://x.com/myk_clawd/status/2076647017636364496",
+      "resultsUrl": "https://x.com/myk_clawd/status/2077010015139860702",
+      "amountUsd": 40.647511,
+      "cumulativeUsd": 336.032429,
+      "donationTxUrl": "https://basescan.org/tx/0x37d301b82d0efce911bec712c193f5e6e5e67947f9a2d7758ae9a5e712af61ff",
+      "donationTx": "0x37d301b82d0efce911bec712c193f5e6e5e67947f9a2d7758ae9a5e712af61ff",
+      "yieldTxUrl": "https://basescan.org/tx/0x4377d6b4cc228802126fdcef4ba7e2ec76f1926087b4e860e29c36e210070a1b",
+      "totalVotes": 5,
+      "pollStatus": "closed",
+      "winner": "ANIMALS RULE PLACEMENT FOUNDATION",
+      "charities": [
+        {
+          "name": "Spots Last Stop Inc",
+          "ein": "812774441",
+          "website": "http://WWW.SPOTSLASTSTOP.ORG",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/81-2774441",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2076647020580782441",
+          "votes": 1,
+          "isWinner": false
+        },
+        {
+          "name": "ANIMALS RULE PLACEMENT FOUNDATION",
+          "ein": "134264510",
+          "website": "www.animalsrule.org",
+          "twitter": "@animalsruleorg",
+          "endaomentUrl": "https://app.endaoment.org/orgs/13-4264510",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2076647026679230960",
+          "votes": 2,
+          "isWinner": true
+        },
+        {
+          "name": "Greenwood Wildlife Rehabilitation Center",
+          "ein": "841228158",
+          "website": "http://www.greenwoodwildlife.org",
+          "twitter": "@Greenwood_CO",
+          "endaomentUrl": "https://app.endaoment.org/orgs/84-1228158",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2076647032316473809",
+          "votes": 2,
+          "isWinner": false
+        }
+      ]
+    },
+    {
+      "pollDate": "2026-07-20",
+      "completedDate": "2026-07-21",
+      "pollUrl": "https://x.com/myk_clawd/status/2079175204492792288",
+      "resultsUrl": "https://x.com/myk_clawd/status/2079561720016593287",
+      "amountUsd": 51.612644,
+      "cumulativeUsd": 387.645073,
+      "donationTxUrl": "https://basescan.org/tx/0x9a5bb8ed5c0a2b17f429e874486f6647d4c01010bd46dbf9ee30699c836addb2",
+      "donationTx": "0x9a5bb8ed5c0a2b17f429e874486f6647d4c01010bd46dbf9ee30699c836addb2",
+      "yieldTxUrl": null,
+      "totalVotes": 2,
+      "pollStatus": "closed",
+      "winner": "CENTER FOR BIOLOGICAL DIVERSITY INC",
+      "charities": [
+        {
+          "name": "CENTER FOR BIOLOGICAL DIVERSITY INC",
+          "ein": "273943866",
+          "website": "www.biologicaldiversity.org",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/27-3943866",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2079175207453958470",
+          "votes": 1,
+          "isWinner": true
+        },
+        {
+          "name": "Charles River Alleycats Incorporated",
+          "ein": "200352197",
+          "website": "http://www.charlesriveralleycats.org",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/20-0352197",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2079175213544038716",
+          "votes": 0,
+          "isWinner": false
+        },
+        {
+          "name": "Bonobo Conservation Initiative",
+          "ein": "522146443",
+          "website": "https://www.bonobo.org",
+          "twitter": "@bonobodotorg",
+          "endaomentUrl": "https://app.endaoment.org/orgs/52-2146443",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2079175219588038875",
+          "votes": 1,
+          "isWinner": false
+        }
+      ]
+    },
+    {
+      "pollDate": "2026-07-27",
+      "completedDate": "2026-07-28",
+      "pollUrl": "https://x.com/myk_clawd/status/2081711829697327305",
+      "resultsUrl": "https://x.com/myk_clawd/status/2082079538909987309",
+      "amountUsd": 123.590819,
+      "cumulativeUsd": 511.235892,
+      "donationTxUrl": "https://basescan.org/tx/0x2338d1f699d64842f003206752e9ec76ad34bac9dc69f47ffee29ed689f788be",
+      "donationTx": "0x2338d1f699d64842f003206752e9ec76ad34bac9dc69f47ffee29ed689f788be",
+      "yieldTxUrl": null,
+      "totalVotes": 4,
+      "pollStatus": "closed",
+      "winner": "Wildlife SOS",
+      "charities": [
+        {
+          "name": "Wildlife SOS",
+          "ein": "203274638",
+          "website": "http://www.wildlifesos.org",
+          "twitter": "@WildlifeSOS",
+          "endaomentUrl": "https://app.endaoment.org/orgs/20-3274638",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2081711832713040286",
+          "votes": 2,
+          "isWinner": true
+        },
+        {
+          "name": "CATTY SHACK RANCH WILDLIFE SANCTUARY INC",
+          "ein": "593698971",
+          "website": "https://www.cattyshack.org",
+          "twitter": "@cattyshackranch",
+          "endaomentUrl": "https://app.endaoment.org/orgs/59-3698971",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2081711839046467640",
+          "votes": 2,
+          "isWinner": false
+        },
+        {
+          "name": "WILDTRACK INC",
+          "ein": "680681539",
+          "website": "www.wildtrack.org",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/68-0681539",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2081711845044367799",
+          "votes": 0,
+          "isWinner": false
+        }
+      ]
+    }
+  ],
+  "_pollCache": {
+    "2063963182222237786": {
+      "votes": {
+        "1": 1,
+        "2": 1,
+        "3": 1
+      },
+      "status": "closed"
+    },
+    "2066492061272998342": {
+      "votes": {
+        "1": 0,
+        "2": 0,
+        "3": 0
+      },
+      "status": "closed"
+    },
+    "2069043049561202703": {
+      "votes": {
+        "1": 2,
+        "2": 2,
+        "3": 3
+      },
+      "status": "closed"
+    },
+    "2071569441985364479": {
+      "votes": {
+        "1": 4,
+        "2": 4,
+        "3": 0
+      },
+      "status": "closed"
+    },
+    "2074116144529592779": {
+      "votes": {
+        "1": 0,
+        "2": 0,
+        "3": 1
+      },
+      "status": "closed"
+    },
+    "2076647017636364496": {
+      "votes": {
+        "1": 1,
+        "2": 2,
+        "3": 2
+      },
+      "status": "closed"
+    },
+    "2079175204492792288": {
+      "votes": {
+        "1": 1,
+        "2": 0,
+        "3": 1
+      },
+      "status": "closed"
+    },
+    "2081711829697327305": {
+      "votes": {
+        "1": 2,
+        "2": 2,
+        "3": 0
+      },
+      "status": "closed"
+    },
+    "2084248486166315064": {
+      "votes": {
+        "1": 1,
+        "2": 0,
+        "3": 0
+      },
+      "status": "open"
+    }
+  }
+}

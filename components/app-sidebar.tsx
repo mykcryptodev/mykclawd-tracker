@@ -26,6 +26,7 @@ import {
   CalendarIcon,
   AtSignIcon,
   BlocksIcon,
+  PawPrintIcon,
 } from "lucide-react"
 
 function BaseballCapIcon() {
@@ -62,6 +63,7 @@ const navMain = [
   { title: "Bounties", url: "/bounties", icon: <TrophyIcon /> },
   { title: "Hat Tap", url: "/hat", icon: <BaseballCapIcon /> },
   { title: "Yankees", url: "/yankees", icon: <CalendarIcon /> },
+  { title: "Pawthereum", url: "/pawthereum", icon: <PawPrintIcon /> },
   { title: "Skills", url: "/skills", icon: <BlocksIcon /> },
   { title: "Server Health", url: "/health", icon: <ServerIcon /> },
 ]
