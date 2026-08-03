@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-03T12:09:00.876681+00:00",
+  "generatedAt": "2026-08-03T12:25:46.070495+00:00",
   "account": "myk_clawd",
   "donationsWallet": "0xceb30cb69998d39ab004ebc7f3e9b9e0b31b0dc0",
   "submodule": "0x12D661f977249778d78985f6ca860f42d7cAC9De",
@@ -17,7 +17,7 @@
     "pollUrl": "https://x.com/myk_clawd/status/2084248486166315064",
     "amountUsd": 58.445326,
     "pollStatus": "open",
-    "totalVotes": 1,
+    "totalVotes": null,
     "charities": [
       {
         "name": "Miller Park Zoological Society",
@@ -26,7 +26,7 @@
         "twitter": null,
         "endaomentUrl": "https://app.endaoment.org/orgs/51-0156393",
         "pitchTweetUrl": "https://x.com/myk_clawd/status/2084248489328816275",
-        "votes": 1,
+        "votes": null,
         "isWinner": false
       },
       {
@@ -36,7 +36,7 @@
         "twitter": null,
         "endaomentUrl": "https://app.endaoment.org/orgs/82-2423479",
         "pitchTweetUrl": "https://x.com/myk_clawd/status/2084248495108592000",
-        "votes": 0,
+        "votes": null,
         "isWinner": false
       },
       {
@@ -46,7 +46,7 @@
         "twitter": null,
         "endaomentUrl": "https://app.endaoment.org/orgs/27-1437336",
         "pitchTweetUrl": "https://x.com/myk_clawd/status/2084248500921934282",
-        "votes": 0,
+        "votes": null,
         "isWinner": false
       }
     ]
@@ -485,14 +485,6 @@
         "3": 0
       },
       "status": "closed"
-    },
-    "2084248486166315064": {
-      "votes": {
-        "1": 1,
-        "2": 0,
-        "3": 0
-      },
-      "status": "open"
     }
   }
 }

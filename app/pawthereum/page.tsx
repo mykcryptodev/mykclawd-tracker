@@ -137,10 +137,13 @@ function CharityRow({
   charity,
   totalVotes,
   showWinner,
+  showVotes = true,
 }: {
   charity: Charity;
   totalVotes: number;
   showWinner: boolean;
+  /** Off while a poll is still open — a running tally biases the vote. */
+  showVotes?: boolean;
 }) {
   const votes = charity.votes ?? 0;
   const pct = totalVotes > 0 ? (votes / totalVotes) * 100 : 0;
@@ -203,16 +206,20 @@ function CharityRow({
             )}
           </div>
         </div>
-        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-          {votes} {votes === 1 ? "vote" : "votes"}
-        </span>
+        {showVotes && (
+          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+            {votes} {votes === 1 ? "vote" : "votes"}
+          </span>
+        )}
       </div>
-      <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-muted">
-        <div
-          className={`h-full rounded-full ${winner ? "bg-green-500" : "bg-muted-foreground/40"}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
+      {showVotes && (
+        <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className={`h-full rounded-full ${winner ? "bg-green-500" : "bg-muted-foreground/40"}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -293,7 +300,9 @@ function WeekCard({ week }: { week: Week }) {
 }
 
 function LivePoll({ current }: { current: CurrentWeek }) {
-  const open = current.pollStatus === "open";
+  // Results stay hidden until voting closes — showing a running tally would
+  // bias the vote, which is why X hides it in its own UI too.
+  const open = current.pollStatus !== "closed";
   const totalVotes = current.totalVotes ?? 0;
 
   return (
@@ -305,7 +314,7 @@ function LivePoll({ current }: { current: CurrentWeek }) {
             {open ? "Poll open now" : "Awaiting donation"} · {fullDate(current.pollDate)}
           </h3>
           <Badge className="border-0 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-            {totalVotes} {totalVotes === 1 ? "vote" : "votes"}
+            {open ? "Voting" : `${totalVotes} ${totalVotes === 1 ? "vote" : "votes"}`}
           </Badge>
         </div>
         <span className="text-lg font-semibold tabular-nums">
@@ -314,8 +323,19 @@ function LivePoll({ current }: { current: CurrentWeek }) {
       </div>
       <div className="flex flex-col gap-2 p-4">
         {current.charities.map((c) => (
-          <CharityRow key={c.ein ?? c.name} charity={c} totalVotes={totalVotes} showWinner={false} />
+          <CharityRow
+            key={c.ein ?? c.name}
+            charity={c}
+            totalVotes={totalVotes}
+            showWinner={false}
+            showVotes={!open}
+          />
         ))}
+        {open && (
+          <p className="text-[11px] text-muted-foreground">
+            Results hidden until the poll closes.
+          </p>
+        )}
         {current.pollUrl && (
           <a
             href={current.pollUrl}
