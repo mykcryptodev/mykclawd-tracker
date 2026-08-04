@@ -1,56 +1,18 @@
 {
-  "generatedAt": "2026-08-03T12:25:46.070495+00:00",
+  "generatedAt": "2026-08-04T13:43:14.377189+00:00",
   "account": "myk_clawd",
   "donationsWallet": "0xceb30cb69998d39ab004ebc7f3e9b9e0b31b0dc0",
   "submodule": "0x12D661f977249778d78985f6ca860f42d7cAC9De",
   "totals": {
-    "usd": 511.235892,
-    "weeks": 8,
-    "charitiesFunded": 8,
-    "charitiesNominated": 24,
-    "avgPerWeek": 63.904486,
-    "totalVotes": 30,
+    "usd": 569.681218,
+    "weeks": 9,
+    "charitiesFunded": 9,
+    "charitiesNominated": 27,
+    "avgPerWeek": 63.297913,
+    "totalVotes": 35,
     "largestWeekUsd": 123.590819
   },
-  "current": {
-    "pollDate": "2026-08-03",
-    "pollUrl": "https://x.com/myk_clawd/status/2084248486166315064",
-    "amountUsd": 58.445326,
-    "pollStatus": "open",
-    "totalVotes": null,
-    "charities": [
-      {
-        "name": "Miller Park Zoological Society",
-        "ein": "510156393",
-        "website": "http://WWW.MPZS.ORG",
-        "twitter": null,
-        "endaomentUrl": "https://app.endaoment.org/orgs/51-0156393",
-        "pitchTweetUrl": "https://x.com/myk_clawd/status/2084248489328816275",
-        "votes": null,
-        "isWinner": false
-      },
-      {
-        "name": "NC Paws Rescue",
-        "ein": "822423479",
-        "website": "ncpawsrescue.org",
-        "twitter": null,
-        "endaomentUrl": "https://app.endaoment.org/orgs/82-2423479",
-        "pitchTweetUrl": "https://x.com/myk_clawd/status/2084248495108592000",
-        "votes": null,
-        "isWinner": false
-      },
-      {
-        "name": "The Perros Project",
-        "ein": "271437336",
-        "website": "http://perrosproject.org/",
-        "twitter": null,
-        "endaomentUrl": "https://app.endaoment.org/orgs/27-1437336",
-        "pitchTweetUrl": "https://x.com/myk_clawd/status/2084248500921934282",
-        "votes": null,
-        "isWinner": false
-      }
-    ]
-  },
+  "current": null,
   "weeks": [
     {
       "pollDate": "2026-06-08",
@@ -73,6 +35,7 @@
           "twitter": null,
           "endaomentUrl": "https://app.endaoment.org/orgs/33-1173163",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2063963184000614815",
+          "pitchCastUrl": null,
           "votes": 1,
           "isWinner": true
         },
@@ -83,6 +46,7 @@
           "twitter": null,
           "endaomentUrl": "https://app.endaoment.org/orgs/58-1798769",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2063963190153588809",
+          "pitchCastUrl": null,
           "votes": 1,
           "isWinner": false
         },
@@ -93,10 +57,14 @@
           "twitter": "@CIC_TherapyDogs",
           "endaomentUrl": "https://app.endaoment.org/orgs/46-0972575",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2063963196268900610",
+          "pitchCastUrl": null,
           "votes": 1,
           "isWinner": false
         }
-      ]
+      ],
+      "tieBreak": null,
+      "farcasterUrl": null,
+      "farcasterResultsUrl": null
     },
     {
       "pollDate": "2026-06-15",
@@ -119,6 +87,7 @@
           "twitter": null,
           "endaomentUrl": "https://app.endaoment.org/orgs/93-1102469",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2066492062527029496",
+          "pitchCastUrl": null,
           "votes": 0,
           "isWinner": false
         },
@@ -129,6 +98,7 @@
           "twitter": null,
           "endaomentUrl": "https://app.endaoment.org/orgs/27-1404082",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2066492068373938655",
+          "pitchCastUrl": null,
           "votes": 0,
           "isWinner": false
         },
@@ -139,10 +109,14 @@
           "twitter": null,
           "endaomentUrl": "https://app.endaoment.org/orgs/56-2279460",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2066492074359189701",
+          "pitchCastUrl": null,
           "votes": 0,
           "isWinner": true
         }
-      ]
+      ],
+      "tieBreak": null,
+      "farcasterUrl": null,
+      "farcasterResultsUrl": null
     },
     {
       "pollDate": "2026-06-22",
@@ -165,6 +139,7 @@
           "twitter": "@bassetandbeagle",
           "endaomentUrl": "https://app.endaoment.org/orgs/20-3539622",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2069043051251601559",
+          "pitchCastUrl": null,
           "votes": 2,
           "isWinner": false
         },
@@ -175,6 +150,7 @@
           "twitter": null,
           "endaomentUrl": "https://app.endaoment.org/orgs/94-1347069",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2069043057274606004",
+          "pitchCastUrl": null,
           "votes": 2,
           "isWinner": false
         },
@@ -185,10 +161,14 @@
           "twitter": null,
           "endaomentUrl": "https://app.endaoment.org/orgs/27-3455389",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2069043062857208212",
+          "pitchCastUrl": null,
           "votes": 3,
           "isWinner": true
         }
-      ]
+      ],
+      "tieBreak": null,
+      "farcasterUrl": null,
+      "farcasterResultsUrl": null
     },
     {
       "pollDate": "2026-06-29",
@@ -211,6 +191,7 @@
           "twitter": null,
           "endaomentUrl": "https://app.endaoment.org/orgs/47-1921056",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2071567810170331513",
+          "pitchCastUrl": null,
           "votes": 4,
           "isWinner": true
         },
@@ -221,6 +202,7 @@
           "twitter": null,
           "endaomentUrl": "https://app.endaoment.org/orgs/38-3847207",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2071567815740449009",
+          "pitchCastUrl": null,
           "votes": 4,
           "isWinner": false
         },
@@ -231,10 +213,14 @@
           "twitter": null,
           "endaomentUrl": "https://app.endaoment.org/orgs/85-2177478",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2071567821624971435",
+          "pitchCastUrl": null,
           "votes": 0,
           "isWinner": false
         }
-      ]
+      ],
+      "tieBreak": null,
+      "farcasterUrl": null,
+      "farcasterResultsUrl": null
     },
     {
       "pollDate": "2026-07-06",
@@ -257,6 +243,7 @@
           "twitter": null,
           "endaomentUrl": "https://app.endaoment.org/orgs/74-3255958",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2074116146010132633",
+          "pitchCastUrl": null,
           "votes": 0,
           "isWinner": false
         },
@@ -267,6 +254,7 @@
           "twitter": null,
           "endaomentUrl": "https://app.endaoment.org/orgs/61-1165562",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2074116151789973818",
+          "pitchCastUrl": null,
           "votes": 0,
           "isWinner": false
         },
@@ -277,10 +265,14 @@
           "twitter": null,
           "endaomentUrl": "https://app.endaoment.org/orgs/30-0172079",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2074116157951348789",
+          "pitchCastUrl": null,
           "votes": 1,
           "isWinner": true
         }
-      ]
+      ],
+      "tieBreak": null,
+      "farcasterUrl": null,
+      "farcasterResultsUrl": null
     },
     {
       "pollDate": "2026-07-13",
@@ -303,6 +295,7 @@
           "twitter": null,
           "endaomentUrl": "https://app.endaoment.org/orgs/81-2774441",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2076647020580782441",
+          "pitchCastUrl": null,
           "votes": 1,
           "isWinner": false
         },
@@ -313,6 +306,7 @@
           "twitter": "@animalsruleorg",
           "endaomentUrl": "https://app.endaoment.org/orgs/13-4264510",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2076647026679230960",
+          "pitchCastUrl": null,
           "votes": 2,
           "isWinner": true
         },
@@ -323,10 +317,14 @@
           "twitter": "@Greenwood_CO",
           "endaomentUrl": "https://app.endaoment.org/orgs/84-1228158",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2076647032316473809",
+          "pitchCastUrl": null,
           "votes": 2,
           "isWinner": false
         }
-      ]
+      ],
+      "tieBreak": null,
+      "farcasterUrl": null,
+      "farcasterResultsUrl": null
     },
     {
       "pollDate": "2026-07-20",
@@ -349,6 +347,7 @@
           "twitter": null,
           "endaomentUrl": "https://app.endaoment.org/orgs/27-3943866",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2079175207453958470",
+          "pitchCastUrl": null,
           "votes": 1,
           "isWinner": true
         },
@@ -359,6 +358,7 @@
           "twitter": null,
           "endaomentUrl": "https://app.endaoment.org/orgs/20-0352197",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2079175213544038716",
+          "pitchCastUrl": null,
           "votes": 0,
           "isWinner": false
         },
@@ -369,10 +369,14 @@
           "twitter": "@bonobodotorg",
           "endaomentUrl": "https://app.endaoment.org/orgs/52-2146443",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2079175219588038875",
+          "pitchCastUrl": null,
           "votes": 1,
           "isWinner": false
         }
-      ]
+      ],
+      "tieBreak": null,
+      "farcasterUrl": null,
+      "farcasterResultsUrl": null
     },
     {
       "pollDate": "2026-07-27",
@@ -395,6 +399,7 @@
           "twitter": "@WildlifeSOS",
           "endaomentUrl": "https://app.endaoment.org/orgs/20-3274638",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2081711832713040286",
+          "pitchCastUrl": null,
           "votes": 2,
           "isWinner": true
         },
@@ -405,6 +410,7 @@
           "twitter": "@cattyshackranch",
           "endaomentUrl": "https://app.endaoment.org/orgs/59-3698971",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2081711839046467640",
+          "pitchCastUrl": null,
           "votes": 2,
           "isWinner": false
         },
@@ -415,10 +421,72 @@
           "twitter": null,
           "endaomentUrl": "https://app.endaoment.org/orgs/68-0681539",
           "pitchTweetUrl": "https://x.com/myk_clawd/status/2081711845044367799",
+          "pitchCastUrl": null,
           "votes": 0,
           "isWinner": false
         }
-      ]
+      ],
+      "tieBreak": null,
+      "farcasterUrl": null,
+      "farcasterResultsUrl": null
+    },
+    {
+      "pollDate": "2026-08-03",
+      "completedDate": "2026-08-04",
+      "pollUrl": "https://x.com/myk_clawd/status/2084248486166315064",
+      "resultsUrl": "https://x.com/myk_clawd/status/2084615788577599644",
+      "amountUsd": 58.445326,
+      "cumulativeUsd": 569.681218,
+      "donationTxUrl": "https://basescan.org/tx/0xe496b957651b7ae152b92536c47e98ea3d32de61235101ea847f197febac709b",
+      "donationTx": "0xe496b957651b7ae152b92536c47e98ea3d32de61235101ea847f197febac709b",
+      "yieldTxUrl": null,
+      "totalVotes": 5,
+      "pollStatus": "closed",
+      "winner": "NC Paws Rescue",
+      "charities": [
+        {
+          "name": "Miller Park Zoological Society",
+          "ein": "510156393",
+          "website": "http://WWW.MPZS.ORG",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/51-0156393",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2084248489328816275",
+          "pitchCastUrl": null,
+          "votes": 1,
+          "isWinner": false,
+          "votesX": 1,
+          "votesFc": 0
+        },
+        {
+          "name": "NC Paws Rescue",
+          "ein": "822423479",
+          "website": "ncpawsrescue.org",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/82-2423479",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2084248495108592000",
+          "pitchCastUrl": null,
+          "votes": 4,
+          "isWinner": true,
+          "votesX": 4,
+          "votesFc": 0
+        },
+        {
+          "name": "The Perros Project",
+          "ein": "271437336",
+          "website": "http://perrosproject.org/",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/27-1437336",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2084248500921934282",
+          "pitchCastUrl": null,
+          "votes": 0,
+          "isWinner": false,
+          "votesX": 0,
+          "votesFc": 0
+        }
+      ],
+      "tieBreak": null,
+      "farcasterUrl": null,
+      "farcasterResultsUrl": null
     }
   ],
   "_pollCache": {
@@ -482,6 +550,14 @@
       "votes": {
         "1": 2,
         "2": 2,
+        "3": 0
+      },
+      "status": "closed"
+    },
+    "2084248486166315064": {
+      "votes": {
+        "1": 1,
+        "2": 4,
         "3": 0
       },
       "status": "closed"

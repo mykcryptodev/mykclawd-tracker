@@ -22,7 +22,10 @@ interface Charity {
   twitter: string | null;
   endaomentUrl: string | null;
   pitchTweetUrl: string | null;
+  pitchCastUrl?: string | null;
   votes: number | null;
+  votesX?: number | null;
+  votesFc?: number | null;
   isWinner: boolean;
 }
 
@@ -40,11 +43,15 @@ interface Week {
   pollStatus: string | null;
   winner: string | null;
   charities: Charity[];
+  tieBreak?: string | null;
+  farcasterUrl?: string | null;
+  farcasterResultsUrl?: string | null;
 }
 
 interface CurrentWeek {
   pollDate: string;
   pollUrl: string | null;
+  farcasterUrl?: string | null;
   amountUsd: number;
   pollStatus: string | null;
   totalVotes: number | null;
@@ -204,11 +211,33 @@ function CharityRow({
                 pitch ↗
               </a>
             )}
+            {charity.pitchCastUrl && (
+              <a
+                href={charity.pitchCastUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-foreground transition-colors"
+              >
+                pitch (fc) ↗
+              </a>
+            )}
           </div>
         </div>
         {showVotes && (
-          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+          <span
+            className="shrink-0 text-xs tabular-nums text-muted-foreground"
+            title={
+              charity.votesX != null || charity.votesFc != null
+                ? `X: ${charity.votesX ?? 0} · Farcaster: ${charity.votesFc ?? 0}`
+                : undefined
+            }
+          >
             {votes} {votes === 1 ? "vote" : "votes"}
+            {charity.votesX != null && charity.votesFc != null && (
+              <span className="ml-1 text-[10px] text-muted-foreground/70">
+                ({charity.votesX}𝕏·{charity.votesFc}fc)
+              </span>
+            )}
           </span>
         )}
       </div>
@@ -251,6 +280,11 @@ function WeekCard({ week }: { week: Week }) {
         ))}
 
         {note && <p className="text-[11px] text-muted-foreground">{note}</p>}
+        {week.tieBreak && (
+          <p className="text-[11px] text-muted-foreground">
+            Combined X + Farcaster vote tied — winner chosen at random among tied charities.
+          </p>
+        )}
 
         <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
           {week.pollUrl && (
@@ -260,7 +294,17 @@ function WeekCard({ week }: { week: Week }) {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
             >
-              Poll <ExternalLinkIcon className="size-3" />
+              Poll (X) <ExternalLinkIcon className="size-3" />
+            </a>
+          )}
+          {week.farcasterUrl && (
+            <a
+              href={week.farcasterUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Poll (Farcaster) <ExternalLinkIcon className="size-3" />
             </a>
           )}
           {week.resultsUrl && (
@@ -271,6 +315,16 @@ function WeekCard({ week }: { week: Week }) {
               className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
             >
               Results <ExternalLinkIcon className="size-3" />
+            </a>
+          )}
+          {week.farcasterResultsUrl && (
+            <a
+              href={week.farcasterResultsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Results (Farcaster) <ExternalLinkIcon className="size-3" />
             </a>
           )}
           {week.donationTxUrl && (
@@ -336,16 +390,28 @@ function LivePoll({ current }: { current: CurrentWeek }) {
             Results hidden until the poll closes.
           </p>
         )}
-        {current.pollUrl && (
-          <a
-            href={current.pollUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline"
-          >
-            Vote on X <ExternalLinkIcon className="size-3" />
-          </a>
-        )}
+        <div className="mt-1 flex flex-wrap items-center gap-x-4">
+          {current.pollUrl && (
+            <a
+              href={current.pollUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Vote on X <ExternalLinkIcon className="size-3" />
+            </a>
+          )}
+          {current.farcasterUrl && (
+            <a
+              href={current.farcasterUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-purple-600 dark:text-purple-400 hover:underline"
+            >
+              Vote on Farcaster <ExternalLinkIcon className="size-3" />
+            </a>
+          )}
+        </div>
       </div>
     </div>
   );
