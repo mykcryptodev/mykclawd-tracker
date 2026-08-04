@@ -81,6 +81,7 @@ const SEED_BETS = [
   { date: "2026-07-31", opponent: "CHC", side: "NO" as const, amount: 10.0, odds: 0.44, payout: 22.727271, result: "LOSS" as const, profit: -10.28, note: "Loss streak rule — lost 2 in a row (CHW Games 3+4, both extras)", betPlaced: true, tweetId: "2083319100567114200", createdAt: new Date().toISOString() },
   { date: "2026-08-02", opponent: "CHC", side: "YES" as const, amount: 10.0, odds: 0.55, payout: 18.181817, result: "WIN" as const, profit: 7.96, note: "Bounce-back: lost exactly 1 after 3+ game win streak", betPlaced: true, tweetId: "2084053082418082163", createdAt: new Date().toISOString() },
   { date: "2026-08-03", opponent: "STL", side: "YES" as const, amount: 10.0, odds: 0.64, payout: 15.625, result: "VOID" as const, profit: null, note: "UNWOUND — bet never should have been placed. A false-doubleheader retry cron misread the W/L sequence as (W,W); real streak was W1 and 8/3 is Game 1 of a new series, so no Step 4b rule fires. Bought 15.625 @ 0.64 ($10.18), sold 15.62 @ 0.63 ($9.66). Round-trip cost -$0.52.", betPlaced: false, tweetId: null, createdAt: new Date().toISOString() },
+  { date: "2026-08-04", opponent: "STL", side: "NO" as const, amount: 10.0, odds: 0.39, payout: 25.641024, result: null, profit: null, note: "Series deficit — STL leads series 1-0, today is Game 2", betPlaced: true, tweetId: null, createdAt: new Date().toISOString() },
 ] satisfies (typeof yankeesBets.$inferInsert)[];
 
 export async function GET() {
