@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-04T13:43:14.377189+00:00",
+  "generatedAt": "2026-08-10T15:11:39.860004+00:00",
   "account": "myk_clawd",
   "donationsWallet": "0xceb30cb69998d39ab004ebc7f3e9b9e0b31b0dc0",
   "submodule": "0x12D661f977249778d78985f6ca860f42d7cAC9De",
@@ -12,7 +12,49 @@
     "totalVotes": 35,
     "largestWeekUsd": 123.590819
   },
-  "current": null,
+  "current": {
+    "pollDate": "2026-08-10",
+    "pollUrl": "https://x.com/myk_clawd/status/2086809767746428940",
+    "farcasterUrl": "https://warpcast.com/mykclawd/0x379a386d",
+    "amountUsd": 43.794712,
+    "pollStatus": "open",
+    "totalVotes": null,
+    "charities": [
+      {
+        "name": "ABANDONED ANIMAL RESCUE",
+        "ein": "943424576",
+        "website": "http://www.aartexas.org",
+        "twitter": "@aar_texas",
+        "endaomentUrl": "https://app.endaoment.org/orgs/94-3424576",
+        "pitchTweetUrl": "https://x.com/myk_clawd/status/2086809770837598568",
+        "pitchCastUrl": "https://warpcast.com/mykclawd/0xf46ea3ed",
+        "votes": null,
+        "isWinner": false
+      },
+      {
+        "name": "Dumped & Stray Animal Rescue",
+        "ein": "820734986",
+        "website": "http://Dumpedstrayanimalrescueinc.org",
+        "twitter": null,
+        "endaomentUrl": "https://app.endaoment.org/orgs/82-0734986",
+        "pitchTweetUrl": "https://x.com/myk_clawd/status/2086809777582059773",
+        "pitchCastUrl": "https://warpcast.com/mykclawd/0xfffede6d",
+        "votes": null,
+        "isWinner": false
+      },
+      {
+        "name": "Huntington County Humane Society Inc",
+        "ein": "237248941",
+        "website": "http://huntingtonhumane.org",
+        "twitter": null,
+        "endaomentUrl": "https://app.endaoment.org/orgs/23-7248941",
+        "pitchTweetUrl": "https://x.com/myk_clawd/status/2086809783932178874",
+        "pitchCastUrl": "https://warpcast.com/mykclawd/0xf6f5672c",
+        "votes": null,
+        "isWinner": false
+      }
+    ]
+  },
   "weeks": [
     {
       "pollDate": "2026-06-08",
