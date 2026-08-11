@@ -1,60 +1,18 @@
 {
-  "generatedAt": "2026-08-10T15:11:39.860004+00:00",
+  "generatedAt": "2026-08-11T15:00:00.753151+00:00",
   "account": "myk_clawd",
   "donationsWallet": "0xceb30cb69998d39ab004ebc7f3e9b9e0b31b0dc0",
   "submodule": "0x12D661f977249778d78985f6ca860f42d7cAC9De",
   "totals": {
-    "usd": 569.681218,
-    "weeks": 9,
-    "charitiesFunded": 9,
-    "charitiesNominated": 27,
-    "avgPerWeek": 63.297913,
-    "totalVotes": 35,
+    "usd": 613.47593,
+    "weeks": 10,
+    "charitiesFunded": 10,
+    "charitiesNominated": 30,
+    "avgPerWeek": 61.347593,
+    "totalVotes": 41,
     "largestWeekUsd": 123.590819
   },
-  "current": {
-    "pollDate": "2026-08-10",
-    "pollUrl": "https://x.com/myk_clawd/status/2086809767746428940",
-    "farcasterUrl": "https://warpcast.com/mykclawd/0x379a386d",
-    "amountUsd": 43.794712,
-    "pollStatus": "open",
-    "totalVotes": null,
-    "charities": [
-      {
-        "name": "ABANDONED ANIMAL RESCUE",
-        "ein": "943424576",
-        "website": "http://www.aartexas.org",
-        "twitter": "@aar_texas",
-        "endaomentUrl": "https://app.endaoment.org/orgs/94-3424576",
-        "pitchTweetUrl": "https://x.com/myk_clawd/status/2086809770837598568",
-        "pitchCastUrl": "https://warpcast.com/mykclawd/0xf46ea3ed",
-        "votes": null,
-        "isWinner": false
-      },
-      {
-        "name": "Dumped & Stray Animal Rescue",
-        "ein": "820734986",
-        "website": "http://Dumpedstrayanimalrescueinc.org",
-        "twitter": null,
-        "endaomentUrl": "https://app.endaoment.org/orgs/82-0734986",
-        "pitchTweetUrl": "https://x.com/myk_clawd/status/2086809777582059773",
-        "pitchCastUrl": "https://warpcast.com/mykclawd/0xfffede6d",
-        "votes": null,
-        "isWinner": false
-      },
-      {
-        "name": "Huntington County Humane Society Inc",
-        "ein": "237248941",
-        "website": "http://huntingtonhumane.org",
-        "twitter": null,
-        "endaomentUrl": "https://app.endaoment.org/orgs/23-7248941",
-        "pitchTweetUrl": "https://x.com/myk_clawd/status/2086809783932178874",
-        "pitchCastUrl": "https://warpcast.com/mykclawd/0xf6f5672c",
-        "votes": null,
-        "isWinner": false
-      }
-    ]
-  },
+  "current": null,
   "weeks": [
     {
       "pollDate": "2026-06-08",
@@ -529,6 +487,64 @@
       "tieBreak": null,
       "farcasterUrl": null,
       "farcasterResultsUrl": null
+    },
+    {
+      "pollDate": "2026-08-10",
+      "completedDate": "2026-08-11",
+      "pollUrl": "https://x.com/myk_clawd/status/2086809767746428940",
+      "resultsUrl": "https://x.com/myk_clawd/status/2087177432042213823",
+      "amountUsd": 43.794712,
+      "cumulativeUsd": 613.47593,
+      "donationTxUrl": "https://basescan.org/tx/0xa30d73f5459d11f112f42e604880445a1caf54693946b5a3327977fd1e7280d0",
+      "donationTx": "0xa30d73f5459d11f112f42e604880445a1caf54693946b5a3327977fd1e7280d0",
+      "yieldTxUrl": null,
+      "totalVotes": 6,
+      "pollStatus": "closed",
+      "winner": "ABANDONED ANIMAL RESCUE",
+      "charities": [
+        {
+          "name": "ABANDONED ANIMAL RESCUE",
+          "ein": "943424576",
+          "website": "http://www.aartexas.org",
+          "twitter": "@aar_texas",
+          "endaomentUrl": "https://app.endaoment.org/orgs/94-3424576",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2086809770837598568",
+          "pitchCastUrl": "https://warpcast.com/mykclawd/0xf46ea3ed",
+          "votes": 6,
+          "isWinner": true,
+          "votesX": 1,
+          "votesFc": 5
+        },
+        {
+          "name": "Dumped & Stray Animal Rescue",
+          "ein": "820734986",
+          "website": "http://Dumpedstrayanimalrescueinc.org",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/82-0734986",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2086809777582059773",
+          "pitchCastUrl": "https://warpcast.com/mykclawd/0xfffede6d",
+          "votes": 0,
+          "isWinner": false,
+          "votesX": 0,
+          "votesFc": 0
+        },
+        {
+          "name": "Huntington County Humane Society Inc",
+          "ein": "237248941",
+          "website": "http://huntingtonhumane.org",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/23-7248941",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2086809783932178874",
+          "pitchCastUrl": "https://warpcast.com/mykclawd/0xf6f5672c",
+          "votes": 0,
+          "isWinner": false,
+          "votesX": 0,
+          "votesFc": 0
+        }
+      ],
+      "tieBreak": null,
+      "farcasterUrl": "https://warpcast.com/mykclawd/0x379a386d",
+      "farcasterResultsUrl": "https://warpcast.com/mykclawd/0xfd7ce4cd"
     }
   ],
   "_pollCache": {
@@ -601,6 +617,14 @@
         "1": 1,
         "2": 4,
         "3": 0
+      },
+      "status": "closed"
+    },
+    "2086809767746428940": {
+      "votes": {
+        "1": 1,
+        "2": 2,
+        "3": 1
       },
       "status": "closed"
     }
