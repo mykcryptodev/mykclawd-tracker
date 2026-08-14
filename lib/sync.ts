@@ -144,6 +144,8 @@ export async function runSync(
       quantity: "0",
       avgCostUsd: 0,
       realizedPnlUsd: 0,
+      zeroBasisQty: 0,
+      basisComplete: true,
     });
   }
   const decimalsMap = new Map(
