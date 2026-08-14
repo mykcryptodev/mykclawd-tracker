@@ -70,6 +70,11 @@ export const lots = sqliteTable("lots", {
   quantity: text("quantity").notNull().default("0"),
   avgCostUsd: real("avg_cost_usd").notNull().default(0),
   realizedPnlUsd: real("realized_pnl_usd").notNull().default(0),
+  // Quantity acquired with no traceable cost (airdrops, unpriceable transfers).
+  zeroBasisQty: real("zero_basis_qty").notNull().default(0),
+  // False when the transfer history does not reach back far enough to cover a
+  // disposal — this token's basis is not trustworthy and the UI hides it.
+  basisComplete: integer("basis_complete", { mode: "boolean" }).notNull().default(true),
 });
 
 export const dailySnapshots = sqliteTable("daily_snapshots", {
@@ -250,6 +255,29 @@ export const aeroConfig = sqliteTable("aero_config", {
   value: text("value").notNull(),
 });
 
+// veAERO (VotingEscrow NFT) snapshots — one row per token per sync run.
+// Appended on every sync; historical rows are kept for charting.
+export const aeroVeSnapshots = sqliteTable(
+  "aero_ve_snapshots",
+  {
+    ts:              integer("ts").notNull(),           // unix seconds — when snapshot was taken
+    address:         text("address").notNull(),         // monitored wallet address (lowercase)
+    tokenId:         integer("token_id").notNull(),     // veNFT token ID
+    lockedAero:      real("locked_aero").notNull(),     // AERO locked (human units, 18 dec)
+    lockEnd:         integer("lock_end").notNull(),     // lock expiry as unix timestamp (0 if permanent)
+    isPermanent:     integer("is_permanent", { mode: "boolean" }).notNull().default(false),
+    votingPower:     real("voting_power").notNull(),    // current veAERO balance (decayed), human units
+    claimableRebase: real("claimable_rebase").notNull(), // pending rebase AERO, human units
+    aeroPrice:       real("aero_price"),                // AERO/USD at snapshot time (nullable — filled from prices table)
+    lockedUsd:       real("locked_usd"),                // lockedAero * aeroPrice
+    claimableUsd:    real("claimable_usd"),             // claimableRebase * aeroPrice
+  },
+  (t) => ({
+    pk:         primaryKey({ columns: [t.ts, t.address, t.tokenId] }),
+    addrTsIdx:  index("aero_ve_ts_addr_idx").on(t.address, t.ts),
+  })
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Bounty / project job tracker
 // ─────────────────────────────────────────────────────────────────────────────
@@ -272,6 +300,55 @@ export const yankeesBets = sqliteTable("yankees_bets", {
   betPlaced: integer("bet_placed", { mode: "boolean" }).notNull().default(true),
   tweetId: text("tweet_id"),
   createdAt: text("created_at").notNull().default(new Date().toISOString()),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Quotient Mirror strategy — synced from the strategy's shadow + live books
+// (/home/mike/.openclaw/workspace/trading/strategies/quotient-mirror/state/)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const quotientPositions = sqliteTable("quotient_positions", {
+  signalId: text("signal_id").primaryKey(),
+  marketId: text("market_id"),
+  headline: text("headline").notNull().default(""),
+  slug: text("slug").notNull().default(""),
+  side: text("side", { enum: ["YES", "NO"] }).notNull(),
+  status: text("status", { enum: ["open", "closed"] }).notNull().default("open"),
+  // shadow (paper) leg
+  shadowStakeUsd: real("shadow_stake_usd"),
+  shadowEntryCost: real("shadow_entry_cost"),   // cents
+  shadowExitCost: real("shadow_exit_cost"),     // cents
+  shadowPnlUsd: real("shadow_pnl_usd"),
+  shadowRoiPct: real("shadow_roi_pct"),
+  // live leg (null until phase=live fills)
+  liveStakeUsd: real("live_stake_usd"),
+  liveEntryPrice: real("live_entry_price"),     // 0–1
+  liveExitPrice: real("live_exit_price"),
+  livePnlUsd: real("live_pnl_usd"),
+  liveEntryTx: text("live_entry_tx"),
+  liveExitTx: text("live_exit_tx"),
+  // shared metadata
+  entryRef: real("entry_ref"),                  // Quotient published reference entry (cents)
+  targetCost: real("target_cost"),              // Quotient fair price / take-profit (cents)
+  volume24h: real("volume_24h"),
+  publishedAt: text("published_at"),
+  enteredAt: text("entered_at"),
+  closedAt: text("closed_at"),
+  closeReason: text("close_reason"),            // target_hit | time_stop | resolution
+  endDate: text("end_date"),
+  syncedAt: integer("synced_at").notNull(),     // unix seconds
+});
+
+// Single-row (id = 1) sync metadata for the quotient sync script.
+export const quotientSync = sqliteTable("quotient_sync", {
+  id: integer("id").primaryKey(), // always 1
+  syncedAt: integer("synced_at").notNull(),
+  phase: text("phase").notNull().default("shadow"),
+  openCount: integer("open_count").notNull().default(0),
+  closedCount: integer("closed_count").notNull().default(0),
+  shadowPnlUsd: real("shadow_pnl_usd").notNull().default(0),
+  livePnlUsd: real("live_pnl_usd").notNull().default(0),
+  error: text("error"),
 });
 
 export const bountyJobs = sqliteTable("bounty_jobs", {

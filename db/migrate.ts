@@ -170,6 +170,23 @@ export async function runMigrations() {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS aero_ve_snapshots (
+      ts INTEGER NOT NULL,
+      address TEXT NOT NULL,
+      token_id INTEGER NOT NULL,
+      locked_aero REAL NOT NULL,
+      lock_end INTEGER NOT NULL,
+      is_permanent INTEGER NOT NULL DEFAULT 0,
+      voting_power REAL NOT NULL,
+      claimable_rebase REAL NOT NULL,
+      aero_price REAL,
+      locked_usd REAL,
+      claimable_usd REAL,
+      PRIMARY KEY (ts, address, token_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS aero_ve_ts_addr_idx ON aero_ve_snapshots(address, ts);
   `);
 
   // Additive migrations for existing databases
@@ -369,6 +386,10 @@ export async function runMigrations() {
   try { await client.execute(`ALTER TABLE portfolio_positions ADD COLUMN change_1d_usd REAL`); } catch { /* exists */ }
   try { await client.execute(`ALTER TABLE portfolio_positions ADD COLUMN change_1d_pct REAL`); } catch { /* exists */ }
 
+  // ── Cost-basis columns on lots (own-tracking PnL) ──────────────────────────
+  try { await client.execute(`ALTER TABLE lots ADD COLUMN zero_basis_qty REAL NOT NULL DEFAULT 0`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE lots ADD COLUMN basis_complete INTEGER NOT NULL DEFAULT 1`); } catch { /* exists */ }
+
   // ── portfolio_orders table ─────────────────────────────────────────────────
   try {
     await client.executeMultiple(`
@@ -401,6 +422,53 @@ export async function runMigrations() {
       CREATE INDEX IF NOT EXISTS portfolio_orders_sell_token_idx ON portfolio_orders(sell_token);
       CREATE INDEX IF NOT EXISTS portfolio_orders_buy_token_idx ON portfolio_orders(buy_token);
       CREATE INDEX IF NOT EXISTS portfolio_orders_status_idx ON portfolio_orders(status);
+    `);
+  } catch { /* exists */ }
+
+  // ── quotient_mirror strategy tables ─────────────────────────────────────────
+  try {
+    await client.executeMultiple(`
+      CREATE TABLE IF NOT EXISTS quotient_positions (
+        signal_id TEXT PRIMARY KEY,
+        market_id TEXT,
+        headline TEXT NOT NULL DEFAULT '',
+        slug TEXT NOT NULL DEFAULT '',
+        side TEXT NOT NULL CHECK(side IN ('YES', 'NO')),
+        status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'closed')),
+        shadow_stake_usd REAL,
+        shadow_entry_cost REAL,
+        shadow_exit_cost REAL,
+        shadow_pnl_usd REAL,
+        shadow_roi_pct REAL,
+        live_stake_usd REAL,
+        live_entry_price REAL,
+        live_exit_price REAL,
+        live_pnl_usd REAL,
+        live_entry_tx TEXT,
+        live_exit_tx TEXT,
+        entry_ref REAL,
+        target_cost REAL,
+        volume_24h REAL,
+        published_at TEXT,
+        entered_at TEXT,
+        closed_at TEXT,
+        close_reason TEXT,
+        end_date TEXT,
+        synced_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS quotient_positions_status_idx ON quotient_positions(status);
+      CREATE INDEX IF NOT EXISTS quotient_positions_entered_idx ON quotient_positions(entered_at);
+
+      CREATE TABLE IF NOT EXISTS quotient_sync (
+        id INTEGER PRIMARY KEY,
+        synced_at INTEGER NOT NULL,
+        phase TEXT NOT NULL DEFAULT 'shadow',
+        open_count INTEGER NOT NULL DEFAULT 0,
+        closed_count INTEGER NOT NULL DEFAULT 0,
+        shadow_pnl_usd REAL NOT NULL DEFAULT 0,
+        live_pnl_usd REAL NOT NULL DEFAULT 0,
+        error TEXT
+      );
     `);
   } catch { /* exists */ }
 
