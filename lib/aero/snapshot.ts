@@ -57,9 +57,18 @@ async function coingeckoSeries(id: string, days: number): Promise<{ now: number;
   const key = process.env.CG_DEMO_KEY;
   const headers: Record<string, string> = { accept: "application/json" };
   if (key) headers["x-cg-demo-api-key"] = key;
-  const url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=${days}&interval=hourly`;
+  // NOTE: do NOT pass `interval=hourly` — CoinGecko caps that at 90 days and returns
+  // HTTP 400 ("days_limit exceeded permissable value") beyond it, which silently broke
+  // this job the day the oldest position aged past 90 days. Auto-granularity gives
+  // hourly for 2–90d and daily past that, which is what we want for a start price.
+  const url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=${days}`;
   const res = await fetch(url, { headers });
-  if (!res.ok) return { now: 0, series: [] };
+  // Fail loud. Returning zeros here poisons every downstream USD figure and turns
+  // deltaPct/apr into NaN, which only surfaces 200 lines later as a libSQL insert error.
+  if (!res.ok) {
+    const body = (await res.text().catch(() => "")).slice(0, 200);
+    throw new Error(`CoinGecko ${id} (days=${days}) failed: HTTP ${res.status} ${body}`);
+  }
   const j = (await res.json()) as { prices?: Array<[number, number]> };
   const series: PriceSeries = (j.prices ?? []).map(([ms, p]) => [Math.floor(ms / 1000), p]);
   return { now: series[series.length - 1]?.[1] ?? 0, series };
@@ -144,12 +153,24 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
   // Prices — cover the full position duration so p0Start/p1Start are accurate.
   const actualDays = Math.ceil((Date.now() / 1000 - firstTs) / 86400) + 3;
   const cgDays = Math.min(365, Math.max(actualDays, 14));
+  // An unmapped token would otherwise be priced as ETH/BTC by the old `?? "ethereum"`
+  // fallback — plausible-looking but completely wrong USD. Refuse instead.
+  const cgId = (token: string): string => {
+    const id = AERO_COINGECKO_IDS[token];
+    if (!id) throw new Error(`No CoinGecko id mapped for token ${token} — add it to AERO_COINGECKO_IDS`);
+    return id;
+  };
   const [p0, p1, pA] = await Promise.all([
-    coingeckoSeries(AERO_COINGECKO_IDS[pos.token0] ?? "ethereum", cgDays),
-    coingeckoSeries(AERO_COINGECKO_IDS[pos.token1] ?? "bitcoin", cgDays),
+    coingeckoSeries(cgId(pos.token0), cgDays),
+    coingeckoSeries(cgId(pos.token1), cgDays),
     coingeckoSeries("aerodrome-finance", cgDays),
   ]);
   const p0Now = p0.now, p1Now = p1.now, paNow = pA.now;
+  if (!(p0Now > 0) || !(p1Now > 0) || !(paNow > 0)) {
+    throw new Error(
+      `CoinGecko returned no usable prices (days=${cgDays}): ${pos.tokenMeta0.sym}=${p0Now} ${pos.tokenMeta1.sym}=${p1Now} AERO=${paNow}`,
+    );
+  }
   const p0Start = priceAt(p0.series, firstTs);
   const p1Start = priceAt(p1.series, firstTs);
   const paStart = priceAt(pA.series, firstTs);
@@ -327,9 +348,11 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
   const aeroAddedUsd = (totalAeroN - startAeroN) * paNow;
   const deltaUsd = stratUsd - hodlUsd;
   const lpOnlyDelta = deltaUsd - aeroAddedUsd;
-  const deltaPct = (stratUsd / hodlUsd - 1) * 100;
+  // hodlUsd can legitimately be 0 for a fully-exited position — guard the divides so we
+  // never hand NaN to the DB (libSQL rejects non-finite numbers).
+  const deltaPct = hodlUsd > 0 ? (stratUsd / hodlUsd - 1) * 100 : 0;
   const days = (lastTs - firstTs) / 86400;
-  const apr = days > 0 ? (Math.pow(stratUsd / hodlUsd, 365 / days) - 1) * 100 : 0;
+  const apr = days > 0 && hodlUsd > 0 ? (Math.pow(stratUsd / hodlUsd, 365 / days) - 1) * 100 : 0;
 
   // ── Health / exit metrics ──
   const netBenefitUsd = aeroAddedUsd + lpOnlyDelta;
