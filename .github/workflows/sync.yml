@@ -84,6 +84,43 @@ jobs:
           DEFINITIVE_API_SECRET: ${{ secrets.DEFINITIVE_API_SECRET }}
         run: pnpm tsx scripts/run-portfolio-sync.ts
 
+  # ── On-chain cost basis ──────────────────────────────────────────────────────
+  # Rebuilds `lots` from our own transfer history so the PnL columns come from
+  # actual fills rather than a provider's mark. Runs after the portfolio sync
+  # because the read layer cross-checks replayed quantities against the live
+  # balances that sync writes: a mismatch hides the PnL rather than showing a
+  # wrong number, so writing them out of order would blank the column.
+  sync-basis:
+    name: On-chain cost basis
+    if: ${{ github.event_name == 'schedule' || inputs.jobs == 'all' || contains(inputs.jobs, 'basis') }}
+    needs: [install, sync-portfolio]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.25.0
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ github.sha }}
+
+      - name: Run cost basis sync
+        env:
+          ZERION_API_KEY: ${{ secrets.ZERION_API_KEY }}
+          CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
+        run: pnpm tsx scripts/run-basis-sync.ts
+
   # ── Yankees bets seed/sync ──────────────────────────────────────────────────
   sync-yankees:
     name: Yankees bets seed
@@ -141,7 +178,5 @@ jobs:
 
       - name: Run Aerodrome sync
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TELEGRAM_TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: pnpm tsx scripts/run-aero-sync.ts

@@ -34,9 +34,7 @@ jobs:
 
       - name: Run Aerodrome backfill (365 days)
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TELEGRAM_TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: pnpm tsx scripts/aero-backfill.ts
 
       # Fill the aero_snapshots gap with one synthetic daily row per day since LP

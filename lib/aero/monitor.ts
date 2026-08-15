@@ -61,25 +61,23 @@ function pct(n: number) {
   return `${sign}${n.toFixed(2)}%`;
 }
 
-async function sendTelegram(text: string): Promise<boolean> {
-  const token  = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  const threadId = process.env.TELEGRAM_TOPIC_ID; // optional thread/forum topic
+// Discord webhook — one env var, no bot token/chat ids to manage.
+// Set DISCORD_WEBHOOK_URL (repo secret) to a webhook for the channel that should
+// receive LP alerts. Discord messages cap at 2000 chars; our alerts are ~600.
+async function sendDiscord(text: string): Promise<boolean> {
+  const url = process.env.DISCORD_WEBHOOK_URL;
+  if (!url) return false;
 
-  if (!token || !chatId) return false;
-
-  const body: Record<string, string | number> = {
-    chat_id: chatId,
-    text,
-    parse_mode: "HTML",
-  };
-  if (threadId) body.message_thread_id = Number(threadId);
+  // Convert the small HTML subset we use to Discord markdown.
+  const md = text
+    .replace(/<b>(.*?)<\/b>/g, "**$1**")
+    .replace(/<[^>]+>/g, "");
 
   try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ content: md.slice(0, 1990) }),
     });
     return res.ok;
   } catch {
@@ -196,7 +194,7 @@ export async function evaluateAndAlert(s: AeroSnapshot): Promise<MonitorResult> 
     lines.push("", "👉 Consider exiting LP and holding assets directly.");
   }
 
-  const sent = await sendTelegram(lines.join("\n"));
+  const sent = await sendDiscord(lines.join("\n"));
   if (sent) await setConfigTs(cooldownKey, now);
 
   return { level, reasons, sent };
