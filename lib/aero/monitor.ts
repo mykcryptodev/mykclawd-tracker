@@ -5,6 +5,8 @@
 //   HARD_EXIT_NET_BENEFIT_PCT   < -5%    net benefit (AERO - IL) as % of start capital
 //   HARD_EXIT_COVERAGE_RATIO    < 0.30   AERO covering <30% of LP drag
 //   HARD_EXIT_LP_DELTA_PCT      < -15%   raw LP-only loss as % of start capital
+//                                        (only when net benefit is negative — deep IL fully
+//                                         covered by AERO rewards is ratio movement, not loss)
 //   HARD_EXIT_APR               < -20%   annualised strategy return deeply negative
 //
 // Warning thresholds (watch, alert — don't act yet):
@@ -121,11 +123,13 @@ export async function evaluateAndAlert(s: AeroSnapshot): Promise<MonitorResult> 
     );
   }
 
+  // Deep IL only warrants EXIT when rewards aren't covering it. Firing on raw
+  // IL alone false-positives on any LP in a trending market that is net profitable.
   const lpDeltaPct = u.startUsd > 0 ? (u.lpOnlyDelta / u.startUsd) * 100 : 0;
-  if (lpDeltaPct < HARD_EXIT_LP_DELTA_PCT) {
+  if (lpDeltaPct < HARD_EXIT_LP_DELTA_PCT && health.netBenefitUsd < 0) {
     level = "EXIT";
     reasons.push(
-      `LP-only delta ${pct(lpDeltaPct)} — raw impermanent loss exceeds ${HARD_EXIT_LP_DELTA_PCT}% of start capital`
+      `LP-only delta ${pct(lpDeltaPct)} with negative net benefit (${usd(health.netBenefitUsd)}) — uncompensated impermanent loss exceeds ${HARD_EXIT_LP_DELTA_PCT}% of start capital`
     );
   }
 
