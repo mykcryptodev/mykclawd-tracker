@@ -9,16 +9,19 @@
 //                                         covered by AERO rewards is ratio movement, not loss)
 //   HARD_EXIT_APR               < -20%   annualised strategy return deeply negative
 //
-// Warning thresholds (watch, alert — don't act yet):
-//   WARN_COVERAGE_RATIO         < 0.70   sustained for ≥ WARN_CONSECUTIVE snapshots
-//   WARN_AERO_VELOCITY_DROP     < 50%    of prior snapshot's velocity (earning nothing)
-//   WARN_NET_BENEFIT_PCT        < -2%    early deterioration signal
+// Warning thresholds (actionable only — myk 2026-08-17: no alerts unless there's
+// something to act on):
+//   OUT OF RANGE                every live position's curTick outside [tickLower, tickUpper)
+//                               — earning zero fees, action = rebalance or exit.
+//                               Checked on-chain from the snapshot's own tick data.
+//                               (Replaces the old USD-velocity WARN, which fired on AERO
+//                               price dips and claimed "may be out of range" — pure noise.)
 //
 // Alert cooldown: max 1 alert per 4 hours per severity level (stored in aero_config).
 
 import { db } from "../../db/client";
-import { aeroConfig, aeroSnapshots } from "../../db/schema";
-import { desc, eq } from "drizzle-orm";
+import { aeroConfig } from "../../db/schema";
+import { eq } from "drizzle-orm";
 import type { AeroSnapshot } from "./snapshot";
 
 // ─── thresholds ───────────────────────────────────────────────────────────────
@@ -26,9 +29,6 @@ const HARD_EXIT_NET_BENEFIT_PCT  = -5;
 const HARD_EXIT_COVERAGE_RATIO   = 0.30;
 const HARD_EXIT_LP_DELTA_PCT     = -15;
 const HARD_EXIT_APR              = -20;
-const WARN_COVERAGE_RATIO        = 0.70;
-const WARN_CONSECUTIVE           = 3;
-const WARN_NET_BENEFIT_PCT       = -2;
 const ALERT_COOLDOWN_S           = 4 * 3600;  // 4 hours
 
 // ─── types ────────────────────────────────────────────────────────────────────
@@ -87,21 +87,6 @@ async function sendDiscord(text: string): Promise<boolean> {
   }
 }
 
-// ─── consecutive low coverage check ──────────────────────────────────────────
-async function consecutiveLowCoverage(threshold: number, n: number): Promise<number> {
-  const rows = await db.select({ coverageRatio: aeroSnapshots.coverageRatio })
-    .from(aeroSnapshots)
-    .orderBy(desc(aeroSnapshots.ts))
-    .limit(n)
-    .all();
-  let count = 0;
-  for (const r of rows) {
-    if ((r.coverageRatio ?? 1) < threshold) count++;
-    else break;
-  }
-  return count;
-}
-
 // ─── main evaluator ───────────────────────────────────────────────────────────
 export async function evaluateAndAlert(s: AeroSnapshot): Promise<MonitorResult> {
   const { health, usd: u } = s;
@@ -139,28 +124,19 @@ export async function evaluateAndAlert(s: AeroSnapshot): Promise<MonitorResult> 
   }
 
   // ── warning checks (only if not already EXIT) ──
+  // Single WARN condition: the position is definitively out of range, verified
+  // from on-chain tick data already in the snapshot. Earning zero fees — the
+  // action is rebalance or exit. Soft "deterioration" WARNs were removed
+  // (2026-08-17): they alerted without an action to take.
   if (level !== "EXIT") {
-    if (health.netBenefitPct < WARN_NET_BENEFIT_PCT) {
-      level = "WARN";
-      reasons.push(`Net benefit ${pct(health.netBenefitPct)} — early deterioration signal (threshold: ${WARN_NET_BENEFIT_PCT}%)`);
-    }
-
-    const consec = await consecutiveLowCoverage(WARN_COVERAGE_RATIO, WARN_CONSECUTIVE);
-    if (consec >= WARN_CONSECUTIVE) {
-      level = "WARN";
-      reasons.push(
-        `Coverage ratio below ${WARN_COVERAGE_RATIO}x for ${consec} consecutive snapshots — rewards not keeping up with drag`
-      );
-    }
-
-    // AERO velocity drop: only if we have a prior data point
+    const live = s.positions.filter((p) => BigInt(p.liquidity) > 0n);
     if (
-      health.aeroVelocityPerHr !== null &&
-      health.aeroVelocityPerHr < 0
+      live.length > 0 &&
+      live.every((p) => p.curTick < p.tickLower || p.curTick >= p.tickUpper)
     ) {
       level = "WARN";
       reasons.push(
-        `AERO velocity is negative (${usd(health.aeroVelocityPerHr)}/hr) — position may be out of range`
+        "Position is OUT OF RANGE (current tick outside all live positions' bounds) — earning zero fees. Rebalance or exit."
       );
     }
   }
