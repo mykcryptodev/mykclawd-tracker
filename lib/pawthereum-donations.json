@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-11T15:00:00.753151+00:00",
+  "generatedAt": "2026-08-17T12:24:38.459104+00:00",
   "account": "myk_clawd",
   "donationsWallet": "0xceb30cb69998d39ab004ebc7f3e9b9e0b31b0dc0",
   "submodule": "0x12D661f977249778d78985f6ca860f42d7cAC9De",
@@ -12,7 +12,49 @@
     "totalVotes": 41,
     "largestWeekUsd": 123.590819
   },
-  "current": null,
+  "current": {
+    "pollDate": "2026-08-17",
+    "pollUrl": "https://x.com/myk_clawd/status/2089324763118260378",
+    "farcasterUrl": "https://warpcast.com/mykclawd/0x7c0d5b33",
+    "amountUsd": 40.522477,
+    "pollStatus": "open",
+    "totalVotes": null,
+    "charities": [
+      {
+        "name": "Monterey Bay Aquarium Foundation",
+        "ein": "942487469",
+        "website": "www.montereybayaquarium.org/",
+        "twitter": null,
+        "endaomentUrl": "https://app.endaoment.org/orgs/94-2487469",
+        "pitchTweetUrl": "https://x.com/myk_clawd/status/2089324765093802288",
+        "pitchCastUrl": "https://warpcast.com/mykclawd/0x69600b53",
+        "votes": null,
+        "isWinner": false
+      },
+      {
+        "name": "AMBERS ANIMAL ADVOCACY",
+        "ein": "812963419",
+        "website": "www.ambersanimaladvocacy.com",
+        "twitter": null,
+        "endaomentUrl": "https://app.endaoment.org/orgs/81-2963419",
+        "pitchTweetUrl": "https://x.com/myk_clawd/status/2089324770923774038",
+        "pitchCastUrl": "https://warpcast.com/mykclawd/0xbf89c99d",
+        "votes": null,
+        "isWinner": false
+      },
+      {
+        "name": "Sophies Gift",
+        "ein": "884016868",
+        "website": "http://SOPHIESGIFT.CO",
+        "twitter": null,
+        "endaomentUrl": "https://app.endaoment.org/orgs/88-4016868",
+        "pitchTweetUrl": "https://x.com/myk_clawd/status/2089324776783249816",
+        "pitchCastUrl": "https://warpcast.com/mykclawd/0xec321e23",
+        "votes": null,
+        "isWinner": false
+      }
+    ]
+  },
   "weeks": [
     {
       "pollDate": "2026-06-08",
