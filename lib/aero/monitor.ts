@@ -9,13 +9,10 @@
 //                                         covered by AERO rewards is ratio movement, not loss)
 //   HARD_EXIT_APR               < -20%   annualised strategy return deeply negative
 //
-// Warning thresholds (actionable only — myk 2026-08-17: no alerts unless there's
-// something to act on):
-//   OUT OF RANGE                every live position's curTick outside [tickLower, tickUpper)
-//                               — earning zero fees, action = rebalance or exit.
-//                               Checked on-chain from the snapshot's own tick data.
-//                               (Replaces the old USD-velocity WARN, which fired on AERO
-//                               price dips and claimed "may be out of range" — pure noise.)
+// No WARN level (myk 2026-08-17): an auto-rebalancer runs every 15m, so
+// out-of-range is self-healing and not alert-worthy; and the old soft WARNs
+// (net-benefit dip, low coverage, USD AERO velocity) fired on price noise with
+// no action attached. Only EXIT conditions alert — those mean get out now.
 //
 // Alert cooldown: max 1 alert per 4 hours per severity level (stored in aero_config).
 
@@ -121,24 +118,6 @@ export async function evaluateAndAlert(s: AeroSnapshot): Promise<MonitorResult> 
   if (u.apr < HARD_EXIT_APR) {
     level = "EXIT";
     reasons.push(`Annualised APR ${pct(u.apr)} is deeply negative (threshold: ${HARD_EXIT_APR}%)`);
-  }
-
-  // ── warning checks (only if not already EXIT) ──
-  // Single WARN condition: the position is definitively out of range, verified
-  // from on-chain tick data already in the snapshot. Earning zero fees — the
-  // action is rebalance or exit. Soft "deterioration" WARNs were removed
-  // (2026-08-17): they alerted without an action to take.
-  if (level !== "EXIT") {
-    const live = s.positions.filter((p) => BigInt(p.liquidity) > 0n);
-    if (
-      live.length > 0 &&
-      live.every((p) => p.curTick < p.tickLower || p.curTick >= p.tickUpper)
-    ) {
-      level = "WARN";
-      reasons.push(
-        "Position is OUT OF RANGE (current tick outside all live positions' bounds) — earning zero fees. Rebalance or exit."
-      );
-    }
   }
 
   if (level === "OK") return { level, reasons: [], sent: false };
