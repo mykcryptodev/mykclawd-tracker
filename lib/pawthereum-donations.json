@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-17T12:24:38.459104+00:00",
+  "generatedAt": "2026-08-18T12:20:45.812663+00:00",
   "account": "myk_clawd",
   "donationsWallet": "0xceb30cb69998d39ab004ebc7f3e9b9e0b31b0dc0",
   "submodule": "0x12D661f977249778d78985f6ca860f42d7cAC9De",
@@ -17,8 +17,8 @@
     "pollUrl": "https://x.com/myk_clawd/status/2089324763118260378",
     "farcasterUrl": "https://warpcast.com/mykclawd/0x7c0d5b33",
     "amountUsd": 40.522477,
-    "pollStatus": "open",
-    "totalVotes": null,
+    "pollStatus": "closed",
+    "totalVotes": 3,
     "charities": [
       {
         "name": "Monterey Bay Aquarium Foundation",
@@ -28,7 +28,7 @@
         "endaomentUrl": "https://app.endaoment.org/orgs/94-2487469",
         "pitchTweetUrl": "https://x.com/myk_clawd/status/2089324765093802288",
         "pitchCastUrl": "https://warpcast.com/mykclawd/0x69600b53",
-        "votes": null,
+        "votes": 2,
         "isWinner": false
       },
       {
@@ -39,7 +39,7 @@
         "endaomentUrl": "https://app.endaoment.org/orgs/81-2963419",
         "pitchTweetUrl": "https://x.com/myk_clawd/status/2089324770923774038",
         "pitchCastUrl": "https://warpcast.com/mykclawd/0xbf89c99d",
-        "votes": null,
+        "votes": 0,
         "isWinner": false
       },
       {
@@ -50,7 +50,7 @@
         "endaomentUrl": "https://app.endaoment.org/orgs/88-4016868",
         "pitchTweetUrl": "https://x.com/myk_clawd/status/2089324776783249816",
         "pitchCastUrl": "https://warpcast.com/mykclawd/0xec321e23",
-        "votes": null,
+        "votes": 1,
         "isWinner": false
       }
     ]
@@ -666,6 +666,14 @@
       "votes": {
         "1": 1,
         "2": 2,
+        "3": 1
+      },
+      "status": "closed"
+    },
+    "2089324763118260378": {
+      "votes": {
+        "1": 2,
+        "2": 0,
         "3": 1
       },
       "status": "closed"
