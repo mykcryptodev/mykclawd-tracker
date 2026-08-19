@@ -87,6 +87,7 @@ const SEED_BETS = [
   { date: "2026-08-13", opponent: "SEA", side: "YES" as const, amount: 15.0, odds: 0.58, payout: 25.862066, result: "LOSS" as const, profit: -15.31, note: "Rule 1: 2+ game win streak (W Aug 11, W Aug 12) + Game 3 of series Yankees lead 2-0 - high confidence 5", betPlaced: true, tweetId: null, createdAt: new Date().toISOString() },
   { date: "2026-08-15", opponent: "TOR", side: "NO" as const, amount: 10.0, odds: 0.4, payout: 25.0, result: "WIN" as const, profit: 14.7, note: "Series deficit — TOR leads series 1-0, today is Game 2", betPlaced: true, tweetId: "2088773030306537710", createdAt: new Date().toISOString() },
   { date: "2026-08-16", opponent: "TOR", side: "NO" as const, amount: 10.0, odds: 0.52, payout: 19.230768, result: "LOSS" as const, profit: -10.24, note: "NO - Game 3 of series, TOR leads 2-0", betPlaced: true, tweetId: null, createdAt: new Date().toISOString() },
+  { date: "2026-08-19", opponent: "BAL", side: "YES" as const, amount: 15.0, odds: 0.53, payout: 28.301885, result: null, profit: null, note: "Rule 1: won last 2+ (Aug 16 vs TOR + Aug 18 at BAL) and Game 2 of series Yankees lead 1-0 - high confidence YES", betPlaced: true, tweetId: null, createdAt: new Date().toISOString() },
 ] satisfies (typeof yankeesBets.$inferInsert)[];
 
 export async function GET() {
