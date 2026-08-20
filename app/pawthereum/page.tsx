@@ -4,6 +4,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { CumulativeChart } from "@/components/pawthereum/cumulative-chart";
+import { ExplainerLightbox } from "@/components/pawthereum/explainer-lightbox";
 import { ExternalLinkIcon, TrophyIcon, RadioIcon } from "lucide-react";
 import donationsData from "@/lib/pawthereum-donations.json";
 
@@ -475,12 +476,9 @@ export default function PawthereumPage() {
           </p>
 
           <div className="overflow-hidden rounded-xl border border-border/60 bg-card">
-            {/* eslint-disable-next-line @next/next/no-img-element -- static explainer asset */}
-            <img
+            <ExplainerLightbox
               src="/images/pawthereum-explainer.jpg"
               alt="Pawthereum yield donation flow: endowment yield in Mamo is claimed weekly via the Gnosis Safe submodule, a community poll on X picks an animal shelter, and the donation is executed via Endaoment."
-              className="h-auto w-full"
-              loading="lazy"
             />
           </div>
 
