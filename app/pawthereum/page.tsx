@@ -474,6 +474,16 @@ export default function PawthereumPage() {
             every donation below is a verifiable Base transaction.
           </p>
 
+          <div className="overflow-hidden rounded-xl border border-border/60 bg-card">
+            {/* eslint-disable-next-line @next/next/no-img-element -- static explainer asset */}
+            <img
+              src="/images/pawthereum-explainer.jpg"
+              alt="Pawthereum yield donation flow: endowment yield in Mamo is claimed weekly via the Gnosis Safe submodule, a community poll on X picks an animal shelter, and the donation is executed via Endaoment."
+              className="h-auto w-full"
+              loading="lazy"
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             {stats.map(({ label, value }) => (
               <div
