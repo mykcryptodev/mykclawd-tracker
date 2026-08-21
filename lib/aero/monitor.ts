@@ -107,11 +107,16 @@ export async function evaluateAndAlert(s: AeroSnapshot): Promise<MonitorResult> 
 
   // Deep IL only warrants EXIT when rewards aren't covering it. Firing on raw
   // IL alone false-positives on any LP in a trending market that is net profitable.
+  // Gate on netBenefitPct < HARD_EXIT_NET_BENEFIT_PCT, not netBenefitUsd < 0:
+  // "rewards aren't covering it" must mean MATERIALLY uncovered (past the -5%
+  // exit threshold), not any-negative — a -$15 wobble on $9k is price noise,
+  // and gating on < 0 made this fire every cooldown window (2026-08-21: two
+  // EXIT alerts at -0.17% and -0.44% net with ~1.00x coverage).
   const lpDeltaPct = u.startUsd > 0 ? (u.lpOnlyDelta / u.startUsd) * 100 : 0;
-  if (lpDeltaPct < HARD_EXIT_LP_DELTA_PCT && health.netBenefitUsd < 0) {
+  if (lpDeltaPct < HARD_EXIT_LP_DELTA_PCT && health.netBenefitPct < HARD_EXIT_NET_BENEFIT_PCT) {
     level = "EXIT";
     reasons.push(
-      `LP-only delta ${pct(lpDeltaPct)} with negative net benefit (${usd(health.netBenefitUsd)}) — uncompensated impermanent loss exceeds ${HARD_EXIT_LP_DELTA_PCT}% of start capital`
+      `LP-only delta ${pct(lpDeltaPct)} with net benefit ${pct(health.netBenefitPct)} (${usd(health.netBenefitUsd)}) — deep impermanent loss not covered by AERO rewards`
     );
   }
 
