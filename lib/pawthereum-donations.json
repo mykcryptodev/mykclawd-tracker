@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-20T13:29:27.846298+00:00",
+  "generatedAt": "2026-08-24T12:32:25.248902+00:00",
   "account": "myk_clawd",
   "donationsWallet": "0xceb30cb69998d39ab004ebc7f3e9b9e0b31b0dc0",
   "submodule": "0x12D661f977249778d78985f6ca860f42d7cAC9De",
@@ -12,7 +12,49 @@
     "totalVotes": 52,
     "largestWeekUsd": 123.590819
   },
-  "current": null,
+  "current": {
+    "pollDate": "2026-08-24",
+    "pollUrl": "https://x.com/myk_clawd/status/2091862533137170614",
+    "farcasterUrl": "https://warpcast.com/mykclawd/0x8cb5ec26",
+    "amountUsd": 35.493239,
+    "pollStatus": "open",
+    "totalVotes": null,
+    "charities": [
+      {
+        "name": "West Place Animal Sanctuary",
+        "ein": "142005606",
+        "website": "https://www.westplace.org",
+        "twitter": null,
+        "endaomentUrl": "https://app.endaoment.org/orgs/14-2005606",
+        "pitchTweetUrl": "https://x.com/myk_clawd/status/2091862535452364905",
+        "pitchCastUrl": "https://warpcast.com/mykclawd/0x9da1c681",
+        "votes": null,
+        "isWinner": false
+      },
+      {
+        "name": "White Coat Waste Project",
+        "ein": "460856543",
+        "website": "https://www.whitecoatwaste.org/",
+        "twitter": "WhiteCoatWaste",
+        "endaomentUrl": "https://app.endaoment.org/orgs/46-0856543",
+        "pitchTweetUrl": "https://x.com/myk_clawd/status/2091862541089567038",
+        "pitchCastUrl": "https://warpcast.com/mykclawd/0xb5b14cc2",
+        "votes": null,
+        "isWinner": false
+      },
+      {
+        "name": "Friends of the Forest",
+        "ein": "871000878",
+        "website": "friendsoftheforestct.org",
+        "twitter": null,
+        "endaomentUrl": "https://app.endaoment.org/orgs/87-1000878",
+        "pitchTweetUrl": "https://x.com/myk_clawd/status/2091862547041288673",
+        "pitchCastUrl": "https://warpcast.com/mykclawd/0x658b8807",
+        "votes": null,
+        "isWinner": false
+      }
+    ]
+  },
   "weeks": [
     {
       "pollDate": "2026-06-08",
