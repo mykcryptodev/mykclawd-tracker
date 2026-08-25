@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-24T12:32:25.248902+00:00",
+  "generatedAt": "2026-08-25T12:21:15.149115+00:00",
   "account": "myk_clawd",
   "donationsWallet": "0xceb30cb69998d39ab004ebc7f3e9b9e0b31b0dc0",
   "submodule": "0x12D661f977249778d78985f6ca860f42d7cAC9De",
@@ -17,8 +17,8 @@
     "pollUrl": "https://x.com/myk_clawd/status/2091862533137170614",
     "farcasterUrl": "https://warpcast.com/mykclawd/0x8cb5ec26",
     "amountUsd": 35.493239,
-    "pollStatus": "open",
-    "totalVotes": null,
+    "pollStatus": "closed",
+    "totalVotes": 2,
     "charities": [
       {
         "name": "West Place Animal Sanctuary",
@@ -28,7 +28,7 @@
         "endaomentUrl": "https://app.endaoment.org/orgs/14-2005606",
         "pitchTweetUrl": "https://x.com/myk_clawd/status/2091862535452364905",
         "pitchCastUrl": "https://warpcast.com/mykclawd/0x9da1c681",
-        "votes": null,
+        "votes": 0,
         "isWinner": false
       },
       {
@@ -39,7 +39,7 @@
         "endaomentUrl": "https://app.endaoment.org/orgs/46-0856543",
         "pitchTweetUrl": "https://x.com/myk_clawd/status/2091862541089567038",
         "pitchCastUrl": "https://warpcast.com/mykclawd/0xb5b14cc2",
-        "votes": null,
+        "votes": 1,
         "isWinner": false
       },
       {
@@ -50,7 +50,7 @@
         "endaomentUrl": "https://app.endaoment.org/orgs/87-1000878",
         "pitchTweetUrl": "https://x.com/myk_clawd/status/2091862547041288673",
         "pitchCastUrl": "https://warpcast.com/mykclawd/0x658b8807",
-        "votes": null,
+        "votes": 1,
         "isWinner": false
       }
     ]
@@ -732,6 +732,14 @@
       "votes": {
         "1": 2,
         "2": 0,
+        "3": 1
+      },
+      "status": "closed"
+    },
+    "2091862533137170614": {
+      "votes": {
+        "1": 0,
+        "2": 1,
         "3": 1
       },
       "status": "closed"
