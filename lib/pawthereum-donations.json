@@ -1,60 +1,18 @@
 {
-  "generatedAt": "2026-08-25T12:21:15.149115+00:00",
+  "generatedAt": "2026-08-25T12:37:06.351282+00:00",
   "account": "myk_clawd",
   "donationsWallet": "0xceb30cb69998d39ab004ebc7f3e9b9e0b31b0dc0",
   "submodule": "0x12D661f977249778d78985f6ca860f42d7cAC9De",
   "totals": {
-    "usd": 653.998407,
-    "weeks": 11,
-    "charitiesFunded": 11,
-    "charitiesNominated": 33,
-    "avgPerWeek": 59.454401,
-    "totalVotes": 52,
+    "usd": 689.491646,
+    "weeks": 12,
+    "charitiesFunded": 12,
+    "charitiesNominated": 36,
+    "avgPerWeek": 57.457637,
+    "totalVotes": 63,
     "largestWeekUsd": 123.590819
   },
-  "current": {
-    "pollDate": "2026-08-24",
-    "pollUrl": "https://x.com/myk_clawd/status/2091862533137170614",
-    "farcasterUrl": "https://warpcast.com/mykclawd/0x8cb5ec26",
-    "amountUsd": 35.493239,
-    "pollStatus": "closed",
-    "totalVotes": 2,
-    "charities": [
-      {
-        "name": "West Place Animal Sanctuary",
-        "ein": "142005606",
-        "website": "https://www.westplace.org",
-        "twitter": null,
-        "endaomentUrl": "https://app.endaoment.org/orgs/14-2005606",
-        "pitchTweetUrl": "https://x.com/myk_clawd/status/2091862535452364905",
-        "pitchCastUrl": "https://warpcast.com/mykclawd/0x9da1c681",
-        "votes": 0,
-        "isWinner": false
-      },
-      {
-        "name": "White Coat Waste Project",
-        "ein": "460856543",
-        "website": "https://www.whitecoatwaste.org/",
-        "twitter": "WhiteCoatWaste",
-        "endaomentUrl": "https://app.endaoment.org/orgs/46-0856543",
-        "pitchTweetUrl": "https://x.com/myk_clawd/status/2091862541089567038",
-        "pitchCastUrl": "https://warpcast.com/mykclawd/0xb5b14cc2",
-        "votes": 1,
-        "isWinner": false
-      },
-      {
-        "name": "Friends of the Forest",
-        "ein": "871000878",
-        "website": "friendsoftheforestct.org",
-        "twitter": null,
-        "endaomentUrl": "https://app.endaoment.org/orgs/87-1000878",
-        "pitchTweetUrl": "https://x.com/myk_clawd/status/2091862547041288673",
-        "pitchCastUrl": "https://warpcast.com/mykclawd/0x658b8807",
-        "votes": 1,
-        "isWinner": false
-      }
-    ]
-  },
+  "current": null,
   "weeks": [
     {
       "pollDate": "2026-06-08",
@@ -645,6 +603,64 @@
       "tieBreak": null,
       "farcasterUrl": "https://warpcast.com/mykclawd/0x7c0d5b33",
       "farcasterResultsUrl": "https://warpcast.com/mykclawd/0xfd6ffd8f"
+    },
+    {
+      "pollDate": "2026-08-24",
+      "completedDate": "2026-08-25",
+      "pollUrl": "https://x.com/myk_clawd/status/2091862533137170614",
+      "resultsUrl": "https://x.com/myk_clawd/status/2092225693010604153",
+      "amountUsd": 35.493239,
+      "cumulativeUsd": 689.491646,
+      "donationTxUrl": "https://basescan.org/tx/0xecf6a14102a0f12904df096186dd2dbad83ca1b493b9f367cf2cf392830cae4d",
+      "donationTx": "0xecf6a14102a0f12904df096186dd2dbad83ca1b493b9f367cf2cf392830cae4d",
+      "yieldTxUrl": null,
+      "totalVotes": 11,
+      "pollStatus": "closed",
+      "winner": "West Place Animal Sanctuary",
+      "charities": [
+        {
+          "name": "West Place Animal Sanctuary",
+          "ein": "142005606",
+          "website": "https://www.westplace.org",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/14-2005606",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2091862535452364905",
+          "pitchCastUrl": "https://warpcast.com/mykclawd/0x9da1c681",
+          "votes": 5,
+          "isWinner": true,
+          "votesX": 0,
+          "votesFc": 5
+        },
+        {
+          "name": "White Coat Waste Project",
+          "ein": "460856543",
+          "website": "https://www.whitecoatwaste.org/",
+          "twitter": "WhiteCoatWaste",
+          "endaomentUrl": "https://app.endaoment.org/orgs/46-0856543",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2091862541089567038",
+          "pitchCastUrl": "https://warpcast.com/mykclawd/0xb5b14cc2",
+          "votes": 4,
+          "isWinner": false,
+          "votesX": 1,
+          "votesFc": 3
+        },
+        {
+          "name": "Friends of the Forest",
+          "ein": "871000878",
+          "website": "friendsoftheforestct.org",
+          "twitter": null,
+          "endaomentUrl": "https://app.endaoment.org/orgs/87-1000878",
+          "pitchTweetUrl": "https://x.com/myk_clawd/status/2091862547041288673",
+          "pitchCastUrl": "https://warpcast.com/mykclawd/0x658b8807",
+          "votes": 2,
+          "isWinner": false,
+          "votesX": 1,
+          "votesFc": 1
+        }
+      ],
+      "tieBreak": null,
+      "farcasterUrl": "https://warpcast.com/mykclawd/0x8cb5ec26",
+      "farcasterResultsUrl": "https://warpcast.com/mykclawd/0x6df1c2f7"
     }
   ],
   "_pollCache": {
