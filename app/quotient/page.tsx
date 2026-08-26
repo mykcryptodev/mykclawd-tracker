@@ -295,7 +295,7 @@ export default function QuotientPage() {
                 ))}
               </div>
 
-              <Tabs defaultValue="live" className="gap-4">
+              <Tabs defaultValue="shadow" className="gap-4">
                 <TabsList>
                   <TabsTrigger value="live">Live only ({livePositions.length})</TabsTrigger>
                   <TabsTrigger value="shadow">Shadow / paper ({positions.length})</TabsTrigger>
