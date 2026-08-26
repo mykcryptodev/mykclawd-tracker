@@ -6,7 +6,19 @@ import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ExternalLinkIcon } from "lucide-react";
+import {
+  closeReasonLabel,
+  computeQuotientStats,
+  inferExecutionStatus,
+  inferLiveStatus,
+  liveCostBasis,
+  polygonscanTxUrl,
+  polymarketUrl,
+  type QuotientExecutionStatus,
+  type QuotientLegStatus,
+} from "@/lib/quotient";
 
 // ── types ────────────────────────────────────────────────────────────────────
 
@@ -17,17 +29,28 @@ interface QuotientPosition {
   slug: string;
   side: "YES" | "NO";
   status: "open" | "closed";
+  executionStatus?: QuotientExecutionStatus;
+  liveStatus?: QuotientLegStatus;
+  liveSkipReason: string | null;
+  liveSkippedAt: string | null;
   shadowStakeUsd: number | null;
   shadowEntryCost: number | null;
   shadowExitCost: number | null;
   shadowPnlUsd: number | null;
   shadowRoiPct: number | null;
   liveStakeUsd: number | null;
+  liveEntryUsdc: number | null;
   liveEntryPrice: number | null;
+  liveEntryShares: number | null;
+  liveExitUsdc: number | null;
   liveExitPrice: number | null;
+  liveExitShares: number | null;
   livePnlUsd: number | null;
+  liveRoiPct: number | null;
   liveEntryTx: string | null;
   liveExitTx: string | null;
+  liveEntryOrderId: string | null;
+  liveExitOrderId: string | null;
   entryRef: number | null;
   targetCost: number | null;
   volume24h: number | null;
@@ -35,6 +58,7 @@ interface QuotientPosition {
   enteredAt: string | null;
   closedAt: string | null;
   closeReason: string | null;
+  liveCloseReason: string | null;
   endDate: string | null;
   syncedAt: number;
 }
@@ -46,6 +70,10 @@ interface QuotientSync {
   closedCount: number;
   shadowPnlUsd: number;
   livePnlUsd: number;
+  liveOpenCount?: number;
+  liveClosedCount?: number;
+  liveSkippedCount?: number;
+  liveOpenCostBasisUsd?: number;
   error: string | null;
 }
 
@@ -62,19 +90,65 @@ function fmtDate(iso: string | null | undefined): string {
   return iso.slice(0, 10);
 }
 
-function closeReasonLabel(r: string | null): string {
-  if (r === "target_hit") return "Target hit";
-  if (r === "time_stop") return "Time stop (7d)";
-  if (r === "resolution") return "Resolved";
-  return r ?? "—";
-}
-
 function timeAgo(unixSec: number): string {
   const diff = Math.floor(Date.now() / 1000) - unixSec;
   if (diff < 60) return `${diff}s ago`;
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function fmtPrice(v: number | null | undefined): string {
+  if (v === null || v === undefined) return "—";
+  return v <= 1 ? `${(v * 100).toFixed(1)}¢` : `${v.toFixed(1)}¢`;
+}
+
+function shortTx(tx: string): string {
+  return `${tx.slice(0, 6)}…${tx.slice(-4)}`;
+}
+
+function executionBadge(p: QuotientPosition) {
+  const status = inferExecutionStatus(p);
+  if (status === "real") {
+    return <Badge className="bg-green-500/15 text-green-400 border-green-500/40">REAL</Badge>;
+  }
+  if (status === "live_skipped") {
+    return <Badge className="bg-amber-500/15 text-amber-300 border-amber-500/40">LIVE-SKIPPED</Badge>;
+  }
+  return <Badge variant="outline" className="text-muted-foreground">SHADOW</Badge>;
+}
+
+function MarketLink({ position, max = 60 }: { position: QuotientPosition; max?: number }) {
+  const label = position.headline.length > max ? position.headline.slice(0, max) + "…" : position.headline;
+  const href = polymarketUrl(position.slug);
+  if (!href) return <span title={position.headline}>{label}</span>;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="hover:underline underline-offset-2"
+      title={position.headline}
+    >
+      {label}
+    </a>
+  );
+}
+
+function TxLink({ tx, label }: { tx: string | null; label: string }) {
+  const href = polygonscanTxUrl(tx);
+  if (!tx || !href) return <span className="text-muted-foreground">—</span>;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 text-blue-300 hover:text-blue-200 hover:underline underline-offset-2"
+      title={tx}
+    >
+      {label}: {shortTx(tx)} <ExternalLinkIcon className="h-3 w-3" />
+    </a>
+  );
 }
 
 // ── component ────────────────────────────────────────────────────────────────
@@ -103,33 +177,14 @@ export default function QuotientPage() {
   }, []);
 
   const stats = React.useMemo(() => {
-    const closed = positions.filter((p) => p.status === "closed");
-    const open = positions.filter((p) => p.status === "open");
-    const shadowWins = closed.filter((p) => (p.shadowPnlUsd ?? 0) > 0).length;
-    const shadowPnl = closed.reduce((s, p) => s + (p.shadowPnlUsd ?? 0), 0);
-    const liveClosed = closed.filter((p) => p.livePnlUsd !== null);
-    const livePnl = liveClosed.reduce((s, p) => s + (p.livePnlUsd ?? 0), 0);
-    const liveWins = liveClosed.filter((p) => (p.livePnlUsd ?? 0) > 0).length;
-    const winRate = closed.length > 0 ? (shadowWins / closed.length) * 100 : 0;
-    const avgRoi =
-      closed.length > 0
-        ? closed.reduce((s, p) => s + (p.shadowRoiPct ?? 0), 0) / closed.length
-        : 0;
-    return {
-      open: open.length,
-      closed: closed.length,
-      shadowWins,
-      shadowPnl,
-      winRate,
-      avgRoi,
-      livePnl,
-      liveWins,
-      liveClosed: liveClosed.length,
-    };
+    return computeQuotientStats(positions);
   }, [positions]);
 
-  const open = positions.filter((p) => p.status === "open");
-  const closed = positions.filter((p) => p.status === "closed");
+  const livePositions = positions.filter((p) => inferExecutionStatus(p) === "real");
+  const liveOpen = livePositions.filter((p) => inferLiveStatus(p) === "open");
+  const liveClosed = livePositions.filter((p) => inferLiveStatus(p) === "closed");
+  const shadowOpen = positions.filter((p) => p.status === "open");
+  const shadowClosed = positions.filter((p) => p.status === "closed");
 
   return (
     <SidebarProvider
@@ -190,13 +245,14 @@ export default function QuotientPage() {
                 <p>
                   <span className="font-semibold text-foreground">The strategy:</span> Mirror
                   qualifying Quotient signals on Polymarket with our own entry filters — ≥8pp
-                  upside to Quotient's fair price, ≥$10k 24h volume, ≤40% drift from publish,
+                  upside to Quotient&apos;s fair price, ≥$10k 24h volume, ≤40% drift from publish,
                   ≤48h signal age, one position per market ever.
                 </p>
                 <p>
-                  Exits: take-profit at Quotient's fair price, 7-day time stop, or market
-                  resolution. Sizing $25 base / $50 high-conviction, max 4 concurrent, $100/wk
-                  loss halt, kill switch if trailing-20 win rate drops below 50%.
+                  Exits: take-profit at Quotient&apos;s fair price, 7-day time stop, or market
+                  resolution. Sizing $25 base / $50 high-conviction, max 6 concurrent,
+                  max 2 per correlated theme, $200 deployed cap, $100/wk loss halt, and a
+                  kill switch if trailing-20 win rate drops below 50%.
                 </p>
               </div>
 
@@ -204,24 +260,24 @@ export default function QuotientPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 {[
                   {
-                    label: "Shadow P&L",
-                    value: fmtUsd(stats.shadowPnl, true),
-                    positive: stats.shadowPnl >= 0,
-                  },
-                  {
-                    label: "Live P&L",
+                    label: "Realized live P&L",
                     value: stats.liveClosed > 0 ? fmtUsd(stats.livePnl, true) : "—",
                     positive: stats.livePnl >= 0,
                   },
                   {
-                    label: "Win rate (shadow)",
-                    value: stats.closed > 0 ? `${stats.shadowWins}/${stats.closed} (${stats.winRate.toFixed(0)}%)` : "—",
-                    positive: stats.winRate >= 50,
+                    label: "Open live cost basis",
+                    value: fmtUsd(sync?.liveOpenCostBasisUsd ?? stats.liveOpenCostBasis),
+                    positive: true,
                   },
                   {
-                    label: "Avg ROI / trade",
-                    value: stats.closed > 0 ? `+${stats.avgRoi.toFixed(1)}%` : "—",
-                    positive: stats.avgRoi >= 0,
+                    label: "Live closed",
+                    value: `${stats.liveClosed} (${stats.liveWins} wins)`,
+                    positive: stats.liveClosed === 0 || stats.liveWins / stats.liveClosed >= 0.5,
+                  },
+                  {
+                    label: "Shadow P&L (paper)",
+                    value: fmtUsd(stats.shadowPnl, true),
+                    positive: stats.shadowPnl >= 0,
                   },
                 ].map(({ label, value, positive }) => (
                   <div key={label} className="rounded-lg border border-border/40 p-3 text-center">
@@ -239,191 +295,203 @@ export default function QuotientPage() {
                 ))}
               </div>
 
-              {/* Open positions */}
-              <Card className="border-border/60">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
-                    Open positions ({open.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {open.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No open positions.</p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="border-b border-border/40">
-                            {["Market", "Side", "Entry ¢", "Target ¢", "Stake", "Vol 24h", "Entered", "Ends"].map(
-                              (h) => (
-                                <th
-                                  key={h}
-                                  className="px-2 py-1.5 text-left text-[10px] uppercase tracking-wider text-muted-foreground font-medium"
-                                >
-                                  {h}
-                                </th>
-                              ),
-                            )}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {open.map((p) => (
-                            <tr
-                              key={p.signalId}
-                              className="border-b border-border/10 last:border-0 hover:bg-muted/20 transition-colors"
-                            >
-                              <td className="px-2 py-2 max-w-[280px]">
-                                <a
-                                  href={`https://polymarket.com/event/${p.slug}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="hover:underline underline-offset-2"
-                                  title={p.headline}
-                                >
-                                  {p.headline.length > 60 ? p.headline.slice(0, 60) + "…" : p.headline}
-                                </a>
-                              </td>
-                              <td className="px-2 py-2">
-                                <span
-                                  className={`rounded px-1 py-0.5 font-mono ${
-                                    p.side === "YES"
-                                      ? "bg-green-500/15 text-green-400"
-                                      : "bg-orange-500/15 text-orange-400"
-                                  }`}
-                                >
-                                  {p.side}
-                                </span>
-                              </td>
-                              <td className="px-2 py-2 font-mono">{p.shadowEntryCost ?? "—"}</td>
-                              <td className="px-2 py-2 font-mono text-muted-foreground">
-                                {p.targetCost ?? "—"}
-                              </td>
-                              <td className="px-2 py-2 font-mono">{fmtUsd(p.shadowStakeUsd)}</td>
-                              <td className="px-2 py-2 font-mono text-muted-foreground">
-                                {p.volume24h ? `$${(p.volume24h / 1000).toFixed(1)}k` : "—"}
-                              </td>
-                              <td className="px-2 py-2 font-mono text-muted-foreground">
-                                {fmtDate(p.enteredAt)}
-                              </td>
-                              <td className="px-2 py-2 font-mono text-muted-foreground">
-                                {fmtDate(p.endDate)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <Tabs defaultValue="live" className="gap-4">
+                <TabsList>
+                  <TabsTrigger value="live">Live only ({livePositions.length})</TabsTrigger>
+                  <TabsTrigger value="shadow">Shadow / paper ({positions.length})</TabsTrigger>
+                </TabsList>
 
-              {/* Closed positions */}
-              <Card className="border-border/60">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
-                    Closed positions ({closed.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {closed.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No closed positions yet.</p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="border-b border-border/40">
-                            {[
-                              "Market",
-                              "Side",
-                              "Entry ¢",
-                              "Exit ¢",
-                              "Shadow P&L",
-                              "ROI",
-                              "Live P&L",
-                              "Exit reason",
-                              "Closed",
-                            ].map((h) => (
-                              <th
-                                key={h}
-                                className="px-2 py-1.5 text-left text-[10px] uppercase tracking-wider text-muted-foreground font-medium"
-                              >
-                                {h}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {closed.map((p) => (
-                            <tr
-                              key={p.signalId}
-                              className="border-b border-border/10 last:border-0 hover:bg-muted/20 transition-colors"
-                            >
-                              <td className="px-2 py-2 max-w-[280px]">
-                                <a
-                                  href={`https://polymarket.com/event/${p.slug}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="hover:underline underline-offset-2"
-                                  title={p.headline}
-                                >
-                                  {p.headline.length > 55 ? p.headline.slice(0, 55) + "…" : p.headline}
-                                </a>
-                              </td>
-                              <td className="px-2 py-2">
-                                <span
-                                  className={`rounded px-1 py-0.5 font-mono ${
-                                    p.side === "YES"
-                                      ? "bg-green-500/15 text-green-400"
-                                      : "bg-orange-500/15 text-orange-400"
-                                  }`}
-                                >
-                                  {p.side}
-                                </span>
-                              </td>
-                              <td className="px-2 py-2 font-mono">{p.shadowEntryCost ?? "—"}</td>
-                              <td className="px-2 py-2 font-mono">{p.shadowExitCost ?? "—"}</td>
-                              <td className="px-2 py-2 font-mono">
-                                <span
-                                  className={
-                                    (p.shadowPnlUsd ?? 0) >= 0 ? "text-green-400" : "text-red-400"
-                                  }
-                                >
-                                  {fmtUsd(p.shadowPnlUsd, true)}
-                                </span>
-                              </td>
-                              <td className="px-2 py-2 font-mono text-muted-foreground">
-                                {p.shadowRoiPct !== null ? `${p.shadowRoiPct.toFixed(1)}%` : "—"}
-                              </td>
-                              <td className="px-2 py-2 font-mono">
-                                {p.livePnlUsd !== null ? (
-                                  <span
-                                    className={p.livePnlUsd >= 0 ? "text-green-400" : "text-red-400"}
-                                    title={
-                                      p.liveExitTx
-                                        ? `exit tx: ${p.liveExitTx}`
-                                        : undefined
-                                    }
-                                  >
-                                    {fmtUsd(p.livePnlUsd, true)}
-                                  </span>
-                                ) : (
-                                  <span className="text-muted-foreground">—</span>
-                                )}
-                              </td>
-                              <td className="px-2 py-2 text-muted-foreground">
-                                {closeReasonLabel(p.closeReason)}
-                              </td>
-                              <td className="px-2 py-2 font-mono text-muted-foreground">
-                                {fmtDate(p.closedAt)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                <TabsContent value="live" className="space-y-4">
+                  <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3 text-xs text-muted-foreground">
+                    Default view: only rows with real Polymarket fills. Realized live P&amp;L is cash-flow P&amp;L from closed live fills; open rows show cost basis and entry transaction links, not mark-to-market profit.
+                  </div>
+
+                  <Card className="border-border/60">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
+                        Open live positions ({liveOpen.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {liveOpen.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No open live positions.</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-border/40">
+                                {["Badge", "Market", "Side", "Live entry", "Cost basis", "Shares", "Entry tx", "Entered", "Shadow target"].map((h) => (
+                                  <th key={h} className="px-2 py-1.5 text-left text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {liveOpen.map((p) => (
+                                <tr key={p.signalId} className="border-b border-border/10 last:border-0 hover:bg-muted/20 transition-colors">
+                                  <td className="px-2 py-2">{executionBadge(p)}</td>
+                                  <td className="px-2 py-2 max-w-[280px]"><MarketLink position={p} /></td>
+                                  <td className="px-2 py-2">
+                                    <span className={`rounded px-1 py-0.5 font-mono ${p.side === "YES" ? "bg-green-500/15 text-green-400" : "bg-orange-500/15 text-orange-400"}`}>{p.side}</span>
+                                  </td>
+                                  <td className="px-2 py-2 font-mono">{fmtPrice(p.liveEntryPrice)}</td>
+                                  <td className="px-2 py-2 font-mono">{fmtUsd(liveCostBasis(p))}</td>
+                                  <td className="px-2 py-2 font-mono text-muted-foreground">{p.liveEntryShares?.toFixed(4) ?? "—"}</td>
+                                  <td className="px-2 py-2 font-mono"><TxLink tx={p.liveEntryTx} label="entry" /></td>
+                                  <td className="px-2 py-2 font-mono text-muted-foreground">{fmtDate(p.enteredAt)}</td>
+                                  <td className="px-2 py-2 font-mono text-muted-foreground">{fmtPrice(p.targetCost)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-border/60">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
+                        Closed live positions ({liveClosed.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {liveClosed.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No closed live positions yet.</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-border/40">
+                                {["Badge", "Market", "Side", "Entry", "Exit", "Cost basis", "Returned", "Realized live P&L", "Tx links", "Reason", "Closed"].map((h) => (
+                                  <th key={h} className="px-2 py-1.5 text-left text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {liveClosed.map((p) => (
+                                <tr key={p.signalId} className="border-b border-border/10 last:border-0 hover:bg-muted/20 transition-colors">
+                                  <td className="px-2 py-2">{executionBadge(p)}</td>
+                                  <td className="px-2 py-2 max-w-[260px]"><MarketLink position={p} max={55} /></td>
+                                  <td className="px-2 py-2"><span className={`rounded px-1 py-0.5 font-mono ${p.side === "YES" ? "bg-green-500/15 text-green-400" : "bg-orange-500/15 text-orange-400"}`}>{p.side}</span></td>
+                                  <td className="px-2 py-2 font-mono">{fmtPrice(p.liveEntryPrice)}</td>
+                                  <td className="px-2 py-2 font-mono">{fmtPrice(p.liveExitPrice)}</td>
+                                  <td className="px-2 py-2 font-mono">{fmtUsd(liveCostBasis(p))}</td>
+                                  <td className="px-2 py-2 font-mono">{fmtUsd(p.liveExitUsdc)}</td>
+                                  <td className="px-2 py-2 font-mono"><span className={(p.livePnlUsd ?? 0) >= 0 ? "text-green-400" : "text-red-400"}>{fmtUsd(p.livePnlUsd, true)}</span></td>
+                                  <td className="px-2 py-2 font-mono space-y-1"><div><TxLink tx={p.liveEntryTx} label="entry" /></div><div><TxLink tx={p.liveExitTx} label="exit" /></div></td>
+                                  <td className="px-2 py-2 text-muted-foreground">{closeReasonLabel(p.liveCloseReason ?? p.closeReason)}</td>
+                                  <td className="px-2 py-2 font-mono text-muted-foreground">{fmtDate(p.closedAt)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="shadow" className="space-y-4">
+                  <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-muted-foreground">
+                    Paper/shadow rows remain useful for strategy evidence and opportunity-cost tracking. They are separate from cash results; rows marked LIVE-SKIPPED were eligible shadow signals that the live executor did not fill.
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {[
+                      { label: "Shadow P&L", value: fmtUsd(stats.shadowPnl, true), positive: stats.shadowPnl >= 0 },
+                      { label: "Shadow win rate", value: stats.closed > 0 ? `${stats.shadowWins}/${stats.closed} (${stats.winRate.toFixed(0)}%)` : "—", positive: stats.winRate >= 50 },
+                      { label: "Avg shadow ROI", value: stats.closed > 0 ? `${stats.avgRoi >= 0 ? "+" : ""}${stats.avgRoi.toFixed(1)}%` : "—", positive: stats.avgRoi >= 0 },
+                      { label: "Live skipped", value: `${sync?.liveSkippedCount ?? stats.liveSkippedCount}`, positive: true },
+                    ].map(({ label, value, positive }) => (
+                      <div key={label} className="rounded-lg border border-border/40 p-3 text-center">
+                        <div className={`text-lg font-bold font-mono ${positive ? "text-green-400" : "text-red-400"}`}>{value}</div>
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wider mt-1">{label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Card className="border-border/60">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
+                        Open shadow positions ({shadowOpen.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {shadowOpen.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No open shadow positions.</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-border/40">
+                                {["Badge", "Market", "Side", "Shadow entry", "Target", "Paper stake", "Live note", "Entered", "Ends"].map((h) => (
+                                  <th key={h} className="px-2 py-1.5 text-left text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {shadowOpen.map((p) => (
+                                <tr key={p.signalId} className="border-b border-border/10 last:border-0 hover:bg-muted/20 transition-colors">
+                                  <td className="px-2 py-2">{executionBadge(p)}</td>
+                                  <td className="px-2 py-2 max-w-[280px]"><MarketLink position={p} /></td>
+                                  <td className="px-2 py-2"><span className={`rounded px-1 py-0.5 font-mono ${p.side === "YES" ? "bg-green-500/15 text-green-400" : "bg-orange-500/15 text-orange-400"}`}>{p.side}</span></td>
+                                  <td className="px-2 py-2 font-mono">{fmtPrice(p.shadowEntryCost)}</td>
+                                  <td className="px-2 py-2 font-mono text-muted-foreground">{fmtPrice(p.targetCost)}</td>
+                                  <td className="px-2 py-2 font-mono">{fmtUsd(p.shadowStakeUsd)}</td>
+                                  <td className="px-2 py-2 text-muted-foreground">{p.liveSkipReason ?? (inferExecutionStatus(p) === "real" ? "Filled live" : "Paper only")}</td>
+                                  <td className="px-2 py-2 font-mono text-muted-foreground">{fmtDate(p.enteredAt)}</td>
+                                  <td className="px-2 py-2 font-mono text-muted-foreground">{fmtDate(p.endDate)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-border/60">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
+                        Closed shadow positions ({shadowClosed.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {shadowClosed.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No closed shadow positions yet.</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-border/40">
+                                {["Badge", "Market", "Side", "Entry", "Exit", "Shadow P&L", "ROI", "Live P&L", "Exit reason", "Closed"].map((h) => (
+                                  <th key={h} className="px-2 py-1.5 text-left text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {shadowClosed.map((p) => (
+                                <tr key={p.signalId} className="border-b border-border/10 last:border-0 hover:bg-muted/20 transition-colors">
+                                  <td className="px-2 py-2">{executionBadge(p)}</td>
+                                  <td className="px-2 py-2 max-w-[280px]"><MarketLink position={p} max={55} /></td>
+                                  <td className="px-2 py-2"><span className={`rounded px-1 py-0.5 font-mono ${p.side === "YES" ? "bg-green-500/15 text-green-400" : "bg-orange-500/15 text-orange-400"}`}>{p.side}</span></td>
+                                  <td className="px-2 py-2 font-mono">{fmtPrice(p.shadowEntryCost)}</td>
+                                  <td className="px-2 py-2 font-mono">{fmtPrice(p.shadowExitCost)}</td>
+                                  <td className="px-2 py-2 font-mono"><span className={(p.shadowPnlUsd ?? 0) >= 0 ? "text-green-400" : "text-red-400"}>{fmtUsd(p.shadowPnlUsd, true)}</span></td>
+                                  <td className="px-2 py-2 font-mono text-muted-foreground">{p.shadowRoiPct !== null ? `${p.shadowRoiPct.toFixed(1)}%` : "—"}</td>
+                                  <td className="px-2 py-2 font-mono">{p.livePnlUsd !== null ? <span className={p.livePnlUsd >= 0 ? "text-green-400" : "text-red-400"}>{fmtUsd(p.livePnlUsd, true)}</span> : <span className="text-muted-foreground">—</span>}</td>
+                                  <td className="px-2 py-2 text-muted-foreground">{closeReasonLabel(p.closeReason)}</td>
+                                  <td className="px-2 py-2 font-mono text-muted-foreground">{fmtDate(p.closedAt)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
 
               {/* Footer note */}
               <p className="text-[10px] text-muted-foreground">

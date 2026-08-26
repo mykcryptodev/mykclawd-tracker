@@ -50,13 +50,41 @@ interface ShadowPos {
 
 interface LivePos {
   signal_id: string;
+  headline?: string;
+  slug?: string;
+  side?: string;
+  market_id?: string;
   status?: string;
   stake_usd?: number;
+  entry_usdc?: number;
   entry_price?: number;
+  entry_shares?: number;
+  exit_usdc?: number;
   exit_price?: number;
+  exit_shares?: number;
   pnl_usd?: number;
+  roi_pct?: number;
   entry_tx?: string;
   exit_tx?: string;
+  entry_order_id?: string;
+  exit_order_id?: string;
+  entered_at?: string;
+  closed_at?: string;
+  close_reason?: string;
+}
+
+interface LiveLogEvent {
+  ts?: string;
+  type?: string;
+  signal_id?: string;
+  slug?: string | null;
+  reason?: string;
+  error?: string;
+}
+
+interface LiveSkip {
+  skippedAt: string | null;
+  reason: string | null;
 }
 
 function readJson<T>(p: string): T | null {
@@ -65,6 +93,59 @@ function readJson<T>(p: string): T | null {
   } catch {
     return null;
   }
+}
+
+function readLiveSkips(logPath: string): Record<string, LiveSkip> {
+  let raw = "";
+  try {
+    raw = fs.readFileSync(logPath, "utf8");
+  } catch {
+    return {};
+  }
+
+  const skips: Record<string, LiveSkip> = {};
+  for (const line of raw.split("\n")) {
+    if (!line.trim()) continue;
+    let event: LiveLogEvent;
+    try {
+      event = JSON.parse(line) as LiveLogEvent;
+    } catch {
+      continue;
+    }
+    if (event.type !== "entry_skipped" || !event.signal_id) continue;
+    skips[event.signal_id] = {
+      skippedAt: event.ts ?? null,
+      reason: event.reason ?? null,
+    };
+  }
+  return skips;
+}
+
+function isLiveFill(lp: LivePos | undefined): lp is LivePos {
+  return Boolean(
+    lp &&
+      (lp.entry_tx ||
+        lp.entry_order_id ||
+        typeof lp.entry_usdc === "number" ||
+        typeof lp.stake_usd === "number" ||
+        typeof lp.entry_price === "number"),
+  );
+}
+
+function normalizeBookStatus(status: string | undefined): "open" | "closed" {
+  return status === "closed" ? "closed" : "open";
+}
+
+function liveStatus(lp: LivePos | undefined, skip: LiveSkip | undefined): "open" | "closed" | "skipped" | "none" {
+  if (isLiveFill(lp)) return normalizeBookStatus(lp.status);
+  if (skip) return "skipped";
+  return "none";
+}
+
+function executionStatus(lp: LivePos | undefined, skip: LiveSkip | undefined): "real" | "shadow" | "live_skipped" {
+  if (isLiveFill(lp)) return "real";
+  if (skip) return "live_skipped";
+  return "shadow";
 }
 
 (async () => {
@@ -76,6 +157,7 @@ function readJson<T>(p: string): T | null {
   const live = readJson<{ positions?: Record<string, LivePos> }>(
     path.join(STRAT_DIR, "state", "live_positions.json"),
   );
+  const liveSkips = readLiveSkips(path.join(STRAT_DIR, "logs", "quotient-mirror-live.jsonl"));
 
   if (!shadow?.positions) {
     console.error("shadow_positions.json missing or unreadable");
@@ -90,17 +172,28 @@ function readJson<T>(p: string): T | null {
     slug: string;
     side: "YES" | "NO";
     status: "open" | "closed";
+    executionStatus: "real" | "shadow" | "live_skipped";
+    liveStatus: "open" | "closed" | "skipped" | "none";
+    liveSkipReason: string | null;
+    liveSkippedAt: string | null;
     shadowStakeUsd: number | null;
     shadowEntryCost: number | null;
     shadowExitCost: number | null;
     shadowPnlUsd: number | null;
     shadowRoiPct: number | null;
     liveStakeUsd: number | null;
+    liveEntryUsdc: number | null;
     liveEntryPrice: number | null;
+    liveEntryShares: number | null;
+    liveExitUsdc: number | null;
     liveExitPrice: number | null;
+    liveExitShares: number | null;
     livePnlUsd: number | null;
+    liveRoiPct: number | null;
     liveEntryTx: string | null;
     liveExitTx: string | null;
+    liveEntryOrderId: string | null;
+    liveExitOrderId: string | null;
     entryRef: number | null;
     targetCost: number | null;
     volume24h: number | null;
@@ -108,6 +201,7 @@ function readJson<T>(p: string): T | null {
     enteredAt: string | null;
     closedAt: string | null;
     closeReason: string | null;
+    liveCloseReason: string | null;
     endDate: string | null;
   }
   const positions: PositionRow[] = [];
@@ -115,11 +209,25 @@ function readJson<T>(p: string): T | null {
   let closedCount = 0;
   let shadowPnl = 0;
   let livePnl = 0;
+  let liveOpenCount = 0;
+  let liveClosedCount = 0;
+  let liveSkippedCount = 0;
+  let liveOpenCostBasis = 0;
 
   for (const sp of Object.values(shadow.positions)) {
     if (!sp.signal_id) continue;
     const lp = liveBySignal[sp.signal_id];
+    const skip = liveSkips[sp.signal_id];
     const status = sp.status === "closed" ? "closed" : "open";
+    const rowLiveStatus = liveStatus(lp, skip);
+    if (rowLiveStatus === "open") {
+      liveOpenCount++;
+      liveOpenCostBasis += lp?.entry_usdc ?? lp?.stake_usd ?? 0;
+    } else if (rowLiveStatus === "closed") {
+      liveClosedCount++;
+    } else if (rowLiveStatus === "skipped") {
+      liveSkippedCount++;
+    }
     if (status === "open") openCount++;
     else closedCount++;
     if (typeof sp.pnl_usd === "number") shadowPnl += sp.pnl_usd;
@@ -132,17 +240,28 @@ function readJson<T>(p: string): T | null {
       slug: sp.slug ?? "",
       side: sp.side === "NO" ? ("NO" as const) : ("YES" as const),
       status: status as "open" | "closed",
+      executionStatus: executionStatus(lp, skip),
+      liveStatus: rowLiveStatus,
+      liveSkipReason: skip?.reason ?? null,
+      liveSkippedAt: skip?.skippedAt ?? null,
       shadowStakeUsd: sp.stake_usd ?? null,
       shadowEntryCost: sp.entry_cost ?? null,
       shadowExitCost: sp.exit_cost ?? null,
       shadowPnlUsd: sp.pnl_usd ?? null,
       shadowRoiPct: sp.roi_pct ?? null,
       liveStakeUsd: lp?.stake_usd ?? null,
+      liveEntryUsdc: lp?.entry_usdc ?? null,
       liveEntryPrice: lp?.entry_price ?? null,
+      liveEntryShares: lp?.entry_shares ?? null,
+      liveExitUsdc: lp?.exit_usdc ?? null,
       liveExitPrice: lp?.exit_price ?? null,
+      liveExitShares: lp?.exit_shares ?? null,
       livePnlUsd: lp?.pnl_usd ?? null,
+      liveRoiPct: lp?.roi_pct ?? null,
       liveEntryTx: lp?.entry_tx ?? null,
       liveExitTx: lp?.exit_tx ?? null,
+      liveEntryOrderId: lp?.entry_order_id ?? null,
+      liveExitOrderId: lp?.exit_order_id ?? null,
       entryRef: sp.entry_ref ?? null,
       targetCost: sp.target_cost ?? null,
       volume24h: sp.volume24h ?? null,
@@ -150,6 +269,7 @@ function readJson<T>(p: string): T | null {
       enteredAt: sp.entered_at ?? null,
       closedAt: sp.closed_at ?? null,
       closeReason: sp.close_reason ?? null,
+      liveCloseReason: lp?.close_reason ?? null,
       endDate: sp.end_date ?? null,
     });
   }
@@ -166,6 +286,10 @@ function readJson<T>(p: string): T | null {
       closedCount,
       shadowPnlUsd: Math.round(shadowPnl * 100) / 100,
       livePnlUsd: Math.round(livePnl * 100) / 100,
+      liveOpenCount,
+      liveClosedCount,
+      liveSkippedCount,
+      liveOpenCostBasisUsd: Math.round(liveOpenCostBasis * 100) / 100,
       error: null,
     },
   };
@@ -180,7 +304,7 @@ function readJson<T>(p: string): T | null {
       { stdio: ["ignore", "pipe", "pipe"] },
     );
     console.log(`gist updated: ${GIST_ID}`);
-  } catch (e) {
+  } catch {
     // -F with @file isn't supported by gh api; fall back to raw JSON body
     const body = JSON.stringify({
       files: { [GIST_FILENAME]: { content: JSON.stringify(payload, null, 2) } },

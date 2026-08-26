@@ -314,6 +314,11 @@ export const quotientPositions = sqliteTable("quotient_positions", {
   slug: text("slug").notNull().default(""),
   side: text("side", { enum: ["YES", "NO"] }).notNull(),
   status: text("status", { enum: ["open", "closed"] }).notNull().default("open"),
+  // status of real-money execution for this shadow signal
+  executionStatus: text("execution_status", { enum: ["real", "shadow", "live_skipped"] }).notNull().default("shadow"),
+  liveStatus: text("live_status", { enum: ["open", "closed", "skipped", "none"] }).notNull().default("none"),
+  liveSkipReason: text("live_skip_reason"),
+  liveSkippedAt: text("live_skipped_at"),
   // shadow (paper) leg
   shadowStakeUsd: real("shadow_stake_usd"),
   shadowEntryCost: real("shadow_entry_cost"),   // cents
@@ -322,11 +327,18 @@ export const quotientPositions = sqliteTable("quotient_positions", {
   shadowRoiPct: real("shadow_roi_pct"),
   // live leg (null until phase=live fills)
   liveStakeUsd: real("live_stake_usd"),
+  liveEntryUsdc: real("live_entry_usdc"),
   liveEntryPrice: real("live_entry_price"),     // 0–1
+  liveEntryShares: real("live_entry_shares"),
+  liveExitUsdc: real("live_exit_usdc"),
   liveExitPrice: real("live_exit_price"),
+  liveExitShares: real("live_exit_shares"),
   livePnlUsd: real("live_pnl_usd"),
+  liveRoiPct: real("live_roi_pct"),
   liveEntryTx: text("live_entry_tx"),
   liveExitTx: text("live_exit_tx"),
+  liveEntryOrderId: text("live_entry_order_id"),
+  liveExitOrderId: text("live_exit_order_id"),
   // shared metadata
   entryRef: real("entry_ref"),                  // Quotient published reference entry (cents)
   targetCost: real("target_cost"),              // Quotient fair price / take-profit (cents)
@@ -335,6 +347,7 @@ export const quotientPositions = sqliteTable("quotient_positions", {
   enteredAt: text("entered_at"),
   closedAt: text("closed_at"),
   closeReason: text("close_reason"),            // target_hit | time_stop | resolution
+  liveCloseReason: text("live_close_reason"),
   endDate: text("end_date"),
   syncedAt: integer("synced_at").notNull(),     // unix seconds
 });

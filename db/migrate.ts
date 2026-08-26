@@ -435,17 +435,28 @@ export async function runMigrations() {
         slug TEXT NOT NULL DEFAULT '',
         side TEXT NOT NULL CHECK(side IN ('YES', 'NO')),
         status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'closed')),
+        execution_status TEXT NOT NULL DEFAULT 'shadow' CHECK(execution_status IN ('real', 'shadow', 'live_skipped')),
+        live_status TEXT NOT NULL DEFAULT 'none' CHECK(live_status IN ('open', 'closed', 'skipped', 'none')),
+        live_skip_reason TEXT,
+        live_skipped_at TEXT,
         shadow_stake_usd REAL,
         shadow_entry_cost REAL,
         shadow_exit_cost REAL,
         shadow_pnl_usd REAL,
         shadow_roi_pct REAL,
         live_stake_usd REAL,
+        live_entry_usdc REAL,
         live_entry_price REAL,
+        live_entry_shares REAL,
+        live_exit_usdc REAL,
         live_exit_price REAL,
+        live_exit_shares REAL,
         live_pnl_usd REAL,
+        live_roi_pct REAL,
         live_entry_tx TEXT,
         live_exit_tx TEXT,
+        live_entry_order_id TEXT,
+        live_exit_order_id TEXT,
         entry_ref REAL,
         target_cost REAL,
         volume_24h REAL,
@@ -453,6 +464,7 @@ export async function runMigrations() {
         entered_at TEXT,
         closed_at TEXT,
         close_reason TEXT,
+        live_close_reason TEXT,
         end_date TEXT,
         synced_at INTEGER NOT NULL
       );
@@ -471,6 +483,19 @@ export async function runMigrations() {
       );
     `);
   } catch { /* exists */ }
+
+  try { await client.execute(`ALTER TABLE quotient_positions ADD COLUMN execution_status TEXT NOT NULL DEFAULT 'shadow'`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE quotient_positions ADD COLUMN live_status TEXT NOT NULL DEFAULT 'none'`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE quotient_positions ADD COLUMN live_skip_reason TEXT`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE quotient_positions ADD COLUMN live_skipped_at TEXT`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE quotient_positions ADD COLUMN live_entry_usdc REAL`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE quotient_positions ADD COLUMN live_entry_shares REAL`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE quotient_positions ADD COLUMN live_exit_usdc REAL`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE quotient_positions ADD COLUMN live_exit_shares REAL`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE quotient_positions ADD COLUMN live_roi_pct REAL`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE quotient_positions ADD COLUMN live_entry_order_id TEXT`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE quotient_positions ADD COLUMN live_exit_order_id TEXT`); } catch { /* exists */ }
+  try { await client.execute(`ALTER TABLE quotient_positions ADD COLUMN live_close_reason TEXT`); } catch { /* exists */ }
 
   // Fix block_timestamp = 0 in transactions (was a bug — now computed from block_number)
   await client.execute(`
