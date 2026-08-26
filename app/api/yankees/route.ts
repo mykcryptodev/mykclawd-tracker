@@ -14,7 +14,11 @@ export async function GET(request: Request) {
 
   try {
     const res = await fetch(url.toString(), {
-      next: { revalidate: 300 }, // cache 5 min
+      // 30s cache: the page now self-heals with a 60s refetch interval plus
+      // focus/visibility triggers (see app/yankees/page.tsx), but a 5-minute
+      // upstream cache was still capable of serving a stale "Scheduled" result
+      // to that refetch for minutes after a game actually went Final.
+      next: { revalidate: 30 },
     });
     if (!res.ok) {
       return NextResponse.json({ error: "upstream error" }, { status: res.status });

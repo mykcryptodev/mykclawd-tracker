@@ -203,23 +203,28 @@ export default function YankeesPage() {
   }, [bets]);
 
   // Fetch bets from DB
-  React.useEffect(() => {
+  const fetchBets = React.useCallback(() => {
     fetch("/api/yankees/bets")
       .then((r) => r.json())
       .then((d) => setBets(d.bets ?? []))
       .catch(() => {});
   }, []);
 
-  // Fetch full season schedule once (or when year changes)
+  React.useEffect(() => {
+    fetchBets();
+  }, [fetchBets]);
+
+  // Fetch full season schedule for a given year. Bypasses the "fetched once" guard
+  // when force=true so a stale in-memory snapshot can self-heal.
   const fetchedYears = React.useRef<Set<number>>(new Set());
 
-  React.useEffect(() => {
-    if (fetchedYears.current.has(viewYear)) return;
-    fetchedYears.current.add(viewYear);
+  const fetchSchedule = React.useCallback((year: number, force = false) => {
+    if (!force && fetchedYears.current.has(year)) return;
+    fetchedYears.current.add(year);
     setLoading(true);
     setError(null);
 
-    fetch(`/api/yankees?season=${viewYear}`)
+    fetch(`/api/yankees?season=${year}`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json() as Promise<MlbScheduleResponse>;
@@ -236,7 +241,37 @@ export default function YankeesPage() {
         setError(e.message);
         setLoading(false);
       });
-  }, [viewYear]);
+  }, []);
+
+  React.useEffect(() => {
+    fetchSchedule(viewYear);
+  }, [viewYear, fetchSchedule]);
+
+  // Self-heal a stale view: the initial fetch only happens once per mounted year
+  // (fetchedYears guard above), so a tab left open across a game finishing never
+  // refetches on its own — the W/L chip for that game just never appears until a
+  // manual reload. Refetch on tab-visible/focus and on a 60s interval so a long-
+  // lived tab converges on the live MLB state without the user having to reload.
+  // (Root cause of the 2026-08-25 game showing no result on mykclawd.xyz/yankees
+  // despite the MLB API and this page's own proxy both reporting it Final 9-7
+  // correctly when queried directly — the browser tab just never asked again.)
+  React.useEffect(() => {
+    function refresh() {
+      fetchSchedule(viewYear, true);
+      fetchBets();
+    }
+    function onVisible() {
+      if (document.visibilityState === "visible") refresh();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", refresh);
+    const interval = setInterval(refresh, 60_000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", refresh);
+      clearInterval(interval);
+    };
+  }, [viewYear, fetchSchedule, fetchBets]);
 
   const grid = buildCalendarGrid(viewYear, viewMonth);
 
