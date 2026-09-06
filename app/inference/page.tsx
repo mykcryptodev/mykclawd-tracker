@@ -4,7 +4,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { ExternalLinkIcon } from "lucide-react";
 import { InferenceSyncButton } from "@/components/inference/inference-sync-button";
-import { UsdcApproval } from "@/components/inference/usdc-approval";
+import { UsdcDepositBalance } from "@/components/inference/usdc-deposit-balance";
 
 export const metadata: Metadata = {
   title: "Inference",
@@ -71,8 +71,8 @@ export default function InferencePage() {
             </a>
           </div>
 
-          {/* Live on-chain USDC approval */}
-          <UsdcApproval />
+          {/* Live on-chain USDC deposit balance */}
+          <UsdcDepositBalance />
 
           {/* Counter stats row */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

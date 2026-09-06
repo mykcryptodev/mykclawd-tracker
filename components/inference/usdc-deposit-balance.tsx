@@ -7,8 +7,7 @@ import { useReadContract } from "thirdweb/react";
 import { thirdwebClient } from "@/lib/thirdweb-client";
 
 const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
-const SURPLUS_ADDRESS = "0x0770d2124C0a581C28Cfc47a659817145e6Cc137";
-const OWNER_ADDRESS = "0xcef6e6639e0c60d5c0805670f4363a6698081fab";
+const DEPOSIT_ADDRESS = "0xddc2beba5360c420f6e7a132af106df6939a84b4";
 const USDC_DECIMALS = 6;
 const TILE_H = 56;
 
@@ -19,8 +18,6 @@ const usdcContract = getContract({
 });
 
 function formatUsdc(raw: bigint): string {
-  // Treat anything >= 2^128 as "unlimited" (covers type(uint256).max)
-  if (raw >= BigInt("0x100000000000000000000000000000000")) return "Unlimited";
   const divisor = BigInt(10 ** USDC_DECIMALS);
   const whole = raw / divisor;
   const cents = raw % divisor;
@@ -146,26 +143,24 @@ function SplitFlapChar({ char }: { char: string }) {
 
 // ---- Main exported component ----
 
-export function UsdcApproval() {
+export function UsdcDepositBalance() {
   const { data, isLoading, isError } = useReadContract({
     contract: usdcContract,
-    method:
-      "function allowance(address owner, address spender) view returns (uint256)",
-    params: [OWNER_ADDRESS, SURPLUS_ADDRESS],
+    method: "function balanceOf(address account) view returns (uint256)",
+    params: [DEPOSIT_ADDRESS],
     queryOptions: {
       refetchInterval: 15_000,
     },
   });
 
   const formatted = data !== undefined ? formatUsdc(data) : null;
-  const isUnlimited = formatted === "Unlimited";
 
   return (
     <div className="rounded-xl border border-border/60 bg-card p-4">
       {/* Header row */}
       <div className="flex items-center justify-between mb-4">
         <p className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
-          USDC Approval to Surplus Intelligence
+          Surplus Intelligence Deposit Balance
         </p>
         <div className="flex items-center gap-1.5">
           <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -191,37 +186,28 @@ export function UsdcApproval() {
       )}
 
       {isError && (
-        <p className="text-sm text-muted-foreground">Failed to load approval</p>
+        <p className="text-sm text-muted-foreground">Failed to load balance</p>
       )}
 
       {!isLoading && !isError && formatted && (
         <div className="flex items-end gap-2 flex-wrap">
-          {isUnlimited ? (
-            <span
-              className="font-mono font-bold text-amber-300"
-              style={{ fontSize: `${Math.round(TILE_H * 0.52)}px`, lineHeight: 1 }}
-            >
-              Unlimited
-            </span>
-          ) : (
-            <div className="flex items-center gap-0.5">
-              {formatted.split("").map((c, i) => (
-                <SplitFlapChar key={i} char={c} />
-              ))}
-            </div>
-          )}
+          <div className="flex items-center gap-0.5">
+            {formatted.split("").map((c, i) => (
+              <SplitFlapChar key={i} char={c} />
+            ))}
+          </div>
           <span className="text-sm font-medium text-muted-foreground pb-1">USDC</span>
         </div>
       )}
 
       {/* Basescan link */}
       <a
-        href={`https://basescan.org/token/${USDC_ADDRESS}?a=${SURPLUS_ADDRESS}`}
+        href={`https://basescan.org/token/${USDC_ADDRESS}?a=${DEPOSIT_ADDRESS}`}
         target="_blank"
         rel="noopener noreferrer"
         className="mt-3 inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors font-mono"
       >
-        spender: {SURPLUS_ADDRESS.slice(0, 10)}…{SURPLUS_ADDRESS.slice(-6)} ↗
+        deposit: {DEPOSIT_ADDRESS.slice(0, 10)}…{DEPOSIT_ADDRESS.slice(-6)} ↗
       </a>
     </div>
   );
