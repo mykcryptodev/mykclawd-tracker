@@ -1,28 +1,28 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { getContract } from "thirdweb";
-import { base } from "thirdweb/chains";
-import { useReadContract } from "thirdweb/react";
-import { thirdwebClient } from "@/lib/thirdweb-client";
 
-const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
-const DEPOSIT_ADDRESS = "0xddc2beba5360c420f6e7a132af106df6939a84b4";
 const USDC_DECIMALS = 6;
 const TILE_H = 56;
+const POLL_INTERVAL = 15_000;
 
-const usdcContract = getContract({
-  client: thirdwebClient,
-  chain: base,
-  address: USDC_ADDRESS,
-});
+interface BalanceResponse {
+  availableUsdcMicro: string;
+  heldUsdcMicro: string;
+  creditBalanceUsdcMicro: string;
+  pendingDepositUsdcMicro: string;
+  depositAddress: string | null;
+  accountStatus: string | null;
+}
 
 function formatUsdc(raw: bigint): string {
+  const negative = raw < BigInt(0);
+  const abs = negative ? -raw : raw;
   const divisor = BigInt(10 ** USDC_DECIMALS);
-  const whole = raw / divisor;
-  const cents = raw % divisor;
+  const whole = abs / divisor;
+  const cents = abs % divisor;
   const centsStr = cents.toString().padStart(USDC_DECIMALS, "0").slice(0, 2);
-  return `${whole.toLocaleString("en-US")}.${centsStr}`;
+  return `${negative ? "-" : ""}${whole.toLocaleString("en-US")}.${centsStr}`;
 }
 
 // ---- Split-flap tile internals ----
@@ -81,7 +81,7 @@ function SplitFlapChar({ char }: { char: string }) {
     return () => clearTimeout(t);
   }, [char]);
 
-  const isSep = char === "." || char === ",";
+  const isSep = char === "." || char === "," || char === "-";
 
   return (
     <div
@@ -144,27 +144,53 @@ function SplitFlapChar({ char }: { char: string }) {
 // ---- Main exported component ----
 
 export function UsdcDepositBalance() {
-  const { data, isLoading, isError } = useReadContract({
-    contract: usdcContract,
-    method: "function balanceOf(address account) view returns (uint256)",
-    params: [DEPOSIT_ADDRESS],
-    queryOptions: {
-      refetchInterval: 15_000,
-    },
-  });
+  const [data, setData] = useState<BalanceResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isError, setIsError] = useState(false);
 
-  const formatted = data !== undefined ? formatUsdc(data) : null;
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const res = await fetch("/api/inference/balance", { cache: "no-store" });
+        if (!res.ok) throw new Error(`status ${res.status}`);
+        const json = (await res.json()) as BalanceResponse;
+        if (cancelled) return;
+        setData(json);
+        setIsError(false);
+        setIsLoading(false);
+      } catch {
+        if (cancelled) return;
+        setIsError(true);
+        setIsLoading(false);
+      }
+    }
+
+    load();
+    const t = setInterval(load, POLL_INTERVAL);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, []);
+
+  const formatted =
+    data !== null ? formatUsdc(BigInt(data.availableUsdcMicro)) : null;
+  const heldMicro = data !== null ? BigInt(data.heldUsdcMicro) : BigInt(0);
+  const pendingDepositMicro =
+    data !== null ? BigInt(data.pendingDepositUsdcMicro) : BigInt(0);
 
   return (
     <div className="rounded-xl border border-border/60 bg-card p-4">
       {/* Header row */}
       <div className="flex items-center justify-between mb-4">
         <p className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
-          Surplus Intelligence Deposit Balance
+          Surplus Intelligence Spendable Balance
         </p>
         <div className="flex items-center gap-1.5">
           <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-[10px] text-muted-foreground">Live · Base</span>
+          <span className="text-[10px] text-muted-foreground">Live · Surplus API</span>
         </div>
       </div>
 
@@ -200,15 +226,26 @@ export function UsdcDepositBalance() {
         </div>
       )}
 
-      {/* Basescan link */}
-      <a
-        href={`https://basescan.org/token/${USDC_ADDRESS}?a=${DEPOSIT_ADDRESS}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mt-3 inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors font-mono"
-      >
-        deposit: {DEPOSIT_ADDRESS.slice(0, 10)}…{DEPOSIT_ADDRESS.slice(-6)} ↗
-      </a>
+      {/* Sub-line: held + pending deposits */}
+      {!isLoading && !isError && data && (heldMicro > BigInt(0) || pendingDepositMicro > BigInt(0)) && (
+        <p className="mt-2 text-[11px] text-muted-foreground font-mono">
+          {heldMicro > BigInt(0) && <>held: ${formatUsdc(heldMicro)}</>}
+          {heldMicro > BigInt(0) && pendingDepositMicro > BigInt(0) && " · "}
+          {pendingDepositMicro > BigInt(0) && <>deposit pending: ${formatUsdc(pendingDepositMicro)}</>}
+        </p>
+      )}
+
+      {/* Deposit address link */}
+      {data?.depositAddress && (
+        <a
+          href={`https://basescan.org/address/${data.depositAddress}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors font-mono"
+        >
+          deposit: {data.depositAddress.slice(0, 10)}…{data.depositAddress.slice(-6)} ↗
+        </a>
+      )}
     </div>
   );
 }
