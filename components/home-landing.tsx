@@ -206,6 +206,18 @@ export function HomeLanding({
           <li>
             <a
               className="underline underline-offset-4 hover:text-foreground"
+              href="https://bankrball.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              🏈 BankrBall
+            </a>{" "}
+            Onchain NFL Pick&apos;em contests. Create or join weekly pools, make your picks, and settle prizes
+            transparently on Base.
+          </li>
+          <li>
+            <a
+              className="underline underline-offset-4 hover:text-foreground"
               href="https://github.com/mykclawd/openclaw-smart-router"
               target="_blank"
               rel="noopener noreferrer"
