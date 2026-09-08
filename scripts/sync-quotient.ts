@@ -73,6 +73,28 @@ interface LivePos {
   close_reason?: string;
 }
 
+interface KalshiPos {
+  signal_id?: string;
+  market_id?: string;
+  ticker?: string;
+  headline?: string;
+  side?: string;
+  status?: string;
+  stake_usd?: number;
+  contracts?: number;
+  entry_cost?: number;
+  entry_usd?: number;
+  entry_order_id?: string;
+  exit_cost?: number;
+  exit_usd?: number;
+  exit_order_id?: string;
+  pnl_usd?: number;
+  roi_pct?: number;
+  entered_at?: string;
+  closed_at?: string;
+  close_reason?: string;
+}
+
 interface LiveLogEvent {
   ts?: string;
   type?: string;
@@ -136,6 +158,41 @@ function normalizeBookStatus(status: string | undefined): "open" | "closed" {
   return status === "closed" ? "closed" : "open";
 }
 
+/** Map a Kalshi book row onto the LivePos shape (single venue per signal —
+ *  kalshi: signals never appear in the Polymarket live book, and vice versa). */
+function kalshiToLive(kp: KalshiPos): LivePos {
+  return {
+    signal_id: kp.signal_id ?? "",
+    headline: kp.headline,
+    slug: undefined,
+    side: kp.side,
+    market_id: kp.market_id,
+    status: kp.status,
+    stake_usd: kp.stake_usd,
+    // Kalshi entry_cost/exit_cost are in cents (Polymarket prices are 0–1
+    // fractions); the page's fmtPrice handles both (v > 1 rendered as cents).
+    entry_usdc: kp.entry_usd,
+    entry_price: kp.entry_cost,
+    entry_shares: kp.contracts,
+    exit_usdc: kp.exit_usd,
+    exit_price: kp.exit_cost,
+    exit_shares: undefined,
+    pnl_usd: kp.pnl_usd,
+    roi_pct: kp.roi_pct,
+    entry_tx: undefined,
+    exit_tx: undefined,
+    entry_order_id: kp.entry_order_id,
+    exit_order_id: kp.exit_order_id,
+    entered_at: kp.entered_at,
+    closed_at: kp.closed_at,
+    close_reason: kp.close_reason,
+  };
+}
+
+function inferVenueSync(marketId: string | null | undefined): "polymarket" | "kalshi" {
+  return marketId?.toLowerCase().startsWith("kalshi:") ? "kalshi" : "polymarket";
+}
+
 function liveStatus(lp: LivePos | undefined, skip: LiveSkip | undefined): "open" | "closed" | "skipped" | "none" {
   if (isLiveFill(lp)) return normalizeBookStatus(lp.status);
   if (skip) return "skipped";
@@ -157,7 +214,13 @@ function executionStatus(lp: LivePos | undefined, skip: LiveSkip | undefined): "
   const live = readJson<{ positions?: Record<string, LivePos> }>(
     path.join(STRAT_DIR, "state", "live_positions.json"),
   );
-  const liveSkips = readLiveSkips(path.join(STRAT_DIR, "logs", "quotient-mirror-live.jsonl"));
+  const kalshi = readJson<{ positions?: Record<string, KalshiPos> }>(
+    path.join(STRAT_DIR, "state", "kalshi_positions.json"),
+  );
+  const liveSkips = {
+    ...readLiveSkips(path.join(STRAT_DIR, "logs", "quotient-mirror-live.jsonl")),
+    ...readLiveSkips(path.join(STRAT_DIR, "logs", "quotient-mirror-kalshi.jsonl")),
+  };
 
   if (!shadow?.positions) {
     console.error("shadow_positions.json missing or unreadable");
@@ -165,9 +228,11 @@ function executionStatus(lp: LivePos | undefined, skip: LiveSkip | undefined): "
   }
 
   const liveBySignal = live?.positions ?? {};
+  const kalshiBySignal = kalshi?.positions ?? {};
   interface PositionRow {
     signalId: string;
     marketId: string | null;
+    venue: "polymarket" | "kalshi";
     headline: string;
     slug: string;
     side: "YES" | "NO";
@@ -216,7 +281,9 @@ function executionStatus(lp: LivePos | undefined, skip: LiveSkip | undefined): "
 
   for (const sp of Object.values(shadow.positions)) {
     if (!sp.signal_id) continue;
-    const lp = liveBySignal[sp.signal_id];
+    const kp = kalshiBySignal[sp.signal_id];
+    // one venue per signal: kalshi: signals fill on Kalshi, others on Polymarket
+    const lp = kp ? kalshiToLive(kp) : liveBySignal[sp.signal_id];
     const skip = liveSkips[sp.signal_id];
     const status = sp.status === "closed" ? "closed" : "open";
     const rowLiveStatus = liveStatus(lp, skip);
@@ -236,6 +303,7 @@ function executionStatus(lp: LivePos | undefined, skip: LiveSkip | undefined): "
     positions.push({
       signalId: sp.signal_id,
       marketId: sp.market_id ?? null,
+      venue: inferVenueSync(sp.market_id ?? (kp ? kp.market_id : null)),
       headline: sp.headline ?? "",
       slug: sp.slug ?? "",
       side: sp.side === "NO" ? ("NO" as const) : ("YES" as const),
@@ -322,7 +390,7 @@ function executionStatus(lp: LivePos | undefined, skip: LiveSkip | undefined): "
     const { quotientPositions, quotientSync } = await import("../db/schema");
     const { runMigrations } = await import("../db/migrate");
     await runMigrations();
-    for (const p of positions) {
+    for (const { venue: _venue, ...p } of positions) {
       await db
         .insert(quotientPositions)
         .values({ ...p, syncedAt: now })

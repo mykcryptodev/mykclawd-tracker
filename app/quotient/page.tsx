@@ -13,6 +13,7 @@ import {
   computeQuotientStats,
   inferExecutionStatus,
   inferLiveStatus,
+  inferVenue,
   liveCostBasis,
   polygonscanTxUrl,
   polymarketUrl,
@@ -25,6 +26,7 @@ import {
 interface QuotientPosition {
   signalId: string;
   marketId: string | null;
+  venue?: "polymarket" | "kalshi";
   headline: string;
   slug: string;
   side: "YES" | "NO";
@@ -118,8 +120,27 @@ function executionBadge(p: QuotientPosition) {
   return <Badge variant="outline" className="text-muted-foreground">SHADOW</Badge>;
 }
 
+function VenueBadge({ venue }: { venue: "polymarket" | "kalshi" | undefined }) {
+  if (venue !== "kalshi") return null;
+  return (
+    <Badge variant="outline" className="ml-1.5 shrink-0 border-blue-500/40 text-blue-300 text-[9px] px-1 py-0">
+      KALSHI
+    </Badge>
+  );
+}
+
 function MarketLink({ position, max = 60 }: { position: QuotientPosition; max?: number }) {
   const label = position.headline.length > max ? position.headline.slice(0, max) + "…" : position.headline;
+  const venue = inferVenue(position.marketId ?? (position.venue === "kalshi" ? "kalshi:" : null));
+  if (venue === "kalshi") {
+    // Kalshi rows: ticker-keyed market on kalshi.com; no slug-based URL exists.
+    return (
+      <span className="inline-flex items-center" title={position.headline}>
+        <span>{label}</span>
+        <VenueBadge venue="kalshi" />
+      </span>
+    );
+  }
   const href = polymarketUrl(position.slug);
   if (!href) return <span title={position.headline}>{label}</span>;
   return (
@@ -135,20 +156,30 @@ function MarketLink({ position, max = 60 }: { position: QuotientPosition; max?: 
   );
 }
 
-function TxLink({ tx, label }: { tx: string | null; label: string }) {
+function TxLink({ tx, label, orderId }: { tx: string | null; label: string; orderId?: string | null }) {
   const href = polygonscanTxUrl(tx);
-  if (!tx || !href) return <span className="text-muted-foreground">—</span>;
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-flex items-center gap-1 text-blue-300 hover:text-blue-200 hover:underline underline-offset-2"
-      title={tx}
-    >
-      {label}: {shortTx(tx)} <ExternalLinkIcon className="h-3 w-3" />
-    </a>
-  );
+  if (tx && href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 text-blue-300 hover:text-blue-200 hover:underline underline-offset-2"
+        title={tx}
+      >
+        {label}: {shortTx(tx)} <ExternalLinkIcon className="h-3 w-3" />
+      </a>
+    );
+  }
+  // Kalshi fills have exchange order ids instead of on-chain txs.
+  if (orderId) {
+    return (
+      <span className="font-mono text-muted-foreground" title={`Kalshi order ${orderId}`}>
+        {label}: {orderId.slice(0, 8)}…
+      </span>
+    );
+  }
+  return <span className="text-muted-foreground">—</span>;
 }
 
 // ── component ────────────────────────────────────────────────────────────────
@@ -244,15 +275,18 @@ export default function QuotientPage() {
               <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground leading-relaxed space-y-1.5">
                 <p>
                   <span className="font-semibold text-foreground">The strategy:</span> Mirror
-                  qualifying Quotient signals on Polymarket with our own entry filters — ≥8pp
-                  upside to Quotient&apos;s fair price, ≥$10k 24h volume, ≤40% drift from publish,
-                  ≤48h signal age, one position per market ever.
+                  qualifying Quotient signals on Polymarket <span className="text-foreground font-medium">and Kalshi</span> with
+                  our own entry filters — ≥8pp upside to Quotient&apos;s fair price, ≥$10k 24h
+                  volume, ≤40% drift from publish, ≤48h signal age, one position per market
+                  ever. Signal venue is set by Quotient: crypto markets execute as Kalshi
+                  contracts, everything else as Polymarket shares — same filters, same exits.
                 </p>
                 <p>
                   Exits: take-profit at Quotient&apos;s fair price, 7-day time stop, or market
-                  resolution. Sizing $25 base / $50 high-conviction, max 6 concurrent,
-                  max 2 per correlated theme, $200 deployed cap, $100/wk loss halt, and a
-                  kill switch if trailing-20 win rate drops below 50%.
+                  resolution. Sizing $25 base / $50 high-conviction, max 10 concurrent (6
+                  on Kalshi), max 2 per correlated theme, $500 deployed cap, $100/wk loss
+                  halt, and a kill switch if trailing-20 win rate drops below 50% — caps
+                  apply across both venues combined.
                 </p>
               </div>
 
@@ -303,7 +337,7 @@ export default function QuotientPage() {
 
                 <TabsContent value="live" className="space-y-4">
                   <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3 text-xs text-muted-foreground">
-                    Default view: only rows with real Polymarket fills. Realized live P&amp;L is cash-flow P&amp;L from closed live fills; open rows show cost basis and entry transaction links, not mark-to-market profit.
+                    Default view: only rows with real fills on Polymarket or Kalshi. Realized live P&amp;L is cash-flow P&amp;L from closed live fills; open rows show cost basis and entry links (chain tx for Polymarket, order id for Kalshi), not mark-to-market profit.
                   </div>
 
                   <Card className="border-border/60">
@@ -336,7 +370,7 @@ export default function QuotientPage() {
                                   <td className="px-2 py-2 font-mono">{fmtPrice(p.liveEntryPrice)}</td>
                                   <td className="px-2 py-2 font-mono">{fmtUsd(liveCostBasis(p))}</td>
                                   <td className="px-2 py-2 font-mono text-muted-foreground">{p.liveEntryShares?.toFixed(4) ?? "—"}</td>
-                                  <td className="px-2 py-2 font-mono"><TxLink tx={p.liveEntryTx} label="entry" /></td>
+                                  <td className="px-2 py-2 font-mono"><TxLink tx={p.liveEntryTx} label="entry" orderId={p.liveEntryOrderId} /></td>
                                   <td className="px-2 py-2 font-mono text-muted-foreground">{fmtDate(p.enteredAt)}</td>
                                   <td className="px-2 py-2 font-mono text-muted-foreground">{fmtPrice(p.targetCost)}</td>
                                 </tr>
@@ -378,7 +412,7 @@ export default function QuotientPage() {
                                   <td className="px-2 py-2 font-mono">{fmtUsd(liveCostBasis(p))}</td>
                                   <td className="px-2 py-2 font-mono">{fmtUsd(p.liveExitUsdc)}</td>
                                   <td className="px-2 py-2 font-mono"><span className={(p.livePnlUsd ?? 0) >= 0 ? "text-green-400" : "text-red-400"}>{fmtUsd(p.livePnlUsd, true)}</span></td>
-                                  <td className="px-2 py-2 font-mono space-y-1"><div><TxLink tx={p.liveEntryTx} label="entry" /></div><div><TxLink tx={p.liveExitTx} label="exit" /></div></td>
+                                  <td className="px-2 py-2 font-mono space-y-1"><div><TxLink tx={p.liveEntryTx} label="entry" orderId={p.liveEntryOrderId} /></div><div><TxLink tx={p.liveExitTx} label="exit" orderId={p.liveExitOrderId} /></div></td>
                                   <td className="px-2 py-2 text-muted-foreground">{closeReasonLabel(p.liveCloseReason ?? p.closeReason)}</td>
                                   <td className="px-2 py-2 font-mono text-muted-foreground">{fmtDate(p.closedAt)}</td>
                                 </tr>
@@ -496,8 +530,8 @@ export default function QuotientPage() {
               {/* Footer note */}
               <p className="text-[10px] text-muted-foreground">
                 Data: strategy books at trading/strategies/quotient-mirror (synced every 15 min).
-                Shadow = paper results; Live = real Polymarket fills once Phase 2 is armed. Not
-                financial advice.
+                Shadow = paper results; Live = real fills on Polymarket and Kalshi (Kalshi live
+                since Sep 8, 2026). Not financial advice.
               </p>
             </div>
           </div>

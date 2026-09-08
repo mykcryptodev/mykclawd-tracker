@@ -4,6 +4,7 @@ import {
   computeQuotientStats,
   inferExecutionStatus,
   inferLiveStatus,
+  inferVenue,
   type QuotientPositionSnapshot,
 } from "./quotient";
 
@@ -82,5 +83,12 @@ describe("Quotient status helpers", () => {
     expect(closeReasonLabel("time_stop_7d")).toBe("Time stop (7d)");
     expect(closeReasonLabel("market_held-to-day7")).toBe("Held to day 7");
     expect(closeReasonLabel("market_resolved")).toBe("Market resolved");
+  });
+
+  it("derives venue from market id: kalshi: prefix → Kalshi, else Polymarket", () => {
+    expect(inferVenue("kalshi:KXBTCD-26SEP1117-T79499.99")).toBe("kalshi");
+    expect(inferVenue("0x1234")).toBe("polymarket");
+    expect(inferVenue(null)).toBe("polymarket");
+    expect(inferVenue(undefined)).toBe("polymarket");
   });
 });

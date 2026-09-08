@@ -1,9 +1,17 @@
 export type QuotientLegStatus = "open" | "closed" | "skipped" | "none";
 export type QuotientExecutionStatus = "real" | "shadow" | "live_skipped";
+export type QuotientVenue = "polymarket" | "kalshi";
+
+/** Venue is derived from the signal's market id: "kalshi:<TICKER>" → Kalshi,
+ *  everything else → Polymarket (the original mirror venue). */
+export function inferVenue(marketId: string | null | undefined): QuotientVenue {
+  return marketId?.toLowerCase().startsWith("kalshi:") ? "kalshi" : "polymarket";
+}
 
 export interface QuotientPositionSnapshot {
   signalId: string;
   marketId: string | null;
+  venue?: QuotientVenue;
   headline: string;
   slug: string;
   side: "YES" | "NO";
