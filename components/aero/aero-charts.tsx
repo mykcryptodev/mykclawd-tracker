@@ -3,7 +3,7 @@
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceArea,
-  LineChart, Line,
+  LineChart, Line, Legend,
 } from "recharts";
 
 // bankr has been down since May 19 2026 9:00 AM EDT — shade this on all timeseries
@@ -171,11 +171,12 @@ export function AeroCompositionChart({ latest }: { latest: AeroLatest }) {
         <ChartContainer config={{}} className="h-72 w-full">
           <PieChart>
             <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={78} paddingAngle={2}
-              label={(p) => `${p.name} ${(((p.percent as number) ?? 0) * 100).toFixed(0)}%`}
+              label={(p) => `${(((p.percent as number) ?? 0) * 100).toFixed(0)}%`}
               labelLine={false}
             >
               {data.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
             </Pie>
+            <Legend verticalAlign="bottom" height={28} iconSize={8} formatter={(v) => <span className="text-xs text-muted-foreground">{v}</span>} />
             <Tooltip formatter={(v) => usdFull(Number(v))} />
           </PieChart>
         </ChartContainer>
