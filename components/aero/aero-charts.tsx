@@ -51,7 +51,7 @@ export function AeroTrendChart({ history }: { history: AeroHistoryPoint[] }) {
         <CardTitle>Performance over time ({history.length} snapshots)</CardTitle>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={{ strategy: { label: "Strategy", color: "var(--chart-1)" }, hodl: { label: "HODL", color: "var(--chart-3)" } }} className="h-72">
+        <ChartContainer config={{ strategy: { label: "Strategy", color: "var(--chart-1)" }, hodl: { label: "HODL", color: "var(--chart-3)" } }} className="h-72 w-full">
           <AreaChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
@@ -108,7 +108,7 @@ export function AeroDeltaChart({ history }: { history: AeroHistoryPoint[] }) {
         <p className="text-sm text-muted-foreground">{subtitle}</p>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={{ delta: { label: "Δ vs HODL", color: "var(--chart-1)" } }} className="h-72">
+        <ChartContainer config={{ delta: { label: "Δ vs HODL", color: "var(--chart-1)" } }} className="h-72 w-full">
           <BarChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
@@ -168,9 +168,9 @@ export function AeroCompositionChart({ latest }: { latest: AeroLatest }) {
     <Card className="border-border/60">
       <CardHeader><CardTitle>Where the money is now</CardTitle></CardHeader>
       <CardContent>
-        <ChartContainer config={{}} className="h-72">
+        <ChartContainer config={{}} className="h-72 w-full">
           <PieChart>
-            <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={95} paddingAngle={2}
+            <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={78} paddingAngle={2}
               label={(p) => `${p.name} ${(((p.percent as number) ?? 0) * 100).toFixed(0)}%`}
               labelLine={false}
             >
@@ -194,7 +194,7 @@ export function AeroVsHodlChart({ latest }: { latest: AeroLatest }) {
     <Card className="border-border/60">
       <CardHeader><CardTitle>Strategy vs HODL</CardTitle></CardHeader>
       <CardContent>
-        <ChartContainer config={{}} className="h-72">
+        <ChartContainer config={{}} className="h-72 w-full">
           <BarChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" tick={{ fontSize: 12 }} />
@@ -251,7 +251,7 @@ export function AeroAeroPriceChart({ priceHistory, startTs }: { priceHistory: Ae
         </p>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={{ price: { label: "AERO", color: "var(--chart-4)" } }} className="h-72">
+        <ChartContainer config={{ price: { label: "AERO", color: "var(--chart-4)" } }} className="h-72 w-full">
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={Math.floor(data.length / 6)} />
@@ -312,7 +312,7 @@ export function AeroWaterfallChart({ latest }: { latest: AeroLatest }) {
     <Card className="border-border/60">
       <CardHeader><CardTitle>Decomposing Δ vs HODL</CardTitle></CardHeader>
       <CardContent>
-        <ChartContainer config={{}} className="h-80">
+        <ChartContainer config={{}} className="h-80 w-full">
           <BarChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="label" tick={{ fontSize: 11 }} />
