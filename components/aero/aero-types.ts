@@ -59,6 +59,9 @@ export interface AeroHistoryPoint {
   hodlUsd: number;
   deltaUsd: number;
   aero: number;
+  // true for rows written by scripts/aero-history-backfill.ts (midnight-aligned,
+  // LP IL modelled as 0) — rendered as "estimated" in the charts.
+  synthetic: boolean;
 }
 
 export interface AeroPayload {

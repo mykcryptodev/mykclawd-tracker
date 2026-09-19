@@ -28,6 +28,23 @@ function tsShort(ts: number) {
   return new Date(ts * 1000).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+// Synthetic (backfilled) rows model LP impermanent loss as 0, so strategy ≥ HODL by
+// construction there. Shade that span so it isn't read as real outperformance.
+const EST_FILL = "#a1a1aa";
+const EST_FILL_OPACITY = 0.14;
+function estimatedSpan(history: AeroHistoryPoint[], labels: string[]) {
+  const first = history.findIndex((h) => h.synthetic);
+  if (first < 0) return null;
+  let last = first;
+  for (let i = history.length - 1; i >= 0; i--) if (history[i].synthetic) { last = i; break; }
+  return { x1: labels[first], x2: labels[last], count: last - first + 1 };
+}
+function snapshotCountLabel(history: AeroHistoryPoint[]) {
+  const est = history.filter((h) => h.synthetic).length;
+  const live = history.length - est;
+  return est > 0 ? `${live} live · ${est} estimated` : `${live} snapshots`;
+}
+
 // ───── Trend over time (strategy vs HODL) ─────
 export function AeroTrendChart({ history }: { history: AeroHistoryPoint[] }) {
   if (history.length < 2) {
@@ -41,6 +58,7 @@ export function AeroTrendChart({ history }: { history: AeroHistoryPoint[] }) {
     );
   }
   const data = history.map((h) => ({ label: tsShort(h.ts), strategy: h.stratUsd, hodl: h.hodlUsd }));
+  const est = estimatedSpan(history, data.map((d) => d.label));
   const bankrIdx = history.findIndex((h) => h.ts >= BANKR_DOWN_TS);
   const bankrLabel = bankrIdx >= 0 ? data[bankrIdx].label : null;
   const bankrEndIdxT = [...history].map((h, i) => ({ ts: h.ts, i })).filter((x) => x.ts <= BANKR_END_TS).at(-1)?.i ?? history.length - 1;
@@ -48,7 +66,12 @@ export function AeroTrendChart({ history }: { history: AeroHistoryPoint[] }) {
   return (
     <Card className="border-border/60">
       <CardHeader>
-        <CardTitle>Performance over time ({history.length} snapshots)</CardTitle>
+        <CardTitle>Performance over time ({snapshotCountLabel(history)})</CardTitle>
+        {est && (
+          <p className="text-sm text-muted-foreground">
+            Shaded span is backfilled daily estimates: HODL is exact, strategy assumes zero LP drag (IL). Live snapshots start after it.
+          </p>
+        )}
       </CardHeader>
       <CardContent>
         <ChartContainer config={{ strategy: { label: "Strategy", color: "var(--chart-1)" }, hodl: { label: "HODL", color: "var(--chart-3)" } }} className="h-72 w-full">
@@ -57,6 +80,10 @@ export function AeroTrendChart({ history }: { history: AeroHistoryPoint[] }) {
             <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
             <YAxis tickFormatter={usdShort} tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
             <ChartTooltip content={<ChartTooltipContent formatter={(v) => usdFull(Number(v))} />} />
+            {est && (
+              <ReferenceArea x1={est.x1} x2={est.x2} fill={EST_FILL} fillOpacity={EST_FILL_OPACITY} stroke={EST_FILL} strokeOpacity={0.4}
+                label={{ value: "estimated (no IL)", position: "insideBottomLeft", fontSize: 10, fill: EST_FILL }} />
+            )}
             {bankrLabel && bankrEndLabel && (
               <ReferenceArea x1={bankrLabel} x2={bankrEndLabel} fill={BANKR_FILL} fillOpacity={BANKR_FILL_OPACITY} stroke={BANKR_FILL} strokeOpacity={0.5}
                 label={{ value: "bankr ⚠︎", position: "insideTopLeft", fontSize: 10, fill: BANKR_FILL }} />
@@ -96,6 +123,7 @@ export function AeroDeltaChart({ history }: { history: AeroHistoryPoint[] }) {
   const sign = latest.delta >= 0 ? "+" : "";
   const subtitle = `Currently ${sign}${usdFull(latest.delta)} vs holding`;
 
+  const est = estimatedSpan(history, data.map((d) => d.label));
   const bankrIdx = history.findIndex((h) => h.ts >= BANKR_DOWN_TS);
   const bankrLabel = bankrIdx >= 0 ? data[bankrIdx].label : null;
   const bankrEndIdxD = [...history].map((h, i) => ({ ts: h.ts, i })).filter((x) => x.ts <= BANKR_END_TS).at(-1)?.i ?? history.length - 1;
@@ -114,6 +142,10 @@ export function AeroDeltaChart({ history }: { history: AeroHistoryPoint[] }) {
             <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
             <YAxis tickFormatter={usdShort} tick={{ fontSize: 11 }} domain={domain} />
             <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1.5} />
+            {est && (
+              <ReferenceArea x1={est.x1} x2={est.x2} fill={EST_FILL} fillOpacity={EST_FILL_OPACITY} stroke={EST_FILL} strokeOpacity={0.4}
+                label={{ value: "estimated (no IL)", position: "insideBottomLeft", fontSize: 10, fill: EST_FILL }} />
+            )}
             {bankrLabel && bankrEndLabelD && (
               <ReferenceArea x1={bankrLabel} x2={bankrEndLabelD} fill={BANKR_FILL} fillOpacity={BANKR_FILL_OPACITY} stroke={BANKR_FILL} strokeOpacity={0.5}
                 label={{ value: "bankr ⚠︎", position: "insideTopLeft", fontSize: 10, fill: BANKR_FILL }} />

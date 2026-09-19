@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
     hodlUsd: s.hodlUsd,
     deltaUsd: s.deltaUsd,
     aero: s.walletAero + s.pendingAero,
+    synthetic: s.ts % 86400 === 0,
   }));
 
   const positions = JSON.parse(latest.positionsJson) as Array<Record<string, unknown>>;
@@ -58,6 +59,13 @@ export async function GET(req: NextRequest) {
         deltaUsd: latest.deltaUsd, lpOnlyDelta: latest.lpOnlyDeltaUsd, aeroAddedUsd: latest.aeroAddedUsd,
         deltaPct: latest.deltaPct, apr: latest.apr,
         totalGasEth: latest.totalGasEth, totalGasUsd: latest.totalGasUsd,
+      },
+      health: {
+        netBenefitUsd: latest.netBenefitUsd ?? 0,
+        netBenefitPct: latest.netBenefitPct ?? 0,
+        coverageRatio: latest.coverageRatio ?? 0,
+        aeroVelocityPerHr: latest.aeroVelocityPerHr ?? null,
+        lpDeltaVelocityPerHr: latest.lpDeltaVelocityPerHr ?? null,
       },
       txCount: latest.txCount,
       gasTxsCounted: latest.gasTxsCounted,

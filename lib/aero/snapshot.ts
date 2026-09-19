@@ -3,8 +3,8 @@
 import { createPublicClient, http, parseAbi, ContractFunctionExecutionError, ContractFunctionRevertedError } from "viem";
 import { base } from "viem/chains";
 import { db } from "../../db/client";
-import { aeroTransfers, aeroSnapshots } from "../../db/schema";
-import { asc, desc, eq } from "drizzle-orm";
+import { aeroTransfers, aeroSnapshots, aeroConfig } from "../../db/schema";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { AERO_AERO, AERO_NPM, AERO_COINGECKO_IDS, AERO_KNOWN_ROUTERS } from "./constants";
 import { DiscoveredPosition } from "./discover";
 import { ingestAeroGas } from "./gas";
@@ -53,6 +53,18 @@ function isContractRevert(e: unknown): boolean {
 // ───── price helpers ─────
 type PriceSeries = Array<[number, number]>;
 
+// Demo-tier CoinGecko throttles bursts with HTTP 429 (the sync fires 9+ calls across three
+// wallets). Back off and retry instead of failing the whole run on the first throttle.
+async function fetchWith429Backoff(url: string, headers: Record<string, string>): Promise<Response> {
+  let res!: Response;
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    res = await fetch(url, { headers });
+    if (res.status !== 429) break;
+    if (attempt < 4) await new Promise((r) => setTimeout(r, 15_000 * attempt));
+  }
+  return res;
+}
+
 async function coingeckoSeries(id: string, days: number): Promise<{ now: number; series: PriceSeries }> {
   const key = process.env.CG_DEMO_KEY;
   const headers: Record<string, string> = { accept: "application/json" };
@@ -62,7 +74,7 @@ async function coingeckoSeries(id: string, days: number): Promise<{ now: number;
   // this job the day the oldest position aged past 90 days. Auto-granularity gives
   // hourly for 2–90d and daily past that, which is what we want for a start price.
   const url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=${days}`;
-  const res = await fetch(url, { headers });
+  const res = await fetchWith429Backoff(url, headers);
   // Fail loud. Returning zeros here poisons every downstream USD figure and turns
   // deltaPct/apr into NaN, which only surfaces 200 lines later as a libSQL insert error.
   if (!res.ok) {
@@ -79,6 +91,54 @@ function priceAt(series: PriceSeries, ts: number): number {
   let best = series[0];
   for (const p of series) if (Math.abs(p[0] - ts) < Math.abs(best[0] - ts)) best = p;
   return best[1];
+}
+
+// Precise price at a single historical timestamp. The `range` endpoint returns hourly
+// points for any historical window ≤ 1 day, regardless of how old it is — unlike
+// `market_chart?days=N`, which degrades to daily granularity once N > 90.
+async function coingeckoPriceNear(id: string, ts: number): Promise<number> {
+  const key = process.env.CG_DEMO_KEY;
+  const headers: Record<string, string> = { accept: "application/json" };
+  if (key) headers["x-cg-demo-api-key"] = key;
+  const from = ts - 3 * 3600, to = ts + 3 * 3600;
+  const url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart/range?vs_currency=usd&from=${from}&to=${to}`;
+  // Demo-tier CoinGecko throttles bursts (HTTP 429). This runs once per wallet (result is
+  // pinned), so a patient retry is cheap.
+  const res = await fetchWith429Backoff(url, headers);
+  if (!res.ok) {
+    const body = (await res.text().catch(() => "")).slice(0, 200);
+    throw new Error(`CoinGecko range ${id} @${ts} failed: HTTP ${res.status} ${body}`);
+  }
+  const j = (await res.json()) as { prices?: Array<[number, number]> };
+  const series: PriceSeries = (j.prices ?? []).map(([ms, p]) => [Math.floor(ms / 1000), p]);
+  const p = priceAt(series, ts);
+  if (!(p > 0)) throw new Error(`CoinGecko range ${id} @${ts} returned no usable price`);
+  return p;
+}
+
+interface StartPrices { firstTs: number; token0: string; token1: string; p0: number; p1: number; pa: number; fetchedAt: number }
+const startPricesKey = (addr: string) => `aero_start_prices_${addr.toLowerCase()}`;
+
+// Entry prices are fetched once (hourly-precision) and pinned in aero_config so they
+// never drift as CoinGecko's rolling-window granularity changes. Re-fetched only if the
+// anchor (firstTs / token pair) changes, e.g. after a deeper backfill.
+async function getStartPrices(pos: DiscoveredPosition, firstTs: number, id0: string, id1: string): Promise<StartPrices> {
+  const row = await db.select().from(aeroConfig).where(eq(aeroConfig.key, startPricesKey(pos.address))).get();
+  if (row) {
+    try {
+      const c = JSON.parse(row.value) as StartPrices;
+      if (c.firstTs === firstTs && c.token0 === pos.token0 && c.token1 === pos.token1 && c.p0 > 0 && c.p1 > 0 && c.pa > 0) return c;
+    } catch { /* malformed — refetch */ }
+  }
+  // Sequential, not Promise.all — three simultaneous calls trip the demo-tier limiter.
+  const p0 = await coingeckoPriceNear(id0, firstTs);
+  const p1 = await coingeckoPriceNear(id1, firstTs);
+  const pa = await coingeckoPriceNear("aerodrome-finance", firstTs);
+  const fresh: StartPrices = { firstTs, token0: pos.token0, token1: pos.token1, p0, p1, pa, fetchedAt: Math.floor(Date.now() / 1000) };
+  const value = JSON.stringify(fresh);
+  await db.insert(aeroConfig).values({ key: startPricesKey(pos.address), value })
+    .onConflictDoUpdate({ target: aeroConfig.key, set: { value } }).run();
+  return fresh;
 }
 
 // ───── concentrated-liquidity math (Uniswap V3) ─────
@@ -171,9 +231,8 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
       `CoinGecko returned no usable prices (days=${cgDays}): ${pos.tokenMeta0.sym}=${p0Now} ${pos.tokenMeta1.sym}=${p1Now} AERO=${paNow}`,
     );
   }
-  const p0Start = priceAt(p0.series, firstTs);
-  const p1Start = priceAt(p1.series, firstTs);
-  const paStart = priceAt(pA.series, firstTs);
+  const sp = await getStartPrices(pos, firstTs, cgId(pos.token0), cgId(pos.token1));
+  const p0Start = sp.p0, p1Start = sp.p1, paStart = sp.pa;
 
   // Starting balances (block before first event)
   const before = firstBlock > 1n ? firstBlock - 1n : firstBlock;
@@ -208,6 +267,16 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
   let depositT0 = 0, depositT1 = 0;  // T0/T1 sent INTO the LP ecosystem
   let withdrawT0 = 0, withdrawT1 = 0; // T0/T1 received BACK from the LP ecosystem
   let extT0 = 0, extT1 = 0;          // external capital additions (for display)
+  let extOutT0 = 0, extOutT1 = 0;    // external capital removals
+  // Capital deployed, priced at the moment each external flow happened. The first flow
+  // uses the pinned hourly start price; later flows use the market_chart series (hourly
+  // for positions < 90d old, daily beyond — acceptable for a cost-basis figure).
+  // External outflows (T0/T1 sent to a non-strategy address) reduce deployed capital.
+  let deployedUsd = 0;
+  const flowPrice = (isT0: boolean, ts: number): number => {
+    if (ts === firstTs) return isT0 ? p0Start : p1Start;
+    return priceAt(isT0 ? p0.series : p1.series, ts);
+  };
   const inflowList: Array<{ ts: number; sym: string; amount: number; from: string; tx: string }> = [];
 
   for (const r of allRows) {
@@ -232,7 +301,14 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
       // (if subsequently deposited into LP), so no separate term needed in the formula.
       if (isT0) extT0 += amount;
       if (isT1) extT1 += amount;
+      deployedUsd += amount * flowPrice(isT0, r.blockTimestamp);
       inflowList.push({ ts: r.blockTimestamp, sym: r.symbol, amount, from: r.counterparty, tx: r.txHash });
+    } else if (r.direction === "out" && !STRAT.has(r.counterparty) && r.counterparty !== ZERO) {
+      // External outflow — capital leaving the strategy. Not part of HODL (it's simply
+      // absent from deposit/withdraw/now) but it must reduce "deployed" cost basis.
+      if (isT0) extOutT0 += amount;
+      if (isT1) extOutT1 += amount;
+      deployedUsd -= amount * flowPrice(isT0, r.blockTimestamp);
     }
   }
 
@@ -245,7 +321,7 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
     balanceAt(AERO_AERO, pos.address, head),
   ]);
   const slot0 = await rpc.readContract({
-    address: pos.pool as `0x${string}`, abi: poolAbi, functionName: "slot0",
+    address: pos.pool as `0x${string}`, abi: poolAbi, functionName: "slot0", blockNumber: head,
   });
   const sqrtP = slot0[0];
   const curTick = Number(slot0[1]);
@@ -342,16 +418,23 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
     (nowT1N + posT1N) * p1Now +
     totalAeroN * paNow;
 
-  // startUsd: USD value of the same WETH+cbBTC HODL quantities at entry prices
-  // (used to express returns as a % of initial invested capital).
-  const startUsd = hodlWeth * p0Start + hodlBtc * p1Start;
+  // startUsd: capital deployed, priced at the time of each external inflow/outflow
+  // (used to express returns as a % of invested capital). Any HODL basis that visible
+  // ERC-20 flows don't explain — e.g. native ETH wrapped to WETH in place, which emits
+  // no Transfer event — is priced at the pinned entry price.
+  const unexplainedT0 = Math.max(0, hodlWeth - (extT0 - extOutT0));
+  const unexplainedT1 = Math.max(0, hodlBtc - (extT1 - extOutT1));
+  const startUsd = deployedUsd + unexplainedT0 * p0Start + unexplainedT1 * p1Start;
   const aeroAddedUsd = (totalAeroN - startAeroN) * paNow;
   const deltaUsd = stratUsd - hodlUsd;
   const lpOnlyDelta = deltaUsd - aeroAddedUsd;
   // hodlUsd can legitimately be 0 for a fully-exited position — guard the divides so we
   // never hand NaN to the DB (libSQL rejects non-finite numbers).
   const deltaPct = hodlUsd > 0 ? (stratUsd / hodlUsd - 1) * 100 : 0;
-  const days = (lastTs - firstTs) / 86400;
+  // Elapsed time is measured to now, not to the last transfer: the position keeps
+  // earning/bleeding between rebalances, so the denominator must include idle time.
+  const nowTs = Math.floor(Date.now() / 1000);
+  const days = (nowTs - firstTs) / 86400;
   const apr = days > 0 && hodlUsd > 0 ? (Math.pow(stratUsd / hodlUsd, 365 / days) - 1) * 100 : 0;
 
   // ── Health / exit metrics ──
@@ -363,8 +446,11 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
       ? aeroAddedUsd / Math.abs(lpOnlyDelta)
       : 0;
 
+  // Velocity must be measured against a real prior snapshot. aero-history-backfill.ts
+  // writes synthetic midnight-aligned rows (ts % 86400 = 0) with lpOnlyDelta = 0; diffing
+  // against one of those would fabricate a huge LP-drag "velocity".
   const priorRow = await db.select().from(aeroSnapshots)
-    .where(eq(aeroSnapshots.address, pos.address.toLowerCase()))
+    .where(and(eq(aeroSnapshots.address, pos.address.toLowerCase()), sql`${aeroSnapshots.ts} % 86400 != 0`))
     .orderBy(desc(aeroSnapshots.ts))
     .limit(1)
     .get();
@@ -372,7 +458,6 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
   let aeroVelocityPerHr: number | null = null;
   let lpDeltaVelocityPerHr: number | null = null;
   if (priorRow) {
-    const nowTs = Math.floor(Date.now() / 1000);
     const dtHrs = (nowTs - priorRow.ts) / 3600;
     if (dtHrs > 0) {
       aeroVelocityPerHr = (aeroAddedUsd - priorRow.aeroAddedUsd) / dtHrs;
@@ -381,7 +466,7 @@ export async function computeAeroSnapshot(pos: DiscoveredPosition, daysBack: num
   }
 
   return {
-    ts: Math.floor(Date.now() / 1000),
+    ts: nowTs,
     address: pos.address,
     pool: pos.pool,
     gauge: pos.gauge,

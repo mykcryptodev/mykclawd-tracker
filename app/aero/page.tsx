@@ -36,6 +36,7 @@ async function getAeroData(address: string): Promise<AeroPayload | null> {
       hodlUsd: s.hodlUsd,
       deltaUsd: s.deltaUsd,
       aero: s.walletAero + s.pendingAero,
+      synthetic: s.ts % 86400 === 0,
     }));
 
     const positions = JSON.parse(latest.positionsJson) as AeroPosition[];
