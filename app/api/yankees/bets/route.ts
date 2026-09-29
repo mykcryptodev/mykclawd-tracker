@@ -104,6 +104,7 @@ const SEED_BETS = [
   { date: "2026-09-16", opponent: "MIN", side: "YES" as const, amount: 15.0, odds: 0.58, payout: 25.862069, result: "LOSS" as const, profit: -15.31, note: "Rule 1: Yankees won Games 150-152 (W3) and lead the MIN series 2-0; Game 153 is Game 3 — high-confidence YES", betPlaced: true, tweetId: null, createdAt: new Date().toISOString() },
   { date: "2026-09-18", opponent: "ARI", side: "YES" as const, amount: 10.0, odds: 0.56, payout: 17.857143, result: "WIN" as const, profit: 7.64, note: "Rule 3: bounce-back YES — Yankees lost Game 153 after a 3-game win streak; Game 154 is exactly one game after the final result", betPlaced: true, tweetId: null, createdAt: new Date().toISOString() },
   { date: "2026-09-25", opponent: "BAL", side: "YES" as const, amount: 10.0, odds: 0.61, payout: 16.393443, result: "LOSS" as const, profit: -10.2, note: "Rule 2: Yankees won Games 159-160 (W2); Game 161 is the next scheduled game after Game 160 final and BAL series opener — standard YES", betPlaced: true, tweetId: null, createdAt: new Date().toISOString() },
+  { date: "2026-09-29", opponent: "BOS", side: "YES" as const, amount: 10.0, odds: 0.56, payout: 17.857143, result: null, profit: null, note: "bounce-back: lost exactly 1 after 4-game win streak (Sep 22 G2 through Sep 25 G1)", betPlaced: true, tweetId: null, createdAt: new Date().toISOString() },
 ] satisfies (typeof yankeesBets.$inferInsert)[];
 
 export async function GET() {
