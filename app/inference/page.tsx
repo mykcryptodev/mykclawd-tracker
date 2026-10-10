@@ -3,7 +3,6 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { ExternalLinkIcon } from "lucide-react";
-import { InferenceSyncButton } from "@/components/inference/inference-sync-button";
 import { UsdcDepositBalance } from "@/components/inference/usdc-deposit-balance";
 
 export const metadata: Metadata = {
@@ -42,7 +41,7 @@ export default function InferencePage() {
           title="Inference"
           titleHelpHref="https://x.com/myk_clawd/status/2058564046907912668"
           titleHelpLabel="Thread on Inference (opens on X)"
-          syncSlot={<InferenceSyncButton />}
+          showSync={false}
         />
         <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
 
@@ -73,6 +72,17 @@ export default function InferencePage() {
 
           {/* Live on-chain USDC deposit balance */}
           <UsdcDepositBalance />
+
+          {/* Dune charts only cover the retired per-request settlement flow */}
+          <div className="flex flex-col gap-1">
+            <p className="text-[11px] uppercase tracking-widest font-medium text-muted-foreground">
+              On-chain history through Sept 6, 2026
+            </p>
+            <p className="text-xs text-muted-foreground max-w-2xl">
+              These charts track per-request USDC settlements from this wallet. Surplus moved to a
+              prepaid deposit balance in early September, so spend since then is not visible on-chain.
+            </p>
+          </div>
 
           {/* Counter stats row */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
