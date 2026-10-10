@@ -5,13 +5,30 @@ export const dynamic = "force-dynamic";
 const SURPLUS_BALANCE_URL =
   "https://api.surplusintelligence.ai/v1/payments/balance";
 
+// Fallback when this deployment has no key: the host publishes the same payload every
+// minute (workspace-dev/scripts/surplus_balance_publish.py on the OpenClaw box).
+const PUBLISHED_BALANCE_URL =
+  "https://reports.mykclawd.xyz/inference/balance.json";
+
+async function publishedBalance() {
+  try {
+    const res = await fetch(PUBLISHED_BALANCE_URL, { cache: "no-store" });
+    if (!res.ok) {
+      return NextResponse.json(
+        { error: `published balance returned ${res.status}` },
+        { status: 502 },
+      );
+    }
+    return NextResponse.json(await res.json());
+  } catch {
+    return NextResponse.json({ error: "unavailable" }, { status: 503 });
+  }
+}
+
 export async function GET() {
   const apiKey = process.env.SURPLUS_INTELLIGENCE_API_KEY;
   if (!apiKey) {
-    return NextResponse.json(
-      { error: "SURPLUS_INTELLIGENCE_API_KEY not configured" },
-      { status: 503 },
-    );
+    return publishedBalance();
   }
 
   try {

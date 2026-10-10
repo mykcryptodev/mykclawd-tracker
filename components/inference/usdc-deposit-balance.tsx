@@ -176,7 +176,7 @@ export function UsdcDepositBalance() {
   }, []);
 
   const formatted =
-    data !== null ? formatUsdc(BigInt(data.availableUsdcMicro)) : null;
+    data !== null ? formatUsdc(BigInt(data.creditBalanceUsdcMicro)) : null;
   const heldMicro = data !== null ? BigInt(data.heldUsdcMicro) : BigInt(0);
   const pendingDepositMicro =
     data !== null ? BigInt(data.pendingDepositUsdcMicro) : BigInt(0);
