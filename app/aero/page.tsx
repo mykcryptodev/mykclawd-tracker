@@ -11,8 +11,10 @@ import { runMigrations } from "@/db/migrate";
 import { fetchAeroPriceHistory } from "@/lib/aero-price";
 import { db } from "@/db/client";
 import { aeroSnapshots } from "@/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, lte } from "drizzle-orm";
 import { AeroAddressFilter } from "@/components/aero/aero-address-filter";
+import { AeroFinalResults, type AeroFinalRow } from "@/components/aero/aero-final-results";
+import { AERO_ENDED, TRACKED_ADDRESSES, aeroSnapshotCutoff } from "@/lib/aero/constants";
 import { LocalDateTime } from "@/components/local-datetime";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +25,7 @@ async function getAeroData(address: string): Promise<AeroPayload | null> {
   try {
     await runMigrations();
     const snapshots = await db.select().from(aeroSnapshots)
-      .where(eq(aeroSnapshots.address, address))
+      .where(and(eq(aeroSnapshots.address, address), lte(aeroSnapshots.ts, aeroSnapshotCutoff(address))))
       .orderBy(desc(aeroSnapshots.ts)).all();
     if (snapshots.length === 0) {
       return { latest: null, history: [] };
@@ -104,6 +106,28 @@ async function getAeroData(address: string): Promise<AeroPayload | null> {
   }
 }
 
+// Final (frozen) snapshot for every wound-down strategy, for the results panel.
+async function getFinalRows(): Promise<AeroFinalRow[]> {
+  try {
+    const rows: AeroFinalRow[] = [];
+    for (const { address, label } of TRACKED_ADDRESSES) {
+      if (!AERO_ENDED[address]) continue;
+      const s = await db.select().from(aeroSnapshots)
+        .where(and(eq(aeroSnapshots.address, address), lte(aeroSnapshots.ts, aeroSnapshotCutoff(address))))
+        .orderBy(desc(aeroSnapshots.ts)).limit(1).get();
+      if (!s) continue;
+      rows.push({
+        address, label, ts: s.ts, days: s.days, paNow: s.paNow,
+        startUsd: s.startUsd, stratUsd: s.stratUsd, hodlUsd: s.hodlUsd, deltaUsd: s.deltaUsd,
+        aeroAddedUsd: s.aeroAddedUsd, lpOnlyDelta: s.lpOnlyDeltaUsd, totalGasUsd: s.totalGasUsd, txCount: s.txCount,
+      });
+    }
+    return rows;
+  } catch {
+    return [];
+  }
+}
+
 export default async function AeroPage({
   searchParams,
 }: {
@@ -111,9 +135,10 @@ export default async function AeroPage({
 }) {
   const params = await searchParams;
   const selectedAddress = (params.address ?? DEFAULT_ADDRESS).toLowerCase();
-  const [data, aeroPriceHistory] = await Promise.all([
+  const [data, aeroPriceHistory, finalRows] = await Promise.all([
     getAeroData(selectedAddress),
     fetchAeroPriceHistory(),
+    getFinalRows(),
   ]);
   const latest = data?.latest ?? null;
   const history = data?.history ?? [];
@@ -137,6 +162,9 @@ export default async function AeroPage({
               <div className="px-4 lg:px-6">
                 <AeroAddressFilter selected={selectedAddress} />
               </div>
+              {finalRows.length > 0 && (
+                <AeroFinalResults rows={finalRows} selected={selectedAddress} />
+              )}
               {!latest ? (
                 <div className="px-4 lg:px-6">
                   <Card className="border-border/60">
