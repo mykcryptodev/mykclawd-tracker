@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { runMigrations } from "../../../db/migrate";
 import { db } from "../../../db/client";
 import { aeroSnapshots } from "../../../db/schema";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, lte } from "drizzle-orm";
+import { aeroSnapshotCutoff } from "../../../lib/aero/constants";
 
 export async function GET(req: NextRequest) {
   await runMigrations();
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
   const address = rawAddress?.toLowerCase() ?? "0xf142022273602c6a6c0ea7a044d21082273bd686";
 
   const snapshots = await db.select().from(aeroSnapshots)
-    .where(eq(aeroSnapshots.address, address))
+    .where(and(eq(aeroSnapshots.address, address), lte(aeroSnapshots.ts, aeroSnapshotCutoff(address))))
     .orderBy(desc(aeroSnapshots.ts)).all();
   if (snapshots.length === 0) {
     return NextResponse.json({ latest: null, history: [] });

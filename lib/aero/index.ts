@@ -7,7 +7,7 @@ import { discoverAeroPosition, DiscoveredPosition } from "./discover";
 import { ingestAeroTransfers } from "./transfers";
 import { computeAeroSnapshot, saveAeroSnapshot, AeroSnapshot } from "./snapshot";
 import { evaluateAndAlert, MonitorResult } from "./monitor";
-import { AERO_DEFAULT_ADDRESS } from "./constants";
+import { AERO_DEFAULT_ADDRESS, AERO_ENDED } from "./constants";
 
 async function getMonitoredAddress(): Promise<string> {
   const row = await db.select().from(aeroConfig).where(eq(aeroConfig.key, "monitored_address")).get();
@@ -30,6 +30,10 @@ export async function ingestAeroMonitor(daysBack = 14): Promise<{
   monitor: MonitorResult | null;
 }> {
   const address = await getMonitoredAddress();
+  // Wound-down strategies stay frozen at their last pre-exit snapshot.
+  if (AERO_ENDED[address]) {
+    return { address, position: null, newTransfers: 0, snapshot: null, monitor: null };
+  }
   const position = await discoverAeroPosition(address, daysBack);
   if (!position) {
     return { address, position: null, newTransfers: 0, snapshot: null, monitor: null };
