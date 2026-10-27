@@ -10,6 +10,7 @@ import {
   lots,
 } from "../../db/schema";
 import { asc, desc, eq } from "drizzle-orm";
+import { isCashToken, normalizeToken } from "../pnl/swaps";
 
 export interface NavPoint {
   date: string; // YYYY-MM-DD (UTC)
@@ -22,13 +23,18 @@ export interface Delta {
 }
 
 export interface TokenPnl {
-  realizedGain: number | null;
-  unrealizedGain: number | null;
-  totalGain: number | null;
-  totalGainPct: number | null;
-  realizedGainPct: number | null;
+  /** Weighted-average USD cost per token, from our own swap replay. */
+  avgCostUsd: number;
+  /** Current holding valued at cost. */
+  costBasisUsd: number;
+  unrealizedGain: number;
+  /** Move against average cost. Null when the whole position was free. */
   unrealizedGainPct: number | null;
-  totalInvested: number | null;
+  /** Booked on actual sale proceeds, not a marked price. */
+  realizedGain: number;
+  totalGain: number;
+  /** Quantity acquired at no cost (airdrops) — the gain on it is the full value. */
+  zeroBasisQty: number;
 }
 
 export interface PortfolioOrder {
@@ -55,6 +61,18 @@ export interface PortfolioOrder {
   updatedAt: string | null;
 }
 
+/** Why a position has no PnL figures. Drives what the table renders. */
+export type PnlUnavailableReason =
+  /** Settlement asset — held to trade with, not a position we score. */
+  | "cash"
+  /** No cost-basis row yet (on-chain sync has not covered this token). */
+  | "no-basis"
+  /**
+   * Basis exists but contradicts the live balance, or a disposal exceeded the
+   * tracked quantity — the transfer history does not reach the original buy.
+   */
+  | "incomplete-history";
+
 export interface PortfolioPosition {
   tokenAddress: string;
   avgCostUsd: number | null;
@@ -69,6 +87,8 @@ export interface PortfolioPosition {
   change1dUsd: number | null;
   change1dPct: number | null;
   pnl: TokenPnl | null;
+  /** Set whenever `pnl` is null, so the UI can explain the blank. */
+  pnlUnavailable: PnlUnavailableReason | null;
   orders: PortfolioOrder[];
 }
 
@@ -80,6 +100,21 @@ export interface PortfolioMeta {
   nativeEthUsd: number;
 }
 
+/**
+ * Portfolio-wide PnL. Summable precisely because settlement assets are excluded
+ * — every dollar here is attributed to exactly one position.
+ */
+export interface PortfolioPnlTotals {
+  unrealizedGain: number;
+  realizedGain: number;
+  totalGain: number;
+  costBasisUsd: number;
+  /** Positions contributing to the totals. */
+  coveredPositions: number;
+  /** Positions left out because basis is missing or untrustworthy. */
+  uncoveredPositions: number;
+}
+
 export interface PortfolioOverview {
   meta: PortfolioMeta | null;
   totalValueUsd: number;
@@ -87,6 +122,7 @@ export interface PortfolioOverview {
   navExEthUsd: number;
   series: NavPoint[];
   positions: PortfolioPosition[];
+  pnlTotals: PortfolioPnlTotals;
   deltas: {
     d1: Delta | null;
     d7: Delta | null;
@@ -258,6 +294,92 @@ async function getOrdersMap(): Promise<Map<string, PortfolioOrder[]>> {
   return map;
 }
 
+/**
+ * Largest relative gap allowed between the quantity our replay tracked and the
+ * live on-chain balance before we stop trusting the basis. A mismatch means the
+ * transfer history missed movements, so any PnL derived from it would be wrong.
+ */
+const MAX_QUANTITY_DRIFT = 0.01;
+
+interface BasisRow {
+  quantity: number;
+  avgCostUsd: number;
+  realizedPnlUsd: number;
+  zeroBasisQty: number;
+  basisComplete: boolean;
+}
+
+/**
+ * Derives a position's PnL from our own cost basis, or explains why it can't.
+ * Exported for tests.
+ */
+export function computeTokenPnl(
+  balance: number,
+  priceUsd: number | null,
+  basis: BasisRow | undefined,
+  isCash: boolean
+): { pnl: TokenPnl | null; unavailable: PnlUnavailableReason | null } {
+  if (isCash) return { pnl: null, unavailable: "cash" };
+  if (!basis) return { pnl: null, unavailable: "no-basis" };
+
+  const drift =
+    balance > 0
+      ? Math.abs(basis.quantity - balance) / balance
+      : basis.quantity > 0
+        ? 1
+        : 0;
+
+  if (!basis.basisComplete || drift > MAX_QUANTITY_DRIFT) {
+    return { pnl: null, unavailable: "incomplete-history" };
+  }
+
+  const price = priceUsd ?? 0;
+  const costBasisUsd = balance * basis.avgCostUsd;
+  const unrealizedGain = balance * price - costBasisUsd;
+  const realizedGain = basis.realizedPnlUsd;
+
+  return {
+    pnl: {
+      avgCostUsd: basis.avgCostUsd,
+      costBasisUsd,
+      unrealizedGain,
+      // A position acquired entirely for free has no cost to measure against.
+      unrealizedGainPct:
+        basis.avgCostUsd > 0 ? (price / basis.avgCostUsd - 1) * 100 : null,
+      realizedGain,
+      totalGain: unrealizedGain + realizedGain,
+      zeroBasisQty: basis.zeroBasisQty,
+    },
+    unavailable: null,
+  };
+}
+
+export function sumPortfolioPnl(positions: PortfolioPosition[]): PortfolioPnlTotals {
+  const totals: PortfolioPnlTotals = {
+    unrealizedGain: 0,
+    realizedGain: 0,
+    totalGain: 0,
+    costBasisUsd: 0,
+    coveredPositions: 0,
+    uncoveredPositions: 0,
+  };
+
+  for (const p of positions) {
+    if (!p.pnl) {
+      // Cash is not a position, so it is not "uncovered" — it is out of scope.
+      if (p.pnlUnavailable !== "cash") totals.uncoveredPositions++;
+      continue;
+    }
+    totals.unrealizedGain += p.pnl.unrealizedGain;
+    totals.realizedGain += p.pnl.realizedGain;
+    totals.totalGain += p.pnl.totalGain;
+    totals.costBasisUsd += p.pnl.costBasisUsd;
+    totals.coveredPositions++;
+  }
+
+  return totals;
+}
+
 export async function getPositions(
   totalUsd: number,
   ordersMap: Map<string, PortfolioOrder[]>
@@ -266,37 +388,39 @@ export async function getPositions(
     db.select().from(portfolioPositions).orderBy(desc(portfolioPositions.balanceUsd)).all(),
     db.select().from(lots).all(),
   ]);
-  const lotsMap = new Map(lotRows.map((l) => [l.tokenAddress.toLowerCase(), l.avgCostUsd]));
+
+  const basisMap = new Map<string, BasisRow>(
+    lotRows.map((l) => [
+      normalizeToken(l.tokenAddress),
+      {
+        quantity: Number(l.quantity) || 0,
+        avgCostUsd: l.avgCostUsd,
+        realizedPnlUsd: l.realizedPnlUsd,
+        zeroBasisQty: l.zeroBasisQty,
+        basisComplete: l.basisComplete,
+      },
+    ])
+  );
 
   return rows.map((r) => {
-    const hasPnl =
-      r.realizedGain !== null ||
-      r.unrealizedGain !== null ||
-      r.totalGain !== null;
-
-    const pnl: TokenPnl | null = hasPnl
-      ? {
-          realizedGain: r.realizedGain ?? null,
-          unrealizedGain: r.unrealizedGain ?? null,
-          totalGain: r.totalGain ?? null,
-          totalGainPct: r.totalGainPct ?? null,
-          realizedGainPct: r.realizedGainPct ?? null,
-          unrealizedGainPct: r.unrealizedGainPct ?? null,
-          totalInvested: r.totalInvested ?? null,
-        }
-      : null;
+    const token = normalizeToken(r.tokenAddress);
+    const { pnl, unavailable } = computeTokenPnl(
+      r.balance,
+      r.price ?? null,
+      basisMap.get(token),
+      isCashToken(token)
+    );
 
     // Deduplicate orders for this token by orderId
     const seen = new Set<string>();
     const orders: PortfolioOrder[] = [];
-    for (const o of ordersMap.get(r.tokenAddress.toLowerCase()) ?? []) {
+    for (const o of ordersMap.get(token) ?? []) {
       if (!seen.has(o.orderId)) {
         seen.add(o.orderId);
         orders.push(o);
       }
     }
 
-    const avgCostUsd = lotsMap.get(r.tokenAddress.toLowerCase()) ?? null;
     return {
       tokenAddress: r.tokenAddress,
       symbol: r.symbol,
@@ -310,7 +434,8 @@ export async function getPositions(
       change1dUsd: r.change1dUsd ?? null,
       change1dPct: r.change1dPct ?? null,
       pnl,
-      avgCostUsd: avgCostUsd && avgCostUsd > 0 ? avgCostUsd : null,
+      pnlUnavailable: unavailable,
+      avgCostUsd: pnl?.avgCostUsd ?? null,
       orders,
     };
   });
@@ -349,6 +474,7 @@ export async function getPortfolioOverview(): Promise<PortfolioOverview> {
     navExEthUsd: totalValueUsd,
     series,
     positions,
+    pnlTotals: sumPortfolioPnl(positions),
     deltas: computeDeltas(series, totalValueUsd),
   };
 }

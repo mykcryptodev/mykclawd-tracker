@@ -100,11 +100,13 @@ async function fetchChartSeries(fungibleId: string): Promise<{
   // 1W/1M (e.g. PEPE yields only ~5 points for 1W). Use the native
   // week/month endpoints (30-min and 2-hour buckets) when they return data,
   // falling back to slicing `max` only if a shorter window has no points.
-  const [max, month, week] = await Promise.all([
-    fetchZerionFungibleChart(fungibleId, "max").catch(() => empty),
-    fetchZerionFungibleChart(fungibleId, "month").catch(() => empty),
-    fetchZerionFungibleChart(fungibleId, "week").catch(() => empty),
-  ]);
+  // Fetch sequentially to stay under Zerion's 1 req/s demo-tier limit.
+  // Parallel calls race each other and the losers 429 (silently caught as
+  // empty), which is why the chart sometimes degrades to the sparse
+  // GeckoTerminal fallback even though Zerion has the data.
+  const max = await fetchZerionFungibleChart(fungibleId, "max").catch(() => empty);
+  const month = await fetchZerionFungibleChart(fungibleId, "month").catch(() => empty);
+  const week = await fetchZerionFungibleChart(fungibleId, "week").catch(() => empty);
   return {
     week: week.length > 0 ? week : recentPoints(max, 7),
     month: month.length > 0 ? month : recentPoints(max, 31),
@@ -122,13 +124,23 @@ async function fetchTokenChartSeries(
 }> {
   if (fungibleId) {
     const zerionSeries = await fetchChartSeries(fungibleId);
-    if (
-      zerionSeries.week.length > 0 ||
-      zerionSeries.month.length > 0 ||
-      zerionSeries.max.length > 0
-    ) {
-      return zerionSeries;
-    }
+    // Merge strategy: take whichever windows actually have data from Zerion,
+    // and only fall back to GeckoTerminal for windows that are empty. This
+    // prevents a single 429 (e.g. on the week endpoint) from throwing away
+    // good Zerion data for the other windows and producing a degraded chart
+    // with no trade markers.
+    const needsFallback =
+      zerionSeries.week.length === 0 ||
+      zerionSeries.month.length === 0 ||
+      zerionSeries.max.length === 0;
+    if (!needsFallback) return zerionSeries;
+
+    const fallback = await fetchFallbackTokenChartSeries(tokenAddress);
+    return {
+      week: zerionSeries.week.length > 0 ? zerionSeries.week : fallback.week,
+      month: zerionSeries.month.length > 0 ? zerionSeries.month : fallback.month,
+      max: zerionSeries.max.length > 0 ? zerionSeries.max : fallback.max,
+    };
   }
 
   return fetchFallbackTokenChartSeries(tokenAddress);
@@ -178,34 +190,31 @@ export default async function HoldingPage({
 
   // Live Zerion data — same source as the positions/PnL sync, fetched fresh so
   // trade history and the chart are never staler than the page load.
+  //
+  // NOTE: fetch sequentially (not Promise.all) — the Zerion demo tier caps at
+  // 1 req/s, and firing both calls at once makes one 429 and return empty,
+  // which is exactly how the chart loses its trade markers intermittently.
   const emptyHistory: TokenTradeHistory = { trades: [], truncated: false, maxPages: 25 };
-  const [tradeHistory, fungibleId] = await Promise.all([
-    fetchTokenTradeHistory(TRACKED_ADDRESS, tokenAddress).catch(() => emptyHistory),
-    fetchZerionFungibleId(tokenAddress).catch(() => null),
-  ]);
+  const tradeHistory = await fetchTokenTradeHistory(TRACKED_ADDRESS, tokenAddress).catch(() => emptyHistory);
+  const fungibleId = await fetchZerionFungibleId(tokenAddress).catch(() => null);
   const trades = tradeHistory.trades;
 
   const chartSeries = await fetchTokenChartSeries(tokenAddress, fungibleId);
 
-  // Prefer a cost basis aligned with the displayed Zerion PnL. The local lot
-  // engine and trade-history average are fallbacks when Zerion lacks PnL fields.
-  const zerionAvgCostUsd = positiveFinite(
-    position.pnl?.unrealizedGain !== null && position.pnl?.unrealizedGain !== undefined && position.balance > 0
-      ? (position.balanceUsd - position.pnl.unrealizedGain) / position.balance
-      : null
-  );
+  // Our own replayed basis is authoritative. The buy-history average is only a
+  // fallback for tokens the on-chain replay has not covered — it is an estimate
+  // because it prices each buy at the provider's mark rather than the fill.
+  const ownAvgCostUsd = positiveFinite(position.pnl?.avgCostUsd ?? null);
   const buys = trades.filter((t) => t.action === "buy" && t.tokenValueUsd !== null);
   const buyQty = buys.reduce((s, t) => s + t.tokenQty, 0);
   const buyValue = buys.reduce((s, t) => s + (t.tokenValueUsd ?? 0), 0);
   const tradeAvgEntryUsd = positiveFinite(buyQty > 0 ? buyValue / buyQty : null);
-  const avgEntryUsd = zerionAvgCostUsd ?? positiveFinite(position.avgCostUsd) ?? tradeAvgEntryUsd;
-  const avgEntrySource = zerionAvgCostUsd
-    ? "Zerion PnL basis"
-    : positiveFinite(position.avgCostUsd)
-      ? "tracker lot basis"
-      : tradeAvgEntryUsd
-        ? "buy-history estimate"
-        : null;
+  const avgEntryUsd = ownAvgCostUsd ?? tradeAvgEntryUsd;
+  const avgEntrySource = ownAvgCostUsd
+    ? "from actual fills"
+    : tradeAvgEntryUsd
+      ? "buy-history estimate"
+      : null;
   const fromEntry =
     avgEntryUsd && position.price ? position.price / avgEntryUsd : null;
 
@@ -345,15 +354,16 @@ export default async function HoldingPage({
                 />
                 <StatCard
                   label="Realized PnL"
-                  value={fmtGain(position.pnl?.realizedGain ?? null, position.pnl?.realizedGainPct ?? null)}
+                  value={fmtGain(position.pnl?.realizedGain ?? null, null)}
+                  sub="on actual sale proceeds"
                   valueClass={gainClass(position.pnl?.realizedGain ?? null)}
                 />
                 <StatCard
                   label="Total PnL"
-                  value={fmtGain(position.pnl?.totalGain ?? null, position.pnl?.totalGainPct ?? null)}
+                  value={fmtGain(position.pnl?.totalGain ?? null, null)}
                   sub={
-                    position.pnl?.totalInvested
-                      ? `${fullUsd.format(position.pnl.totalInvested)} invested`
+                    position.pnl
+                      ? `${fullUsd.format(position.pnl.costBasisUsd)} cost basis`
                       : undefined
                   }
                   valueClass={gainClass(position.pnl?.totalGain ?? null)}

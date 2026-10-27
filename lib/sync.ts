@@ -9,12 +9,8 @@ import { resolveTransactions } from "./ingest/transactions";
 import { getPriceForDate, ingestPrices } from "./ingest/prices";
 import { ingestLiquidity } from "./ingest/liquidity";
 import { ingestImages } from "./ingest/images";
-import {
-  computePnl,
-  computePnlIncremental,
-  initializePnlCursorFromCurrentState,
-  recomputeTodaySnapshot,
-} from "./pnl/snapshot";
+import { recomputeTodaySnapshot } from "./pnl/snapshot";
+import { computeCostBasis } from "./pnl/basis";
 import { ingestAeroMonitor } from "./aero";
 import { db } from "../db/client";
 import { lots, tokens } from "../db/schema";
@@ -63,9 +59,6 @@ export async function runSync(
     onProgress?.({ step, totalSteps: TOTAL_STEPS, label, detail });
 
   await runMigrations();
-  if (mode === "fast") {
-    await initializePnlCursorFromCurrentState();
-  }
 
   emit(1, "Ingesting transfers");
   const { newTransfers, blocksScanned } = await ingestTransfers(TRACKED_ADDRESS);
@@ -116,21 +109,21 @@ export async function runSync(
     }).then(() => emit(6, "Resolving token images", "done")),
   ]);
 
-  emit(7, mode === "full" ? "Computing full PnL" : "Computing incremental PnL");
-  let pnlEventsProcessed: number | null = null;
-  if (mode === "full") {
-    await computePnl();
-    emit(7, "Computing full PnL", "full replay done");
-  } else {
-    const pnl = await computePnlIncremental();
-    pnlEventsProcessed = pnl.eventsProcessed;
-    const detail = pnl.fullReplay
-      ? "bootstrap full replay done"
-      : pnl.initializedCursor
-        ? "cursor initialized"
-        : `${pnl.eventsProcessed} events · ${pnl.snapshotsWritten} snapshots`;
-    emit(7, "Computing incremental PnL", detail);
-  }
+  // Cost basis comes from replaying swaps priced off their cash counter-leg.
+  // This is the only writer of `lots` — the older oracle-priced replay in
+  // lib/pnl/snapshot.ts is left in place but no longer runs, so the two cannot
+  // race each other into the same rows.
+  emit(7, "Computing cost basis");
+  const basis = await computeCostBasis();
+  const pnlEventsProcessed = basis.eventsProcessed;
+  emit(
+    7,
+    "Computing cost basis",
+    `${basis.eventsProcessed} swaps · ${basis.tokensWritten} tokens` +
+      (basis.incompleteTokens.length > 0
+        ? ` · ${basis.incompleteTokens.length} with incomplete history`
+        : "")
+  );
 
   // Reconcile lot quantities against live on-chain balances.
   // Transfer-event replay can miss internal movements or SQL ingestion gaps. ERC-20
@@ -185,16 +178,21 @@ export async function runSync(
             ? await getPriceForDate(NATIVE_TOKEN_ADDRESS, today)
             : lot.avgCostUsd;
 
+        // Needing a correction proves the replayed transfers missed movements,
+        // so the cost basis derived from them cannot be trusted either. Flag it
+        // rather than letting the corrected quantity hide the gap.
         await db.insert(lots)
           .values({
             tokenAddress: lot.tokenAddress,
             quantity: onChainQty.toString(),
             avgCostUsd,
             realizedPnlUsd: lot.realizedPnlUsd,
+            zeroBasisQty: lot.zeroBasisQty,
+            basisComplete: false,
           })
           .onConflictDoUpdate({
             target: lots.tokenAddress,
-            set: { quantity: onChainQty.toString(), avgCostUsd },
+            set: { quantity: onChainQty.toString(), avgCostUsd, basisComplete: false },
           })
           .run();
         corrected++;
