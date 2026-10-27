@@ -27,6 +27,14 @@ export default async function PortfolioPage() {
   const positions = overview?.positions ?? [];
   const deltas = overview?.deltas ?? { d1: null, d7: null, d30: null };
   const syncedAt = overview?.meta?.syncedAt ?? null;
+  const pnlTotals = overview?.pnlTotals ?? {
+    unrealizedGain: 0,
+    realizedGain: 0,
+    totalGain: 0,
+    costBasisUsd: 0,
+    coveredPositions: 0,
+    uncoveredPositions: 0,
+  };
 
   const allocation = positions.map((p) => ({
     symbol: p.symbol || p.tokenAddress.slice(0, 6),
@@ -69,7 +77,11 @@ export default async function PortfolioPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-0">
-                    <HoldingsTable positions={positions} trackedAddress={TRACKED_ADDRESS} />
+                    <HoldingsTable
+                      positions={positions}
+                      trackedAddress={TRACKED_ADDRESS}
+                      pnlTotals={pnlTotals}
+                    />
                   </CardContent>
                 </Card>
               </div>

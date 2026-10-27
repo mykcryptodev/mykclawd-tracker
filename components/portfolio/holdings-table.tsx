@@ -14,7 +14,13 @@ import { Badge } from "@/components/ui/badge";
 import { Toggle } from "@/components/ui/toggle";
 import { Blobbie } from "thirdweb/react";
 import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
-import type { PortfolioPosition, PortfolioOrder, TokenPnl } from "@/lib/portfolio/read";
+import type {
+  PortfolioPosition,
+  PortfolioOrder,
+  PortfolioPnlTotals,
+  PnlUnavailableReason,
+  TokenPnl,
+} from "@/lib/portfolio/read";
 import {
   filterPortfolioOrders,
   fmtRawTokenAmount,
@@ -25,6 +31,7 @@ import {
 interface Props {
   positions: PortfolioPosition[];
   trackedAddress: string;
+  pnlTotals: PortfolioPnlTotals;
 }
 
 type SortKey = "balanceUsd" | "balance" | "pctOfNav" | "totalGain" | "unrealizedGain";
@@ -228,25 +235,44 @@ export function OrderRow({ order, avgCostUsd }: { order: PortfolioOrder; avgCost
   );
 }
 
-function PnlCell({ pnl }: { pnl: TokenPnl | null }) {
-  if (!pnl || (pnl.totalGain === null && pnl.unrealizedGain === null)) {
-    return <span className="text-muted-foreground">—</span>;
-  }
-  // Show unrealized (open position) + realized if available
-  const unreal = pnl.unrealizedGain;
-  const real = pnl.realizedGain;
+/** Explains a blank PnL cell instead of leaving an unexplained dash. */
+const UNAVAILABLE_LABEL: Record<PnlUnavailableReason, string> = {
+  cash: "Settlement asset — held to trade with, not scored as a position",
+  "no-basis": "No cost basis yet — on-chain sync hasn't covered this token",
+  "incomplete-history":
+    "Transfer history doesn't reach the original purchase, so cost basis would be wrong",
+};
+
+function NoPnl({ reason }: { reason: PnlUnavailableReason | null }) {
+  return (
+    <span
+      className="text-muted-foreground"
+      title={reason ? UNAVAILABLE_LABEL[reason] : undefined}
+    >
+      —
+    </span>
+  );
+}
+
+function PnlCell({
+  pnl,
+  reason,
+}: {
+  pnl: TokenPnl | null;
+  reason: PnlUnavailableReason | null;
+}) {
+  if (!pnl) return <NoPnl reason={reason} />;
+
   return (
     <div className="flex flex-col items-end gap-0.5 leading-tight">
-      {unreal !== null && (
-        <div className="flex items-center gap-1">
-          <span className="text-[10px] text-muted-foreground">U</span>
-          {fmtGain(unreal, pnl.unrealizedGainPct)}
-        </div>
-      )}
-      {real !== null && real !== 0 && (
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] text-muted-foreground">U</span>
+        {fmtGain(pnl.unrealizedGain, pnl.unrealizedGainPct)}
+      </div>
+      {pnl.realizedGain !== 0 && (
         <div className="flex items-center gap-1">
           <span className="text-[10px] text-muted-foreground">R</span>
-          {fmtGain(real, pnl.realizedGainPct)}
+          {fmtGain(pnl.realizedGain, null)}
         </div>
       )}
     </div>
@@ -283,7 +309,7 @@ function ColHead({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function HoldingsTable({ positions, trackedAddress }: Props) {
+export function HoldingsTable({ positions, trackedAddress, pnlTotals }: Props) {
   const router = useRouter();
   const [sortKey, setSortKey] = useState<SortKey>("balanceUsd");
   const [asc, setAsc] = useState(false);
@@ -340,7 +366,7 @@ export function HoldingsTable({ positions, trackedAddress }: Props) {
       <Table>
         <TableBody>
           <TableRow>
-            <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+            <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
               No holdings yet — run Sync to load data.
             </TableCell>
           </TableRow>
@@ -373,11 +399,12 @@ export function HoldingsTable({ positions, trackedAddress }: Props) {
           <TableHead className="w-8" /> {/* expand chevron */}
           <ColHead label="Token" sortKey={sortKey} asc={asc} onSort={toggleSort} />
           <ColHead label="Price" align="right" sortKey={sortKey} asc={asc} onSort={toggleSort} />
+          <ColHead label="Avg Cost" align="right" sortKey={sortKey} asc={asc} onSort={toggleSort} />
           <ColHead label="24h" align="right" sortKey={sortKey} asc={asc} onSort={toggleSort} />
           <ColHead label="Balance" k="balance" align="right" sortKey={sortKey} asc={asc} onSort={toggleSort} />
           <ColHead label="Value" k="balanceUsd" align="right" sortKey={sortKey} asc={asc} onSort={toggleSort} />
           <ColHead label="% NAV" k="pctOfNav" align="right" sortKey={sortKey} asc={asc} onSort={toggleSort} />
-          <ColHead label="Unreal. PnL" k="unrealizedGain" align="right" sortKey={sortKey} asc={asc} onSort={toggleSort} />
+          <ColHead label="Unreal / Real" k="unrealizedGain" align="right" sortKey={sortKey} asc={asc} onSort={toggleSort} />
           <ColHead label="Total PnL" k="totalGain" align="right" sortKey={sortKey} asc={asc} onSort={toggleSort} />
           <ColHead label="Orders" align="right" sortKey={sortKey} asc={asc} onSort={toggleSort} />
         </TableRow>
@@ -474,6 +501,11 @@ export function HoldingsTable({ positions, trackedAddress }: Props) {
                   {fmtPrice(p.price)}
                 </TableCell>
 
+                {/* Avg cost — our own weighted-average basis */}
+                <TableCell className="text-right tabular-nums text-muted-foreground">
+                  {p.pnl ? fmtPrice(p.pnl.avgCostUsd) : <NoPnl reason={p.pnlUnavailable} />}
+                </TableCell>
+
                 {/* 24h */}
                 <TableCell className="text-right tabular-nums text-xs">
                   {fmtChange(p.change1dUsd, p.change1dPct)}
@@ -494,26 +526,18 @@ export function HoldingsTable({ positions, trackedAddress }: Props) {
                   {p.pctOfNav.toFixed(1)}%
                 </TableCell>
 
-                {/* Unrealized PnL */}
+                {/* Unrealized / realized */}
                 <TableCell className="text-right tabular-nums text-xs">
-                  <PnlCell
-                    pnl={
-                      p.pnl
-                        ? {
-                            ...p.pnl,
-                            realizedGain: null,
-                            realizedGainPct: null,
-                            totalGain: null,
-                            totalGainPct: null,
-                          }
-                        : null
-                    }
-                  />
+                  <PnlCell pnl={p.pnl} reason={p.pnlUnavailable} />
                 </TableCell>
 
                 {/* Total PnL */}
                 <TableCell className="text-right tabular-nums text-xs">
-                  {fmtGain(p.pnl?.totalGain ?? null, p.pnl?.totalGainPct ?? null)}
+                  {p.pnl ? (
+                    fmtGain(p.pnl.totalGain, null)
+                  ) : (
+                    <NoPnl reason={p.pnlUnavailable} />
+                  )}
                 </TableCell>
 
                 {/* Orders count */}
@@ -542,7 +566,7 @@ export function HoldingsTable({ positions, trackedAddress }: Props) {
               {/* ── Expanded orders panel ── */}
               {isOpen && canExpand && (
                 <TableRow key={`${p.tokenAddress}-orders`} className="bg-muted/10 hover:bg-muted/20">
-                  <TableCell colSpan={10} className="px-4 pb-3 pt-1">
+                  <TableCell colSpan={11} className="px-4 pb-3 pt-1">
                     <div className="flex flex-col gap-1.5">
                       <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
                         Orders ({visibleOrders.length}
@@ -567,6 +591,53 @@ export function HoldingsTable({ positions, trackedAddress }: Props) {
             </Fragment>
           );
         })}
+
+        {/* ── Portfolio total ──
+            Summable because settlement assets carry no PnL, so no dollar is
+            counted on both a position row and its quote leg. */}
+        {pnlTotals.coveredPositions > 0 && (
+          <TableRow className="border-t-2 border-border/60 bg-muted/20 hover:bg-muted/20">
+            <TableCell />
+            <TableCell className="font-medium">
+              Total
+              {pnlTotals.uncoveredPositions > 0 && (
+                <span
+                  className="ml-2 text-[10px] font-normal text-muted-foreground"
+                  title="Positions without a trustworthy cost basis are excluded from this total"
+                >
+                  {pnlTotals.coveredPositions} of{" "}
+                  {pnlTotals.coveredPositions + pnlTotals.uncoveredPositions} positions
+                </span>
+              )}
+            </TableCell>
+            <TableCell />
+            <TableCell />
+            <TableCell />
+            <TableCell />
+            <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
+              {fullUsd.format(pnlTotals.costBasisUsd)} cost
+            </TableCell>
+            <TableCell />
+            <TableCell className="text-right tabular-nums text-xs">
+              <div className="flex flex-col items-end gap-0.5 leading-tight">
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-muted-foreground">U</span>
+                  {fmtGain(pnlTotals.unrealizedGain, null)}
+                </div>
+                {pnlTotals.realizedGain !== 0 && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-muted-foreground">R</span>
+                    {fmtGain(pnlTotals.realizedGain, null)}
+                  </div>
+                )}
+              </div>
+            </TableCell>
+            <TableCell className="text-right tabular-nums text-xs font-medium">
+              {fmtGain(pnlTotals.totalGain, null)}
+            </TableCell>
+            <TableCell />
+          </TableRow>
+        )}
       </TableBody>
     </Table>
     </div>
