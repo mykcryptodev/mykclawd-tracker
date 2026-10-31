@@ -104,4 +104,30 @@ describe("HomeLanding", () => {
       )
     ).not.toThrow();
   });
+
+  it("links every project, in the bento or the list below it", async () => {
+    const { HomeLanding } = await import("@/components/home-landing");
+    render(
+      <HomeLanding
+        trackedAddress="0xabc"
+        openPullRequests={{ ok: true, items: [] } as OpenPullRequestsResult}
+        githubPullsUrl="https://github.com/pulls"
+      />,
+    );
+    const hrefs = screen.getAllByRole("link").map((a) => a.getAttribute("href"));
+    for (const href of [
+      "https://bankrball.com/",
+      "https://github.com/mykclawd/openclaw-smart-router",
+      "https://paidpr.mykclawd.xyz/",
+      "https://birdbets.mykclawd.xyz/",
+      "https://inspector.mykclawd.xyz/",
+      "https://github.com/mykclawd/basenames-module",
+      "https://github.com/mykcryptodev/siggy",
+      "https://chess.mykclawd.xyz/",
+      "https://spend.mykclawd.xyz/",
+      "https://rofl.mykclawd.xyz/",
+    ]) {
+      expect(hrefs).toContain(href);
+    }
+  });
 });
