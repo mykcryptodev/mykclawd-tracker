@@ -1,0 +1,452 @@
+/* Everything nests under .pb-root so nothing here reaches the rest of the site.
+   Each tile wears its product's own ground, in both site themes. */
+.pb-root {
+  --pad: 24px;
+  --gap: 12px;
+  display: grid;
+  gap: var(--gap);
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  grid-template-columns: minmax(0, 1fr);
+
+  & .ss-stage {
+    --ss-font: var(--font-segment), system-ui, sans-serif;
+  }
+
+  & .pb-tile {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border-radius: 18px;
+    background: var(--tile);
+    color: var(--ink-2);
+  }
+
+  & .pb-tile:has(.pb-link:focus-visible) {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  & .pb-copy {
+    position: relative;
+    margin: 0;
+    padding: 22px var(--pad) 18px;
+    font-size: 15px;
+    line-height: 22px;
+    text-wrap: pretty;
+  }
+
+  & .pb-link {
+    font-weight: 700;
+    color: var(--ink);
+    outline: none;
+  }
+
+  /* The whole tile is the link */
+  & .pb-link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+  }
+
+  & .pb-tile:has(.pb-link:hover) .pb-link {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  & .pb-picture {
+    width: 100%;
+  }
+
+  & .pb-picture .pb-stage .ss-stage {
+    overflow: hidden;
+    background: transparent;
+  }
+
+  /* ---- BankrBall: lime on a dark pitch, as the product draws it ---- */
+
+  & .pb-tile--hero {
+    --tile: #06140d;
+    --ink: #f4f6f1;
+    --ink-2: #a3b0a6;
+    --lime: #e4ff4f;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: 52px 52px;
+  }
+
+  & .pb-sheet {
+    position: absolute;
+    top: 0;
+    left: var(--pad);
+    width: 440px;
+    height: 320px;
+    padding: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 18px;
+    background: #12271e;
+    color: #f4f6f1;
+  }
+
+  & .pb-sheet[data-compact] {
+    width: calc(100% - 2 * var(--pad));
+    padding: 14px;
+  }
+
+  & .pb-sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  & .pb-sheet-name {
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  & .pb-sheet-sub {
+    margin-top: 2px;
+    font-size: 12px;
+    line-height: 1.3;
+    color: #a3b0a6;
+  }
+
+  & .pb-submit {
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    height: 36px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: var(--lime);
+    color: #101a06;
+    font-size: 13px;
+    font-weight: 700;
+    transition: transform 120ms ease;
+  }
+
+  & .pb-submit[data-pressed] {
+    transform: scale(0.97);
+  }
+
+  & .pb-submit-done {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  & .pb-game {
+    display: grid;
+    grid-template-columns: 76px 20px 76px auto;
+    justify-content: start;
+    align-items: center;
+    gap: 8px;
+    height: 54px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  & .pb-team {
+    display: grid;
+    place-items: center;
+    height: 36px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+  }
+
+  & .pb-team[data-picked] {
+    border-color: var(--lime);
+    background: var(--lime);
+    color: #101a06;
+  }
+
+  & .pb-at {
+    font-size: 12px;
+    text-align: center;
+    color: #a3b0a6;
+  }
+
+  & .pb-time {
+    padding-left: 8px;
+    font-size: 12px;
+    white-space: nowrap;
+    color: #a3b0a6;
+  }
+
+  & .pb-pot {
+    position: absolute;
+    top: 92px;
+    left: 396px;
+    width: 176px;
+    padding: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 14px;
+    background: #1b3529;
+    box-shadow: 0 14px 30px -12px rgba(0, 0, 0, 0.6);
+    color: #f4f6f1;
+  }
+
+  & .pb-pot-label,
+  & .pb-pot-sub {
+    font-size: 12px;
+    line-height: 1.3;
+    color: #a3b0a6;
+  }
+
+  & .pb-pot-value {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 0 4px;
+    font-size: 34px;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+
+  /* ---- Smart Router: the one light tile, paper against the dark ones ---- */
+
+  & .pb-tile--router {
+    --tile: #e9ebee;
+    --ink: #14171c;
+    --ink-2: #5c636e;
+  }
+
+  & .pb-router {
+    position: absolute;
+    top: 0;
+    left: var(--pad);
+    right: var(--pad);
+    height: 230px;
+    padding: 14px;
+    border-radius: 14px 14px 0 0;
+    background: #fff;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 10px 26px -12px rgba(20, 25, 40, 0.25);
+    color: #14171c;
+  }
+
+  & .pb-prompt {
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #f1f2f4;
+    font-size: 13px;
+    line-height: 1.3;
+  }
+
+  & .pb-model {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 5px 8px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.3;
+    color: #5c636e;
+  }
+
+  & .pb-model[data-won] {
+    color: #14171c;
+    font-weight: 700;
+  }
+
+  & .pb-model-meter {
+    grid-column: 1 / -1;
+  }
+
+  & .pb-model .ss-meter__fill {
+    background: #b4bac4;
+  }
+
+  & .pb-model[data-won] .ss-meter__fill {
+    background: #2563eb;
+  }
+
+  /* ---- PaidPR: black and purple ---- */
+
+  & .pb-tile--paidpr {
+    --tile: #0a0a0a;
+    --ink: #fff;
+    --ink-2: #a0a0a0;
+    --purple: #6d4fe8;
+  }
+
+  & .pb-pr {
+    position: absolute;
+    top: 0;
+    left: var(--pad);
+    right: var(--pad);
+    height: 230px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid #2c2c2c;
+    border-bottom: 0;
+    border-radius: 14px 14px 0 0;
+    background: #181818;
+    color: #fff;
+  }
+
+  & .pb-pr-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  & .pb-pr-body {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  & .pb-pay {
+    align-self: stretch;
+    display: grid;
+    place-items: center;
+    height: 40px;
+    margin-top: 4px;
+    border-radius: 10px;
+    background: var(--purple);
+    font-size: 13px;
+    font-weight: 700;
+    transition: background-color 260ms ease;
+  }
+
+  & .pb-pay[data-on] {
+    background: #2a2a2a;
+  }
+
+  /* ---- Agent Chess: the board, cut by the tile ---- */
+
+  & .pb-tile--chess {
+    --tile: #0f172a;
+    --ink: #f1f5f9;
+    --ink-2: #94a3b8;
+  }
+
+  & .pb-board {
+    position: absolute;
+    top: 0;
+    left: var(--pad);
+    display: grid;
+    grid-template-columns: repeat(8, var(--cell));
+    grid-auto-rows: var(--cell);
+    border-radius: 8px 0 0 0;
+    overflow: hidden;
+  }
+
+  & .pb-square {
+    background: #475569;
+    transition: background-color 300ms ease 200ms;
+  }
+
+  & .pb-square[data-light] {
+    background: #94a3b8;
+  }
+
+  & .pb-square[data-moved] {
+    background: #2563eb;
+  }
+
+  & .pb-piece {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: grid;
+    place-items: center;
+    width: var(--cell);
+    height: var(--cell);
+    font-size: 32px;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(11, 17, 32, 0.55);
+  }
+
+  & .pb-piece[data-dark] {
+    color: #0b1120;
+    text-shadow: none;
+  }
+
+  & .pb-piece--mover {
+    transition: transform 620ms cubic-bezier(0.3, 0, 0.1, 1);
+  }
+
+  /* ---- BirdBets: real frames from the feeder ---- */
+
+  & .pb-tile--birds {
+    --tile: #18240f;
+    --ink: #fff7e6;
+    --ink-2: #c2c7ad;
+  }
+
+  & .pb-cam {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+
+  & .pb-cam-frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 62%;
+  }
+
+  & .pb-cam-frame--next {
+    opacity: 0;
+    transition: opacity 900ms ease;
+  }
+
+  & .pb-cam-frame--next[data-on] {
+    opacity: 1;
+  }
+
+  & .pb-cam-label {
+    position: absolute;
+    top: 12px;
+    left: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: rgba(10, 16, 8, 0.72);
+    font-size: 11px;
+    line-height: 1.3;
+    color: #fff7e6;
+  }
+
+  & .pb-cam-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #ff3b3b;
+  }
+}
+
+/* Two columns once half a tile can hold its picture */
+@media (min-width: 640px) {
+  .pb-root {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pb-root .pb-tile--hero {
+    grid-column: 1 / -1;
+  }
+}

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { HomeCopyButton } from "@/components/home-copy-button";
+import { ProjectsBento } from "@/components/projects-bento";
 import { TwitterEmbed } from "@/components/twitter-embed";
 import type { OpenPullRequestsResult } from "@/lib/github/open-pull-requests";
 
@@ -201,56 +202,11 @@ export function HomeLanding({
         </div>
 
         <h2 className="mt-12 text-xl font-semibold tracking-tight">Projects</h2>
-        <p className="mt-2 text-sm text-muted-foreground">Things I&apos;ve built or am building.</p>
-        <ul className="mt-4 space-y-3 text-sm leading-relaxed">
-          <li>
-            <a
-              className="underline underline-offset-4 hover:text-foreground"
-              href="https://bankrball.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              🏈 BankrBall
-            </a>{" "}
-            Onchain NFL Pick&apos;em contests. Create or join weekly pools, make your picks, and settle prizes
-            transparently on Base.
-          </li>
-          <li>
-            <a
-              className="underline underline-offset-4 hover:text-foreground"
-              href="https://github.com/mykclawd/openclaw-smart-router"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              🔀 OpenClaw Smart Router
-            </a>{" "}
-            Picks the best LLM for every request. Scores eligible candidates by prompt intent and quality, then
-            proxies the winner through unmodified.
-          </li>
-          <li>
-            <a
-              className="underline underline-offset-4 hover:text-foreground"
-              href="https://paidpr.mykclawd.xyz/"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              🛡️ PaidPR
-            </a>{" "}
-            Stop the Slop. Open a Real PR. Deters drive-by PRs on OSS repos by charging a small amount to open a PR via
-            x402.
-          </li>
-          <li>
-            <a
-              className="underline underline-offset-4 hover:text-foreground"
-              href="https://birdbets.mykclawd.xyz/"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              🐦 BirdBets
-            </a>{" "}
-            Prediction markets powered by a live Bird Buddy feeder. Bet on daily bird visits as the feeder tracks them
-            in real time.
-          </li>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Things I&apos;ve built or am building. Pictures are illustrations, not live data.
+        </p>
+        <ProjectsBento />
+        <ul className="mt-6 space-y-3 text-sm leading-relaxed">
           <li>
             <a
               className="underline underline-offset-4 hover:text-foreground"
@@ -302,17 +258,6 @@ export function HomeLanding({
             </a>{" "}
             Telegram bot that monitors Gnosis Safe multisig wallets and posts human-readable transaction notifications.
             Supports Ethereum, Base, Optimism, Arbitrum, Polygon, and Gnosis.
-          </li>
-          <li>
-            <a
-              className="underline underline-offset-4 hover:text-foreground"
-              href="https://chess.mykclawd.xyz/"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              ♟️ Agent Chess
-            </a>{" "}
-            Onchain chess where AI agents play against each other for ETH. Create games, accept challenges, win prizes.
           </li>
           <li>
             <a
