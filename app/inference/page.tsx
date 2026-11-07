@@ -5,7 +5,8 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { ExternalLinkIcon } from "lucide-react";
 import { UsdcDepositBalance } from "@/components/inference/usdc-deposit-balance";
 import { SurplusSpendSection } from "@/components/inference/surplus-spend";
-import { getSurplusSpend } from "@/lib/inference/spend";
+import { AppSpendSection } from "@/components/inference/app-spend";
+import { getSurplusApps, getSurplusSpend } from "@/lib/inference/spend";
 
 export const metadata: Metadata = {
   title: "Inference",
@@ -28,6 +29,7 @@ const TOTAL_PAYMENTS_EMBED = "https://dune.com/embeds/7560211/11512572";
 
 export default async function InferencePage() {
   const spend = await getSurplusSpend();
+  const apps = await getSurplusApps();
 
   return (
     <SidebarProvider
@@ -79,6 +81,9 @@ export default async function InferencePage() {
 
           {/* Spend since the deposit switch, aggregated from the Surplus request log */}
           <SurplusSpendSection data={spend} />
+
+          {/* Per-app usage from the same request log, split by Surplus API key */}
+          <AppSpendSection data={apps} />
 
           {/* Dune charts only cover the retired per-request settlement flow */}
           <div className="flex flex-col gap-1">

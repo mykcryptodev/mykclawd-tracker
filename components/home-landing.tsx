@@ -206,6 +206,18 @@ export function HomeLanding({
           <li>
             <a
               className="underline underline-offset-4 hover:text-foreground"
+              href="https://wishlist.holiday/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              🎁 Wishlist
+            </a>{" "}
+            Holiday gift-exchange app. Build a wishlist, invite family and friends, and claim gifts. Live on web and
+            Android; iOS in review.
+          </li>
+          <li>
+            <a
+              className="underline underline-offset-4 hover:text-foreground"
               href="https://bankrball.com/"
               target="_blank"
               rel="noopener noreferrer"
