@@ -212,8 +212,8 @@ export function HomeLanding({
             >
               🎁 Wishlist
             </a>{" "}
-            Holiday gift-exchange app. Build a wishlist, invite family and friends, and claim gifts. Live on web and
-            Android; iOS in review.
+            Holiday gift-exchange app. Build a wishlist, invite family and friends, and claim gifts. Live on iOS,
+            Android, and web.
           </li>
           <li>
             <a
