@@ -28,6 +28,7 @@ import {
   BlocksIcon,
   PawPrintIcon,
   RadarIcon,
+  GiftIcon,
 } from "lucide-react"
 
 function BaseballCapIcon() {
@@ -60,6 +61,7 @@ const navMain = [
   { title: "Portfolio", url: "/pnl", icon: <LayoutDashboardIcon /> },
   { title: "Aero LP", url: "/aero", icon: <DropletsIcon /> },
   { title: "Inference", url: "/inference", icon: <CpuIcon /> },
+  { title: "Wishlist", url: "/wishlist", icon: <GiftIcon /> },
   { title: "X Signals", url: "/x402", icon: <AtSignIcon /> },
   { title: "Bounties", url: "/bounties", icon: <TrophyIcon /> },
   { title: "Hat Tap", url: "/hat", icon: <BaseballCapIcon /> },
