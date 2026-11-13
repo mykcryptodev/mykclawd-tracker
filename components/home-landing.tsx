@@ -206,6 +206,18 @@ export function HomeLanding({
           <li>
             <a
               className="underline underline-offset-4 hover:text-foreground"
+              href="https://mykfully.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              ✍️ mykfully
+            </a>{" "}
+            Write, organize, and schedule X posts and threads. Open source, with a live X preview,
+            @mention autocomplete, and media uploads.
+          </li>
+          <li>
+            <a
+              className="underline underline-offset-4 hover:text-foreground"
               href="https://wishlist.holiday/"
               target="_blank"
               rel="noopener noreferrer"
