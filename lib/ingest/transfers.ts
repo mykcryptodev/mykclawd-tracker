@@ -128,7 +128,10 @@ async function fetchSql(
     ]);
     return [...parseSqlRows(transferRows, address), ...parseSqlWethRows(wethRows), ...parseSqlNativeEthRows(nativeEthRows, address)];
   } catch (e) {
-    if (e instanceof CdpSqlError) return null;
+    if (e instanceof CdpSqlError) {
+      console.warn(`    SQL failed for ${fromBlock}-${toBlock}: ${e.message}`);
+      return null;
+    }
     throw e;
   }
 }
@@ -142,10 +145,8 @@ async function fetchRpc(
   const BASE_GENESIS = 1686789347;
   for (let cur = fromBlock; cur <= toBlock; cur += RPC_CHUNK_BLOCKS) {
     const end = cur + RPC_CHUNK_BLOCKS - 1n > toBlock ? toBlock : cur + RPC_CHUNK_BLOCKS - 1n;
-    const [logs, wethEvents] = await Promise.all([
-      getTransferLogs(address, cur, end),
-      getWethEvents(address, cur, end),
-    ]);
+    const logs = await getTransferLogs(address, cur, end);
+    const wethEvents = await getWethEvents(address, cur, end);
     for (const log of logs) {
       const direction = log.to === address.toLowerCase() ? "in" : "out";
       out.push({
@@ -197,20 +198,20 @@ async function fetchAdaptive(
   if (rows === null) {
     // SQL scan limit exceeded — split and recurse
     const mid = fromBlock + (toBlock - fromBlock) / 2n;
-    const [a, b] = await Promise.all([
-      fetchAdaptive(address, fromBlock, mid, depth + 1),
-      fetchAdaptive(address, mid + 1n, toBlock, depth + 1),
-    ]);
+    // Sequential, not Promise.all: parallel halves fanned out to 16 RPC leaves
+    // x 4 getLogs each, which tripped the RPC's 429 rate limit every run.
+    const a = await fetchAdaptive(address, fromBlock, mid, depth + 1);
+    const b = await fetchAdaptive(address, mid + 1n, toBlock, depth + 1);
     return [...a, ...b];
   }
 
   if (rows.length === limit) {
     // Hit the limit — might have missed some, split to be sure
     const mid = fromBlock + (toBlock - fromBlock) / 2n;
-    const [a, b] = await Promise.all([
-      fetchAdaptive(address, fromBlock, mid, depth + 1),
-      fetchAdaptive(address, mid + 1n, toBlock, depth + 1),
-    ]);
+    // Sequential, not Promise.all: parallel halves fanned out to 16 RPC leaves
+    // x 4 getLogs each, which tripped the RPC's 429 rate limit every run.
+    const a = await fetchAdaptive(address, fromBlock, mid, depth + 1);
+    const b = await fetchAdaptive(address, mid + 1n, toBlock, depth + 1);
     return [...a, ...b];
   }
 

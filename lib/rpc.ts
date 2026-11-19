@@ -9,7 +9,8 @@ const BASE_RPC_URL =
 
 export const publicClient = createPublicClient({
   chain: base,
-  transport: http(BASE_RPC_URL),
+  // Back off on 429s instead of failing the whole sync on the first burst.
+  transport: http(BASE_RPC_URL, { retryCount: 6, retryDelay: 1_000 }),
 });
 
 export const TRANSFER_SIG = parseAbiItem(
@@ -36,20 +37,18 @@ export async function getTransferLogs(
   fromBlock: bigint,
   toBlock: bigint
 ): Promise<TransferLog[]> {
-  const [inbound, outbound] = await Promise.all([
-    publicClient.getLogs({
-      event: TRANSFER_SIG,
-      args: { to: address },
-      fromBlock,
-      toBlock,
-    }),
-    publicClient.getLogs({
-      event: TRANSFER_SIG,
-      args: { from: address },
-      fromBlock,
-      toBlock,
-    }),
-  ]);
+  const inbound = await publicClient.getLogs({
+    event: TRANSFER_SIG,
+    args: { to: address },
+    fromBlock,
+    toBlock,
+  });
+  const outbound = await publicClient.getLogs({
+    event: TRANSFER_SIG,
+    args: { from: address },
+    fromBlock,
+    toBlock,
+  });
 
   const seen = new Set<string>();
   const all = [...inbound, ...outbound];
@@ -93,22 +92,20 @@ export async function getWethEvents(
   const depositEvent = parseAbiItem("event Deposit(address indexed dst, uint256 wad)");
   const withdrawalEvent = parseAbiItem("event Withdrawal(address indexed src, uint256 wad)");
 
-  const [deposits, withdrawals] = await Promise.all([
-    publicClient.getLogs({
-      address: WETH_ADDRESS,
-      event: depositEvent,
-      args: { dst: address },
-      fromBlock,
-      toBlock,
-    }),
-    publicClient.getLogs({
-      address: WETH_ADDRESS,
-      event: withdrawalEvent,
-      args: { src: address },
-      fromBlock,
-      toBlock,
-    }),
-  ]);
+  const deposits = await publicClient.getLogs({
+    address: WETH_ADDRESS,
+    event: depositEvent,
+    args: { dst: address },
+    fromBlock,
+    toBlock,
+  });
+  const withdrawals = await publicClient.getLogs({
+    address: WETH_ADDRESS,
+    event: withdrawalEvent,
+    args: { src: address },
+    fromBlock,
+    toBlock,
+  });
 
   const result: WethEvent[] = [];
   for (const log of deposits) {
