@@ -8,6 +8,11 @@ const SQL_LIMIT = 1000; // target limit per SQL query
 const RPC_CHUNK_BLOCKS = 1_000n; // ThirdWeb/Coinbase RPC max
 const SQL_FALLBACK_MIN = 50_000n; // below this, switch straight to RPC
 
+// CDP SQL has returned HTTP 500 for every range since ~Oct 2026. After the
+// first failure in a run, skip it: otherwise every chunk burns ~15 failing
+// SQL rounds (each with retries) before falling back to RPC.
+let sqlDisabled = false;
+
 // Block where the address first appeared — determined from prior exploration
 const FIRST_ACTIVE_BLOCK = 41_000_000n;
 
@@ -97,6 +102,7 @@ async function fetchSql(
   toBlock: bigint,
   limit = SQL_LIMIT
 ): Promise<RawTransfer[] | null> {
+  if (sqlDisabled) return null;
   try {
     const [transferRows, wethRows, nativeEthRows] = await Promise.all([
       cdpQuery(`
@@ -129,7 +135,8 @@ async function fetchSql(
     return [...parseSqlRows(transferRows, address), ...parseSqlWethRows(wethRows), ...parseSqlNativeEthRows(nativeEthRows, address)];
   } catch (e) {
     if (e instanceof CdpSqlError) {
-      console.warn(`    SQL failed for ${fromBlock}-${toBlock}: ${e.message}`);
+      console.warn(`    SQL failed for ${fromBlock}-${toBlock}: ${e.message} (using RPC for the rest of this run)`);
+      sqlDisabled = true;
       return null;
     }
     throw e;
@@ -188,12 +195,16 @@ async function fetchAdaptive(
   const blockRange = toBlock - fromBlock + 1n;
 
   // Below the minimum, skip straight to RPC (avoids deep recursion for tiny ranges)
-  if (blockRange <= SQL_FALLBACK_MIN || depth >= 5) {
+  if (blockRange <= SQL_FALLBACK_MIN || depth >= 5 || sqlDisabled) {
     return fetchRpc(address as `0x${string}`, fromBlock, toBlock);
   }
 
   const limit = depth === 0 ? SQL_LIMIT : 200; // use smaller limit for sub-chunks
   const rows = await fetchSql(address, fromBlock, toBlock, limit);
+
+  if (rows === null && sqlDisabled) {
+    return fetchRpc(address as `0x${string}`, fromBlock, toBlock);
+  }
 
   if (rows === null) {
     // SQL scan limit exceeded — split and recurse
@@ -345,7 +356,16 @@ export async function ingestNativeEthBackfill(address: string): Promise<number> 
     const url = `https://api.basescan.org/api?module=account&action=txlist&address=${address}&startblock=${Number(fromBlock)}&endblock=${Number(currentBlock)}&page=${page}&offset=10000&sort=asc&apikey=${apiKey}`;
     const res = await fetch(url);
     const json = (await res.json()) as { status: string; result: BasescanTx[] | string };
-    if (json.status !== "1" || !Array.isArray(json.result)) break;
+    if (json.status !== "1" || !Array.isArray(json.result)) {
+      // "No transactions found" is a real empty result. Anything else (missing
+      // key, deprecated endpoint) means we learned nothing, so keep the cursor
+      // where it is instead of marking the range synced with no data.
+      if (typeof json.result === "string" && !/no transactions found/i.test(json.result) && page === 1) {
+        console.warn(`  ETH backfill skipped, cursor not advanced: ${json.result.slice(0, 120)}`);
+        return added;
+      }
+      break;
+    }
 
     const ethTxs: RawTransfer[] = json.result
       .filter((tx) => tx.isError === "0" && BigInt(tx.value || "0") > 0n)
@@ -423,9 +443,12 @@ async function fetchNativeEthSqlAdaptive(
   return [...a, ...b];
 }
 
+// `deadline` (epoch ms) stops between chunks so a large backlog is worked off
+// across several runs instead of the job timing out and losing the chunk.
 export async function ingestTransfers(
-  address: string
-): Promise<{ newTransfers: number; blocksScanned: number }> {
+  address: string,
+  deadline = Infinity
+): Promise<{ newTransfers: number; blocksScanned: number; blocksRemaining: number }> {
   const syncKey = getSyncKey(address);
   const stateRow = await db
     .select()
@@ -436,10 +459,11 @@ export async function ingestTransfers(
   const fromBlock = stateRow ? BigInt(stateRow.value) + 1n : FIRST_ACTIVE_BLOCK;
   const toBlock = await getCurrentBlock();
 
-  if (fromBlock > toBlock) return { newTransfers: 0, blocksScanned: 0 };
+  if (fromBlock > toBlock) return { newTransfers: 0, blocksScanned: 0, blocksRemaining: 0 };
 
-  // Split into top-level 500k block chunks for progress tracking
-  const TOP_CHUNK = 500_000n;
+  // Split into 100k block chunks; the cursor is saved after each one. When SQL
+  // is down, each chunk is ~100 RPC windows, so a cancelled run loses little.
+  const TOP_CHUNK = 100_000n;
   const chunks: Array<[bigint, bigint]> = [];
   for (let cur = fromBlock; cur <= toBlock; cur += TOP_CHUNK) {
     const end = cur + TOP_CHUNK - 1n > toBlock ? toBlock : cur + TOP_CHUNK - 1n;
@@ -449,8 +473,13 @@ export async function ingestTransfers(
   console.log(`  ${chunks.length} chunks (${fromBlock.toLocaleString()} → ${toBlock.toLocaleString()})`);
 
   let newTransfers = 0;
+  let scannedTo = fromBlock - 1n;
 
   for (let i = 0; i < chunks.length; i++) {
+    if (Date.now() > deadline) {
+      console.log(`  Time budget reached after ${i}/${chunks.length} chunks; resuming next run`);
+      break;
+    }
     const [chunkStart, chunkEnd] = chunks[i];
     const rows = await fetchAdaptive(address, chunkStart, chunkEnd);
     newTransfers += await upsertTransfers(rows);
@@ -460,8 +489,14 @@ export async function ingestTransfers(
       .onConflictDoUpdate({ target: syncState.key, set: { value: chunkEnd.toString() } })
       .run();
 
+    scannedTo = chunkEnd;
+
     console.log(`  ${i + 1}/${chunks.length} chunks | ${newTransfers} new transfers`);
   }
 
-  return { newTransfers, blocksScanned: Number(toBlock - fromBlock + 1n) };
+  return {
+    newTransfers,
+    blocksScanned: Number(scannedTo - fromBlock + 1n),
+    blocksRemaining: Number(toBlock - scannedTo),
+  };
 }

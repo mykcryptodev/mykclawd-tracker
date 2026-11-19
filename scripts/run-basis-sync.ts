@@ -28,9 +28,20 @@ const TRACKED_ADDRESS =
 
     await runMigrations();
 
-    console.log("1/5 Ingesting transfers...");
-    const { newTransfers, blocksScanned } = await ingestTransfers(TRACKED_ADDRESS);
+    // Leave room for steps 2-5 inside the job's timeout-minutes.
+    const budgetMinutes = Number(process.env.INGEST_BUDGET_MINUTES || 20);
+    const deadline = Date.now() + budgetMinutes * 60_000;
+
+    console.log(`1/5 Ingesting transfers (budget ${budgetMinutes} min)...`);
+    const { newTransfers, blocksScanned, blocksRemaining } =
+      await ingestTransfers(TRACKED_ADDRESS, deadline);
     console.log(`    ${newTransfers} new across ${blocksScanned.toLocaleString()} blocks`);
+    if (blocksRemaining > 0) {
+      console.warn(
+        `    CATCHING UP: ${blocksRemaining.toLocaleString()} blocks still to ingest; ` +
+          `PnL stays incomplete until the backlog clears`
+      );
+    }
 
     console.log("2/5 Backfilling native ETH...");
     const nativeEth = await ingestNativeEthBackfill(TRACKED_ADDRESS);
