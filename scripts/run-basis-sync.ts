@@ -28,6 +28,20 @@ const TRACKED_ADDRESS =
 
     await runMigrations();
 
+    // One-time repair: getZerionId used to swallow 429s as "not listed", so the
+    // 2026-11-20 catch-up marked hundreds of tokens zerion_checked with no id.
+    // Re-queue them; the per-run Zerion budget spreads the re-check out.
+    const { client } = await import("../db/client");
+    const repairKey = "zerion_recheck_2026_11_20";
+    const done = await client.execute({ sql: "SELECT 1 FROM sync_state WHERE key = ?", args: [repairKey] });
+    if (done.rows.length === 0) {
+      const res = await client.execute(
+        "UPDATE tokens SET zerion_checked = 0 WHERE zerion_checked = 1 AND zerion_id IS NULL AND is_priced = 0"
+      );
+      await client.execute({ sql: "INSERT INTO sync_state (key, value) VALUES (?, ?)", args: [repairKey, new Date().toISOString()] });
+      console.log(`Re-queued ${res.rowsAffected} tokens for a Zerion re-check`);
+    }
+
     // Leave room for steps 2-5 inside the job's timeout-minutes.
     const budgetMinutes = Number(process.env.INGEST_BUDGET_MINUTES || 20);
     const deadline = Date.now() + budgetMinutes * 60_000;

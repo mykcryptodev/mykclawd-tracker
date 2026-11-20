@@ -1,7 +1,7 @@
 import { db } from "../../db/client";
 import { tokens } from "../../db/schema";
 import { getCoinIdByContract, invalidateCoinsListCache } from "../coingecko";
-import { getZerionId } from "../zerion";
+import { getZerionId, ZerionQuotaError } from "../zerion";
 import { publicClient, NATIVE_TOKEN_ADDRESS } from "../rpc";
 import { eq, and } from "drizzle-orm";
 import { erc20Abi } from "viem";
@@ -112,7 +112,14 @@ export async function enrichTokens(): Promise<number> {
     console.log(`  Checking ${zerionUnresolved.length} tokens on Zerion...`);
     let zerionFound = 0;
     for (const token of zerionUnresolved) {
-      const zId = await getZerionId(token.contractAddress);
+      let zId: string | null;
+      try {
+        zId = await getZerionId(token.contractAddress);
+      } catch (e) {
+        if (!(e instanceof ZerionQuotaError)) throw e;
+        console.log("  Zerion budget spent; remaining tokens are checked on later runs");
+        break;
+      }
       await db.update(tokens)
         .set(zId
           ? { zerionId: zId, isPriced: true, zerionChecked: true }

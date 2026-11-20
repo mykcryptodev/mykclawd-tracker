@@ -1,7 +1,7 @@
 import { db } from "../../db/client";
 import { prices, tokens, syncState } from "../../db/schema";
 import { getDailyPrices } from "../coingecko";
-import { getZerionPriceHistory } from "../zerion";
+import { getZerionPriceHistory, ZerionQuotaError } from "../zerion";
 import { getCodexDailyPrices } from "../codex";
 import { eq, and, isNotNull } from "drizzle-orm";
 
@@ -101,6 +101,10 @@ export async function ingestPrices(): Promise<number> {
           added++;
         }
       } catch (e) {
+        if (e instanceof ZerionQuotaError) {
+          console.log(`  Zerion budget spent at ${zdone}/${zerionTokens.length}; rest refresh on later runs`);
+          break;
+        }
         console.warn(`  Zerion price fetch failed for ${token.symbol}: ${(e as Error).message}`);
       }
       await new Promise((r) => setTimeout(r, 200));
