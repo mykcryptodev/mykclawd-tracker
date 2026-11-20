@@ -346,14 +346,44 @@ export async function ingestNativeEthBackfill(address: string): Promise<number> 
     return added;
   }
 
-  const apiKey = process.env.BASESCAN_API_KEY ?? "";
+  // Etherscan-compatible txlist providers, tried in order. Basescan's v1 API is
+  // dead, and both of these need a paid plan for Base (chain 8453).
+  const providers = [
+    process.env.ETHERSCAN_API_KEY &&
+      { name: "Etherscan", base: `https://api.etherscan.io/v2/api?chainid=8453&apikey=${process.env.ETHERSCAN_API_KEY}` },
+    process.env.BLOCKSCOUT_API_KEY &&
+      { name: "Blockscout", base: `https://api.blockscout.com/v2/api?chain_id=8453&apikey=${process.env.BLOCKSCOUT_API_KEY}` },
+  ].filter((p): p is { name: string; base: string } => Boolean(p));
+  if (providers.length === 0) {
+    console.warn("  ETH backfill skipped, cursor not advanced: no ETHERSCAN_API_KEY or BLOCKSCOUT_API_KEY");
+    return 0;
+  }
+
+  for (const provider of providers) {
+    const added = await fetchNativeEthTxlist(provider, address, fromBlock, currentBlock);
+    if (added !== null) {
+      await markSynced();
+      return added;
+    }
+  }
+  return 0;
+}
+
+// Returns null when the provider gave no usable answer, so the caller can try
+// the next one without advancing the cursor.
+async function fetchNativeEthTxlist(
+  provider: { name: string; base: string },
+  address: string,
+  fromBlock: bigint,
+  currentBlock: bigint
+): Promise<number | null> {
   const addrLower = address.toLowerCase();
   let added = 0;
   let page = 1;
 
   // Fetch normal txs (direct ETH sends/receives) — paginated 10k at a time
   while (true) {
-    const url = `https://api.basescan.org/api?module=account&action=txlist&address=${address}&startblock=${Number(fromBlock)}&endblock=${Number(currentBlock)}&page=${page}&offset=10000&sort=asc&apikey=${apiKey}`;
+    const url = `${provider.base}&module=account&action=txlist&address=${address}&startblock=${Number(fromBlock)}&endblock=${Number(currentBlock)}&page=${page}&offset=10000&sort=asc`;
     const res = await fetch(url);
     const body = await res.text();
     let json: { status: string; result: BasescanTx[] | string };
@@ -362,16 +392,16 @@ export async function ingestNativeEthBackfill(address: string): Promise<number> 
     } catch {
       // Basescan's v1 API now serves an HTML page here. Don't fail the whole
       // sync over it; WETH withdrawals are still synthesized below.
-      console.warn(`  ETH backfill skipped, cursor not advanced: Basescan HTTP ${res.status} non-JSON response`);
-      return added;
+      console.warn(`  ETH backfill via ${provider.name} failed: HTTP ${res.status} non-JSON response`);
+      return page === 1 ? null : added;
     }
     if (json.status !== "1" || !Array.isArray(json.result)) {
       // "No transactions found" is a real empty result. Anything else (missing
       // key, deprecated endpoint) means we learned nothing, so keep the cursor
       // where it is instead of marking the range synced with no data.
       if (typeof json.result === "string" && !/no transactions found/i.test(json.result) && page === 1) {
-        console.warn(`  ETH backfill skipped, cursor not advanced: ${json.result.slice(0, 120)}`);
-        return added;
+        console.warn(`  ETH backfill via ${provider.name} failed: ${json.result.slice(0, 120)}`);
+        return null;
       }
       break;
     }
@@ -402,7 +432,6 @@ export async function ingestNativeEthBackfill(address: string): Promise<number> 
     await new Promise((r) => setTimeout(r, 250));
   }
 
-  await markSynced();
   return added;
 }
 
