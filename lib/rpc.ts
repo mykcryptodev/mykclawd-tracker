@@ -1,11 +1,15 @@
 import { createPublicClient, http, parseAbiItem, type Address } from "viem";
 import { base } from "viem/chains";
 
-// ThirdWeb RPC for fallback getLogs calls (1000 block range limit).
+// Coinbase CDP node when configured: its eth_getLogs takes 100k-block ranges.
+// Otherwise the BASE_RPC_URL provider, which caps getLogs at 1000 blocks.
 const BASE_RPC_URL =
+  process.env.CDP_RPC_URL ??
   process.env.BASE_RPC_URL ??
   process.env.THIRDWEB_RPC_URL ??
   "https://mainnet.base.org";
+
+export const GETLOGS_MAX_RANGE = process.env.CDP_RPC_URL ? 100_000n : 1_000n;
 
 export const publicClient = createPublicClient({
   chain: base,

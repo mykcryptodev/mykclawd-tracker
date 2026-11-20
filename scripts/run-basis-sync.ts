@@ -42,6 +42,16 @@ const TRACKED_ADDRESS =
       console.log(`Re-queued ${res.rowsAffected} tokens for a Zerion re-check`);
     }
 
+    // One-time: rescan native ETH from the start once the CDP address index is
+    // available. The old Basescan path marked ranges synced without data.
+    const ethRescanKey = "native_eth_rescan_cdp_2026_11_20";
+    const rescanned = await client.execute({ sql: "SELECT 1 FROM sync_state WHERE key = ?", args: [ethRescanKey] });
+    if (process.env.CDP_RPC_URL && rescanned.rows.length === 0) {
+      await client.execute({ sql: "DELETE FROM sync_state WHERE key = ?", args: [`last_native_eth_block_${TRACKED_ADDRESS.toLowerCase()}`] });
+      await client.execute({ sql: "INSERT INTO sync_state (key, value) VALUES (?, ?)", args: [ethRescanKey, new Date().toISOString()] });
+      console.log("Native ETH cursor reset for a full CDP rescan");
+    }
+
     // Leave room for steps 2-5 inside the job's timeout-minutes.
     const budgetMinutes = Number(process.env.INGEST_BUDGET_MINUTES || 20);
     const deadline = Date.now() + budgetMinutes * 60_000;

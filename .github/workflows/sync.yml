@@ -156,6 +156,7 @@ jobs:
         env:
           ZERION_API_KEY: ${{ secrets.ZERION_API_KEY }}
           CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
+          CDP_RPC_URL: ${{ secrets.CDP_RPC_URL }}
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
           BLOCKSCOUT_API_KEY: ${{ secrets.BLOCKSCOUT_API_KEY }}
           INGEST_BUDGET_MINUTES: ${{ inputs.ingest_minutes || '20' }}

@@ -1,11 +1,11 @@
 import { changedRows, db } from "../../db/client";
 import { transfers, syncState, tokens } from "../../db/schema";
-import { getTransferLogs, getWethEvents, getCurrentBlock, NATIVE_TOKEN_ADDRESS, WETH_ADDRESS } from "../rpc";
+import { getTransferLogs, getWethEvents, getCurrentBlock, GETLOGS_MAX_RANGE, NATIVE_TOKEN_ADDRESS, WETH_ADDRESS } from "../rpc";
 import { eq } from "drizzle-orm";
 import { CdpSqlError, cdpQuery, parseSqlTimestamp, sqlString } from "../cdp-sql";
 
 const SQL_LIMIT = 1000; // target limit per SQL query
-const RPC_CHUNK_BLOCKS = 1_000n; // ThirdWeb/Coinbase RPC max
+const RPC_CHUNK_BLOCKS = GETLOGS_MAX_RANGE;
 const SQL_FALLBACK_MIN = 50_000n; // below this, switch straight to RPC
 
 // CDP SQL has returned HTTP 500 for every range since ~Oct 2026. After the
@@ -317,6 +317,75 @@ export async function synthesizeEthFromWethWithdrawals(): Promise<number> {
   return added;
 }
 
+type CdpTrace = { error: string; type: string; from: string; to: string; value: string };
+type CdpAddressTx = {
+  hash: string;
+  blockHeight: string;
+  ethereum: { blockTimestamp: string; flattenedTraces?: CdpTrace[] };
+};
+
+// Native ETH moves from the CDP node's address index (cdp_listAddressTransactions).
+// Unlike a txlist it includes internal calls, e.g. ETH paid out by a router.
+// Pages newest-first (25 per page) and stops once it passes fromBlock.
+export async function fetchNativeEthCdp(address: string, fromBlock: bigint): Promise<RawTransfer[]> {
+  const addr = address.toLowerCase();
+  const out: RawTransfer[] = [];
+  let pageToken: string | undefined;
+  let pages = 0;
+  while (true) {
+    const res = await fetch(process.env.CDP_RPC_URL!, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "cdp_listAddressTransactions",
+        params: [{ address: addr, limit: 25, ...(pageToken ? { pageToken } : {}) }],
+      }),
+    });
+    const json = (await res.json()) as {
+      result?: { addressTransactions: CdpAddressTx[]; nextPageToken?: string };
+      error?: { message: string };
+    };
+    if (!json.result) throw new Error(`cdp_listAddressTransactions failed: ${json.error?.message ?? res.status}`);
+    pages++;
+
+    let passedFrom = false;
+    for (const tx of json.result.addressTransactions) {
+      if (BigInt(tx.blockHeight) < fromBlock) {
+        passedFrom = true;
+        continue;
+      }
+      (tx.ethereum.flattenedTraces ?? []).forEach((tr, i) => {
+        const from = tr.from.toLowerCase();
+        const to = tr.to.toLowerCase();
+        if (tr.error || BigInt(tr.value || "0") === 0n || (from !== addr && to !== addr)) return;
+        // WETH unwraps are already synthesized from Withdrawal events.
+        if (from === WETH_ADDRESS) return;
+        const direction: "in" | "out" = to === addr ? "in" : "out";
+        out.push({
+          txHash: tx.hash,
+          // -1 matches the old txlist rows for the top-level call; internal
+          // calls get their own range so they never collide with WETH synth rows.
+          logIndex: i === 0 ? -1 : -(10_000 + i),
+          blockNumber: Number(tx.blockHeight),
+          blockTimestamp: Math.floor(new Date(tx.ethereum.blockTimestamp).getTime() / 1000),
+          tokenAddress: NATIVE_TOKEN_ADDRESS,
+          direction,
+          rawAmount: tr.value,
+          counterparty: direction === "in" ? from : to,
+        });
+      });
+    }
+
+    pageToken = json.result.nextPageToken;
+    if (passedFrom || !pageToken) break;
+    if (pages % 100 === 0) console.log(`  ETH backfill (CDP) ${pages} pages | ${out.length} ETH moves`);
+  }
+  console.log(`  ETH backfill (CDP): ${pages} pages, ${out.length} ETH moves`);
+  return out;
+}
+
 export async function ingestNativeEthBackfill(address: string): Promise<number> {
   const syncKey = getNativeEthSyncKey(address);
   const stateRow = await db
@@ -337,6 +406,18 @@ export async function ingestNativeEthBackfill(address: string): Promise<number> 
         set: { value: currentBlock.toString() },
       })
       .run();
+  }
+
+  if (process.env.CDP_RPC_URL) {
+    try {
+      const cdpRows = await fetchNativeEthCdp(address, fromBlock);
+      const added = await upsertTransfers(cdpRows);
+      await markSynced();
+      return added;
+    } catch (e) {
+      console.warn(`  ETH backfill (CDP) failed, cursor not advanced: ${(e as Error).message}`);
+      return 0;
+    }
   }
 
   const sqlRows = await fetchNativeEthSqlAdaptive(address, fromBlock, currentBlock);
