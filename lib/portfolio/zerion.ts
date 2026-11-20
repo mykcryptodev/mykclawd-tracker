@@ -67,7 +67,10 @@ async function zerionFetch<T>(pathOrUrl: string): Promise<T> {
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      throw new Error(`Zerion ${pathOrUrl} -> ${res.status}: ${text.slice(0, 200)}`);
+      // Rate-limit headers say whether a 429 is a burst limit or a spent quota.
+      const limits = [...res.headers].filter(([k]) => /ratelimit|retry-after/i.test(k))
+        .map(([k, v]) => `${k}=${v}`).join(" ");
+      throw new Error(`Zerion ${pathOrUrl} -> ${res.status}${limits ? ` [${limits}]` : ""}: ${text.slice(0, 200)}`);
     }
     return res.json() as Promise<T>;
   }
