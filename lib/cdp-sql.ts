@@ -47,6 +47,10 @@ export async function cdpQuery(sql: string, attempt = 1): Promise<Record<string,
   }
 
   const text = await res.text();
+  if ((res.status === 429 || res.status >= 500) && attempt < 4) {
+    await sleep(2_000 * attempt);
+    return cdpQuery(sql, attempt + 1);
+  }
   let json: { result?: Record<string, unknown>[]; errorMessage?: string };
   try {
     json = JSON.parse(text) as { result?: Record<string, unknown>[]; errorMessage?: string };
@@ -54,7 +58,7 @@ export async function cdpQuery(sql: string, attempt = 1): Promise<Record<string,
     throw new CdpSqlError(`CDP HTTP ${res.status}: ${text.slice(0, 120)}`);
   }
 
-  if (!res.ok) throw new CdpSqlError(json.errorMessage ?? `CDP HTTP ${res.status}`);
+  if (!res.ok) throw new CdpSqlError(`CDP HTTP ${res.status}: ${json.errorMessage ?? text.slice(0, 120)}`);
   if (json.errorMessage) throw new CdpSqlError(json.errorMessage);
   return json.result ?? [];
 }

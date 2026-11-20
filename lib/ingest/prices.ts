@@ -74,9 +74,18 @@ export async function ingestPrices(): Promise<number> {
 
   if (zerionTokens.length > 0) {
     console.log(`  Fetching prices from Zerion for ${zerionTokens.length} tokens...`);
+    const today = toDateString(Date.now());
     let zdone = 0;
     for (const token of zerionTokens) {
       zdone++;
+      // Daily prices only: once a token has today's row, skip it until tomorrow.
+      // Without this, 400+ Zerion calls every 6h throttled the portfolio sync.
+      const fresh = await db
+        .select()
+        .from(prices)
+        .where(and(eq(prices.tokenAddress, token.contractAddress), eq(prices.date, today)))
+        .get();
+      if (fresh) continue;
       console.log(`  Zerion prices ${zdone}/${zerionTokens.length} | ${token.symbol || token.contractAddress.slice(0, 10)}`);
       try {
         const points = await getZerionPriceHistory(token.zerionId!);

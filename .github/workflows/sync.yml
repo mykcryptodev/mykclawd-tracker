@@ -10,6 +10,10 @@ on:
         description: 'Comma-separated list of jobs to run (portfolio, basis, yankees, all). Defaults to all.'
         required: false
         default: 'all'
+      ingest_minutes:
+        description: 'Minutes the cost basis job may spend ingesting transfers before stopping (use ~300 to clear a backlog in one run).'
+        required: false
+        default: '20'
 
 # Shared env injected into every job
 env:
@@ -126,7 +130,9 @@ jobs:
     if: ${{ github.event_name == 'schedule' || inputs.jobs == 'all' || contains(inputs.jobs, 'basis') }}
     needs: [install, sync-portfolio]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Scheduled runs ingest for 20 min. Manual runs get the 6h runner max so a
+    # long ingest_minutes catch-up can finish.
+    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && 350 || 30 }}
     steps:
       - uses: actions/checkout@v4
 
@@ -150,4 +156,5 @@ jobs:
         env:
           ZERION_API_KEY: ${{ secrets.ZERION_API_KEY }}
           CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
+          INGEST_BUDGET_MINUTES: ${{ inputs.ingest_minutes || '20' }}
         run: pnpm tsx scripts/run-basis-sync.ts
