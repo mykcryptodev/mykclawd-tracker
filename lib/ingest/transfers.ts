@@ -355,7 +355,16 @@ export async function ingestNativeEthBackfill(address: string): Promise<number> 
   while (true) {
     const url = `https://api.basescan.org/api?module=account&action=txlist&address=${address}&startblock=${Number(fromBlock)}&endblock=${Number(currentBlock)}&page=${page}&offset=10000&sort=asc&apikey=${apiKey}`;
     const res = await fetch(url);
-    const json = (await res.json()) as { status: string; result: BasescanTx[] | string };
+    const body = await res.text();
+    let json: { status: string; result: BasescanTx[] | string };
+    try {
+      json = JSON.parse(body) as { status: string; result: BasescanTx[] | string };
+    } catch {
+      // Basescan's v1 API now serves an HTML page here. Don't fail the whole
+      // sync over it; WETH withdrawals are still synthesized below.
+      console.warn(`  ETH backfill skipped, cursor not advanced: Basescan HTTP ${res.status} non-JSON response`);
+      return added;
+    }
     if (json.status !== "1" || !Array.isArray(json.result)) {
       // "No transactions found" is a real empty result. Anything else (missing
       // key, deprecated endpoint) means we learned nothing, so keep the cursor
